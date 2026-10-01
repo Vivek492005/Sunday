@@ -3,23 +3,30 @@ import { MockChatProvider } from '@sunday/gateway';
 import type { ChatChunk, ChatRequest } from '@sunday/gateway';
 import { createDefaultRegistry } from '@sunday/tools';
 import type { ChatEvent } from '@sunday/protocol';
-import { AgentLoop, SessionStore, newTurnId } from '@sunday/sundayd';
-import { Router, ProviderRegistry } from '@sunday/gateway';
-import { OrchestrationError } from './errors.js';
-import type { OrchestratorHost, SubAgentRunOptions } from './host.js';
-import { registerOrchestrationMethods } from './host.js';
-import { createOrchestrationHandlers } from './handlers.js';
-import { planGoal, estimateTotalBudget } from './planner.js';
-import { runOrchestration } from './runner.js';
-import { globsOverlap, findOverlaps, checkUnitsOverlap } from './overlap.js';
-import { validatePlanUnits } from './planner.js';
+import { AgentLoop, SessionStore, newTurnId } from './index.js';
 import {
+  OrchestrationError,
+  registerOrchestrationMethods,
+  createOrchestrationHandlers,
+  planGoal,
+  estimateTotalBudget,
+  runOrchestration,
+  globsOverlap,
+  findOverlaps,
+  checkUnitsOverlap,
+  validatePlanUnits,
   ORCHESTRATOR_TOOL_NAMES,
   VERIFIER_TOOL_NAMES,
   scopedToolDefinitions,
   scopedRegistry,
-} from './toolscope.js';
-import type { OrchestrationEvent, PlannedUnit } from './schemas.js';
+} from '@sunday/orchestrator';
+import type {
+  OrchestratorHost,
+  SubAgentRunOptions,
+  OrchestrationEvent,
+  PlannedUnit,
+} from '@sunday/orchestrator';
+import { Router, ProviderRegistry } from '@sunday/gateway';
 
 /* ------------------------------------------------------------------ */
 /* Fakes: a fake gateway (no network, no keys), a fake daemon dispatch for the
