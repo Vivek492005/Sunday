@@ -1,4 +1,5 @@
 import type { ContentPart, ToolCall, ToolDefinition, Usage } from '@sunday/protocol';
+import type { SchedulerPriority } from './multi-scheduler.js';
 
 /** Gateway types (§10). The gateway speaks to hosted providers through
  *  OpenAI-compatible adapters and streams normalized chunks to sundayd. */
@@ -20,6 +21,25 @@ export interface ChatRequest {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  /**
+   * Parallel-agents scheduling context. When set AND the Router was built
+   * with a `MultiAgentScheduler`, this request's quota slot is fair-queued
+   * through the scheduler (priority + round-robin across agents) instead of
+   * the plain per-provider limiter. When unset, routing behaves exactly as
+   * before — single-agent flows are untouched.
+   */
+  agent?: AgentRequestContext;
+}
+
+/**
+ * Identifies which agent (run unit) a model request belongs to, for fair
+ * quota scheduling across parallel agents.
+ */
+export interface AgentRequestContext {
+  /** Agent / run-unit id (e.g. the orchestration unit id). */
+  id: string;
+  /** Priority class; defaults to P1 (agent step). */
+  priority?: SchedulerPriority;
 }
 
 export type ChatChunk =

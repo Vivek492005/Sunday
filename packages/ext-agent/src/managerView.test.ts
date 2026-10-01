@@ -23,8 +23,10 @@ const flush = () => new Promise((r) => setTimeout(r, 20));
 
 function makeBridge() {
   const listeners = new Set<(n: any) => void>();
+  const orchestrateListeners = new Set<(n: any) => void>();
   return {
     listeners,
+    orchestrateListeners,
     sessionList: vi.fn(async () => ({
       sessions: [{ id: 'sess-1', title: 'T1', cwd: '/fake/cwd', updatedAt: '2026-10-01T00:00:00Z' }],
     })),
@@ -44,6 +46,12 @@ function makeBridge() {
       listeners.add(l);
       return () => {
         listeners.delete(l);
+      };
+    }),
+    onOrchestrateEvent: vi.fn((l: (n: any) => void) => {
+      orchestrateListeners.add(l);
+      return () => {
+        orchestrateListeners.delete(l);
       };
     }),
   };

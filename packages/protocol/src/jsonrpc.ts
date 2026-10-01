@@ -64,6 +64,7 @@ export const ErrorCode = {
   ModelUnavailable: -32002, // provider/model down or key missing
   SessionNotFound: -32003,
   TurnCancelled: -32004,
+  RunNotFound: -32005, // Parallel Agents phase: orchestrate/status|merge|resolveConflict on an unknown runId
   ProtocolMismatch: -32010, // sunday/hello version negotiation failed
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

@@ -416,7 +416,7 @@ describe('runOrchestration (sequential v1)', () => {
 /* ------------------------------------------------------------------ */
 
 describe('registerOrchestrationMethods', () => {
-  it('registers orchestrate/plan and orchestrate/run on the daemon', async () => {
+  it('registers the full orchestrate/* method table on the daemon', async () => {
     const { host } = makeHost([
       textDone(JSON.stringify({ units: [{ id: 'a', title: 'A', owns_paths: ['x/**'], acceptance: ['y'], budget: 5 }] })),
     ]);
@@ -427,7 +427,14 @@ describe('registerOrchestrationMethods', () => {
       },
       getOrchestratorHost: () => host,
     });
-    expect([...registered.keys()].sort()).toEqual(['orchestrate/plan', 'orchestrate/run']);
+    expect([...registered.keys()].sort()).toEqual([
+      'orchestrate/merge',
+      'orchestrate/plan',
+      'orchestrate/resolveConflict',
+      'orchestrate/run',
+      'orchestrate/status',
+      'orchestrate/stop',
+    ]);
 
     const plan = (await registered.get('orchestrate/plan')!({
       goal: 'g',

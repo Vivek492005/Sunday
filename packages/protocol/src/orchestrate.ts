@@ -57,15 +57,22 @@ export const runParamsSchema = planParamsSchema.extend({
   /** Skip planning when the caller already has an approved plan. The overlap
    *  check is re-run on supplied plans — a hand-made plan is not trusted. */
   plan: planDraftSchema.optional(),
+  /** Parallel agents (ADR-17): run units concurrently in separate worktrees.
+   *  Default false — sequential until the parallel benchmark passes. */
+  parallel: z.boolean().optional(),
+  /** Max concurrent units when parallel is true. */
+  maxParallel: z.number().int().min(1).max(MAX_PLAN_UNITS).optional(),
 });
 export type RunParams = z.infer<typeof runParamsSchema>;
 
 export const orchestrationPhaseSchema = z.enum([
   'planned',
+  'queued',
   'started',
   'verifying',
   'merged',
   'failed',
+  'conflicted',
 ]);
 export type OrchestrationPhase = z.infer<typeof orchestrationPhaseSchema>;
 
@@ -79,7 +86,8 @@ export type OrchestrationEvent = z.infer<typeof orchestrationEventSchema>;
 
 export const unitResultSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(['merged', 'failed']),
+  /** 'cancelled' is parallel-mode only: the unit never ran to a verdict. */
+  status: z.enum(['merged', 'failed', 'cancelled']),
   /** HEAD sha recorded by `worktree/merge` (present on merged units). */
   sha: z.string().optional(),
 });
@@ -92,11 +100,107 @@ export const runResultSchema = z.object({
 });
 export type OrchestrationRunResult = z.infer<typeof runResultSchema>;
 
+/* ---- Parallel agents: run registry state, merge conflicts (shared contract) ---- */
+
+export const unitRunStatusSchema = z.enum([
+  'queued',
+  'running',
+  'verifying',
+  'done',
+  'failed',
+  'cancelled',
+]);
+export type UnitRunStatus = z.infer<typeof unitRunStatusSchema>;
+
+export const runStatusSchema = z.enum([
+  'running',
+  'conflicted',
+  'done',
+  'failed',
+  'cancelled',
+  'interrupted',
+]);
+export type RunStatus = z.infer<typeof runStatusSchema>;
+
+export const unitRunStateSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  status: unitRunStatusSchema,
+  worktreePath: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  steps: z.number().int().nonnegative().optional(),
+  sha: z.string().optional(),
+  error: z.string().optional(),
+});
+export type UnitRunState = z.infer<typeof unitRunStateSchema>;
+
+export const conflictHunkSchema = z.object({
+  file: z.string().min(1),
+  unitA: z.string().min(1),
+  unitB: z.string().min(1),
+  rangeA: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+  rangeB: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+});
+export type ConflictHunk = z.infer<typeof conflictHunkSchema>;
+
+export const mergeConflictSchema = z.object({
+  index: z.number().int().nonnegative(),
+  file: z.string().min(1),
+  hunks: z.array(conflictHunkSchema),
+});
+export type MergeConflict = z.infer<typeof mergeConflictSchema>;
+
+export const conflictResolutionSchema = z.object({
+  conflictIndex: z.number().int().nonnegative(),
+  keepUnitId: z.string().min(1),
+});
+export type ConflictResolution = z.infer<typeof conflictResolutionSchema>;
+
+export const orchestrationRunStateSchema = z.object({
+  runId: z.string().min(1),
+  goal: z.string().min(1),
+  parallel: z.boolean(),
+  status: runStatusSchema,
+  units: z.array(unitRunStateSchema),
+  conflicts: z.array(mergeConflictSchema),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+});
+export type OrchestrationRunState = z.infer<typeof orchestrationRunStateSchema>;
+
+export const orchestrateStopParamsSchema = z.object({ runId: z.string().min(1) });
+export type OrchestrateStopParams = z.infer<typeof orchestrateStopParamsSchema>;
+
+export const orchestrateStopResultSchema = z.object({ stopped: z.boolean() });
+export type OrchestrateStopResult = z.infer<typeof orchestrateStopResultSchema>;
+
+export const orchestrateStatusParamsSchema = z.object({ runId: z.string().min(1) });
+export type OrchestrateStatusParams = z.infer<typeof orchestrateStatusParamsSchema>;
+
+export const orchestrateMergeResultSchema = z.object({
+  conflicts: z.array(mergeConflictSchema),
+  merged: z.array(z.string().min(1)),
+});
+export type OrchestrateMergeResult = z.infer<typeof orchestrateMergeResultSchema>;
+
+export const orchestrateResolveConflictParamsSchema = z.object({
+  runId: z.string().min(1),
+  resolutions: z.array(conflictResolutionSchema).min(1),
+});
+export type OrchestrateResolveConflictParams = z.infer<typeof orchestrateResolveConflictParamsSchema>;
+
 /** Method registry for `orchestrate/*` — same shape as the other `*_METHODS`
  *  tables so the daemon validates params/results uniformly. */
 export const ORCHESTRATE_METHODS = {
   'orchestrate/plan': { params: planParamsSchema, result: planResultSchema },
   'orchestrate/run': { params: runParamsSchema, result: runResultSchema },
+  'orchestrate/stop': { params: orchestrateStopParamsSchema, result: orchestrateStopResultSchema },
+  'orchestrate/status': { params: orchestrateStatusParamsSchema, result: orchestrationRunStateSchema },
+  'orchestrate/merge': { params: orchestrateStatusParamsSchema, result: orchestrateMergeResultSchema },
+  'orchestrate/resolveConflict': {
+    params: orchestrateResolveConflictParamsSchema,
+    result: orchestrateMergeResultSchema,
+  },
 } as const;
 export type OrchestrateMethodName = keyof typeof ORCHESTRATE_METHODS;
 

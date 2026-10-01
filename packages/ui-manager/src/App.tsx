@@ -3,23 +3,32 @@ import {
   addWorktree,
   applyManagerError,
   applyManagerState,
+  applyOrchestrationState,
+  activeOrchestrationRun,
   clearError,
   createCheckpoint,
   createInitialState,
   mergeWorktree,
+  openConflictDiff,
   removeWorktree,
   requestRefresh,
+  resolveConflict,
   restoreCheckpoint,
   setRefreshing,
   shortSha,
+  stopAllOrchestration,
   stopTurn,
   type InboundMessage,
   type ManagerState,
+  type MergeConflictView,
+  type OrchestrationRunView,
+  type UnitRunView,
 } from './managerClient.js';
 import { postToExtension } from './vscode.js';
 
 type Action =
   | { kind: 'state'; snap: Extract<InboundMessage, { type: 'sunday/manager/state' }> }
+  | { kind: 'orchestration'; runs: OrchestrationRunView[] }
   | { kind: 'error'; message: string }
   | { kind: 'refreshing' }
   | { kind: 'clear-error' };
@@ -28,6 +37,8 @@ function reducer(state: ManagerState, action: Action): ManagerState {
   switch (action.kind) {
     case 'state':
       return applyManagerState(state, action.snap);
+    case 'orchestration':
+      return applyOrchestrationState(state, action.runs);
     case 'error':
       return applyManagerError(state, action.message);
     case 'refreshing':
@@ -55,6 +66,7 @@ export function App(): JSX.Element {
       const m = e.data as InboundMessage | undefined;
       if (!m || typeof m.type !== 'string') return;
       if (m.type === 'sunday/manager/state') dispatch({ kind: 'state', snap: m });
+      else if (m.type === 'sunday/manager/orchestration') dispatch({ kind: 'orchestration', runs: m.runs });
       else if (m.type === 'sunday/manager/error') dispatch({ kind: 'error', message: m.message });
     };
     window.addEventListener('message', onMessage);
@@ -71,13 +83,29 @@ export function App(): JSX.Element {
     requestRefresh(host);
   };
 
+  const activeRun = activeOrchestrationRun(state);
+
   return (
     <div className="mgr-root">
       <header className="mgr-header">
         <span className="mgr-title">Sunday Manager</span>
-        <button className="mgr-btn" onClick={refresh} disabled={state.refreshing}>
-          {state.refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="mgr-row">
+          <button
+            className="mgr-btn mgr-btn-danger"
+            onClick={() => stopAllOrchestration(host)}
+            disabled={!activeRun}
+            title={
+              activeRun
+                ? `Stop all units of orchestration run ${activeRun.runId}`
+                : 'No active orchestration run'
+            }
+          >
+            Stop all
+          </button>
+          <button className="mgr-btn" onClick={refresh} disabled={state.refreshing}>
+            {state.refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </header>
       {(state.workspaceRoot || state.repoRoot) && (
         <div className="mgr-roots">
@@ -93,6 +121,18 @@ export function App(): JSX.Element {
           </button>
         </div>
       )}
+
+      <section className="mgr-section">
+        <h2>Orchestration ({state.orchestration.length})</h2>
+        {state.orchestration.length === 0 && (
+          <div className="mgr-empty">
+            No orchestration runs yet. Run "Sunday: Run Orchestration…" from the command palette.
+          </div>
+        )}
+        {state.orchestration.map((run) => (
+          <OrchestrationRunCard key={run.runId} run={run} />
+        ))}
+      </section>
 
       <section className="mgr-section">
         <h2>Agents ({state.agents.length})</h2>
@@ -226,6 +266,161 @@ export function App(): JSX.Element {
           </div>
         ))}
       </section>
+    </div>
+  );
+}
+
+// -- orchestration run cards (parallel agents) ----------------------------------
+
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'running':
+    case 'verifying':
+      return 'mgr-badge mgr-badge-running';
+    case 'done':
+    case 'merged':
+      return 'mgr-badge mgr-badge-done';
+    case 'failed':
+    case 'conflicted':
+      return 'mgr-badge mgr-badge-failed';
+    case 'cancelled':
+      return 'mgr-badge mgr-badge-cancelled';
+    default:
+      return 'mgr-badge';
+  }
+}
+
+function fmtRange(range: [number, number]): string {
+  return `L${range[0]}–${range[1]}`;
+}
+
+function UnitCard({
+  runId,
+  unit,
+  expanded,
+  onToggle,
+}: {
+  runId: string;
+  unit: UnitRunView;
+  expanded: boolean;
+  onToggle: () => void;
+}): JSX.Element {
+  return (
+    <div className="mgr-unit-card" onClick={onToggle} role="button" tabIndex={0}>
+      <div className="mgr-card-head">
+        <span className="mgr-card-title">{unit.title || unit.id}</span>
+        <span className={statusBadgeClass(unit.status)}>{unit.status}</span>
+      </div>
+      <div className="mgr-meta">
+        {unit.worktreePath && <span>{unit.worktreePath}</span>}
+        {unit.model && <span> · {unit.model}</span>}
+        {unit.steps !== undefined && (
+          <span>
+            {' '}
+            · {unit.steps} step{unit.steps === 1 ? '' : 's'}
+          </span>
+        )}
+        {unit.sha && (
+          <span className="mgr-sha" title={unit.sha}>
+            {' '}
+            · {shortSha(unit.sha)}
+          </span>
+        )}
+      </div>
+      {unit.error && <div className="mgr-unit-error">{unit.error}</div>}
+      {expanded && (
+        <pre className="mgr-unit-log" onClick={(e) => e.stopPropagation()}>
+          {unit.log.length > 0 ? unit.log.join('\n') : '(no log lines yet)'}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function ConflictCard({
+  runId,
+  conflict,
+}: {
+  runId: string;
+  conflict: MergeConflictView;
+}): JSX.Element {
+  const first = conflict.hunks[0];
+  const unitA = first?.unitA ?? '';
+  const unitB = first?.unitB ?? '';
+  return (
+    <div className="mgr-conflict">
+      <div className="mgr-card-head">
+        <span className="mgr-card-title mgr-mono">{conflict.file}</span>
+        <span className="mgr-badge mgr-badge-failed">conflict #{conflict.index}</span>
+      </div>
+      {conflict.hunks.map((h, i) => (
+        <div key={i} className="mgr-meta mgr-mono">
+          {h.file}: {fmtRange(h.rangeA)} ({h.unitA}) vs {fmtRange(h.rangeB)} ({h.unitB})
+        </div>
+      ))}
+      <div className="mgr-row">
+        <button
+          className="mgr-btn mgr-btn-sm"
+          disabled={!unitA}
+          onClick={() => resolveConflict(host, runId, conflict.index, unitA)}
+        >
+          Keep {unitA || '…'}
+        </button>
+        <button
+          className="mgr-btn mgr-btn-sm"
+          disabled={!unitB}
+          onClick={() => resolveConflict(host, runId, conflict.index, unitB)}
+        >
+          Keep {unitB || '…'}
+        </button>
+        <button
+          className="mgr-btn mgr-btn-sm"
+          onClick={() => openConflictDiff(host, runId, conflict.index)}
+        >
+          Open diff
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OrchestrationRunCard({ run }: { run: OrchestrationRunView }): JSX.Element {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (unitId: string): void =>
+    setExpanded((prev) => ({ ...prev, [unitId]: !prev[unitId] }));
+  return (
+    <div className="mgr-card">
+      <div className="mgr-card-head">
+        <span className="mgr-card-title">{run.goal || run.runId}</span>
+        <span className={statusBadgeClass(run.status)}>{run.status}</span>
+      </div>
+      <div className="mgr-meta">
+        <span className="mgr-mono">{run.runId}</span>
+        {run.parallel && <span> · parallel</span>}
+        {!run.parallel && <span> · sequential</span>}
+        <span> · updated {fmtTime(run.updatedAt)}</span>
+      </div>
+      <div className="mgr-units">
+        {run.units.map((u) => (
+          <UnitCard
+            key={u.id}
+            runId={run.runId}
+            unit={u}
+            expanded={!!expanded[u.id]}
+            onToggle={() => toggle(u.id)}
+          />
+        ))}
+      </div>
+      {run.status === 'conflicted' && (
+        <div className="mgr-conflicts">
+          <div className="mgr-conflicts-title">
+            Merge conflicts ({run.conflicts.length}) — pick a side per conflict:
+          </div>
+          {run.conflicts.map((c) => (
+            <ConflictCard key={c.index} runId={run.runId} conflict={c} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -10,9 +10,77 @@ import * as fs from 'node:fs';
 import * as crypto from 'node:crypto';
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
-import type { ChatEventNotification } from '@sunday/protocol';
+import type {
+  ChatEventNotification,
+  MergeConflict,
+  OrchestrationEvent,
+  OrchestrationPhase,
+  OrchestrationRunState,
+  RunStatus,
+  UnitRunStatus,
+} from '@sunday/protocol';
 
 export const MANAGER_VIEW_TYPE = 'sunday.managerView';
+
+/** Webview → extension: resolve one merge conflict in favour of a unit. */
+export const ORCHESTRATION_RESOLVE_MESSAGE = 'sunday/orchestration/resolve';
+/** Webview → extension: open a vscode.diff for a conflict's two worktree files. */
+export const ORCHESTRATION_OPEN_DIFF_MESSAGE = 'sunday/orchestration/openDiff';
+/** Webview → extension: stop the active orchestration run (confirmed). */
+export const ORCHESTRATION_STOP_ALL_MESSAGE = 'sunday/orchestration/stopAll';
+/** Extension → webview: orchestration runs snapshot. */
+export const ORCHESTRATION_STATE_MESSAGE = 'sunday/manager/orchestration';
+
+/** Cap on log lines kept per unit (accumulated from orchestrate/event details). */
+export const MAX_UNIT_LOG_LINES = 100;
+
+/** One unit of an orchestration run, as shown in the manager webview. */
+export interface UnitRunView {
+  id: string;
+  title: string;
+  status: UnitRunStatus;
+  worktreePath?: string;
+  model?: string;
+  steps?: number;
+  sha?: string;
+  error?: string;
+  /** Recent log lines accumulated from orchestrate/event details (newest last). */
+  log: string[];
+}
+
+/** One orchestration run, as shown in the manager webview. */
+export interface OrchestrationRunView {
+  runId: string;
+  goal: string;
+  parallel: boolean;
+  status: RunStatus;
+  units: UnitRunView[];
+  conflicts: MergeConflict[];
+  updatedAt: string;
+}
+
+/** Map an orchestrate/event phase onto a unit status. Run-level phases
+ *  ('planned' with no unit, 'conflicted') return undefined. */
+export function eventPhaseToUnitStatus(phase: OrchestrationPhase): UnitRunStatus | undefined {
+  switch (phase) {
+    case 'queued':
+    case 'planned':
+      return 'queued';
+    case 'started':
+      return 'running';
+    case 'verifying':
+      return 'verifying';
+    case 'merged':
+      return 'done';
+    case 'failed':
+      return 'failed';
+    case 'conflicted':
+      return undefined;
+  }
+}
+
+const TERMINAL_UNIT_STATUSES: readonly UnitRunStatus[] = ['done', 'failed', 'cancelled'];
+const TERMINAL_RUN_STATUSES: readonly RunStatus[] = ['done', 'failed', 'cancelled', 'interrupted'];
 
 export interface ManagerViewDeps {
   /** context.extensionPath of the sunday-agent extension. */
@@ -56,9 +124,14 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
 
   private view: vscode.WebviewView | undefined;
   private detachBridge: (() => void) | undefined;
+  private detachOrchestrate: (() => void) | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   /** sessionId → turnId for turns currently streaming (from chat events). */
   private readonly activeTurns = new Map<string, string>();
+  /** runId → latest known run view (from orchestrate/event + orchestrate/status). */
+  private readonly runs = new Map<string, OrchestrationRunView>();
+  /** Serializes orchestrate/event handling so before/after snapshots stay consistent. */
+  private orchestrateQueue: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: ManagerViewDeps) {}
 
@@ -98,9 +171,18 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
   private attachBridge(): void {
     this.detachBridge?.();
     this.detachBridge = undefined;
+    this.detachOrchestrate?.();
+    this.detachOrchestrate = undefined;
     const bridge = this.deps.getBridge();
     if (!bridge) return;
     this.detachBridge = bridge.onChatEvent((n) => this.trackTurn(n));
+    // Serialize: events must be applied in arrival order for the
+    // before/after transition diffing in handleOrchestrateEvent.
+    this.detachOrchestrate = bridge.onOrchestrateEvent((n) => {
+      this.orchestrateQueue = this.orchestrateQueue
+        .then(() => this.handleOrchestrateEvent(n))
+        .catch(() => undefined);
+    });
   }
 
   /** Track per-session active turns from daemon chat events. */
@@ -110,6 +192,224 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
     } else {
       this.activeTurns.set(n.sessionId, n.turnId);
     }
+  }
+
+  // -- orchestration (parallel agents) -----------------------------------------
+
+  /**
+   * Run id of the latest run that is still actionable (running/conflicted),
+   * or undefined when nothing is active. Used by "Stop all".
+   */
+  getActiveRunId(): string | undefined {
+    let active: string | undefined;
+    for (const [runId, run] of this.runs) {
+      if (run.status === 'running' || run.status === 'conflicted') active = runId;
+    }
+    return active;
+  }
+
+  /** Live updates for the orchestration section: refresh from
+   *  orchestrate/status on every event, falling back to a local projection
+   *  from the event stream when the daemon does not implement it. */
+  private async handleOrchestrateEvent(n: OrchestrationEvent): Promise<void> {
+    // Snapshot: the fallback path mutates the stored view in place, so the
+    // transition diff needs a deep copy of the pre-event state.
+    const before = this.runs.get(n.runId);
+    const beforeSnap = before ? structuredClone(before) : undefined;
+    let state: OrchestrationRunState | undefined;
+    try {
+      const bridge = await this.deps.ensureBridge();
+      state = await bridge.orchestrateStatus(n.runId);
+    } catch (err) {
+      this.deps.log(`manager view: orchestrate/status failed: ${(err as Error).message}`);
+    }
+    if (state) this.setRunFromState(state, n);
+    else this.applyEventFallback(n);
+    this.notifyRunChanges(beforeSnap, this.runs.get(n.runId));
+    this.postOrchestration();
+  }
+
+  /** Merge an authoritative run state with event detail lines (unit logs). */
+  private setRunFromState(state: OrchestrationRunState, event?: OrchestrationEvent): void {
+    const prev = this.runs.get(state.runId);
+    const units: UnitRunView[] = state.units.map((u) => {
+      const prevUnit = prev?.units.find((p) => p.id === u.id);
+      let log = prevUnit?.log ?? [];
+      if (event && event.unitId === u.id && event.detail && event.phase !== 'conflicted') {
+        const lines = event.detail.split('\n').map((l) => l.trim()).filter(Boolean);
+        log = [...log, ...lines].slice(-MAX_UNIT_LOG_LINES);
+      }
+      return { ...u, log };
+    });
+    this.runs.set(state.runId, {
+      runId: state.runId,
+      goal: state.goal,
+      parallel: state.parallel,
+      status: state.status,
+      units,
+      conflicts: state.conflicts,
+      updatedAt: state.updatedAt,
+    });
+  }
+
+  /** Best-effort local projection when orchestrate/status is unavailable. */
+  private applyEventFallback(n: OrchestrationEvent): void {
+    let view = this.runs.get(n.runId);
+    if (!view) {
+      view = {
+        runId: n.runId,
+        goal: '',
+        parallel: false,
+        status: 'running',
+        units: [],
+        conflicts: [],
+        updatedAt: new Date().toISOString(),
+      };
+      this.runs.set(n.runId, view);
+    }
+    if (n.phase === 'conflicted') {
+      view.status = 'conflicted';
+      try {
+        const parsed: unknown = JSON.parse(n.detail ?? 'null');
+        if (Array.isArray(parsed)) view.conflicts = parsed as MergeConflict[];
+      } catch {
+        /* detail is informational only — ignore unparseable JSON */
+      }
+    } else if (n.unitId) {
+      let unit = view.units.find((u) => u.id === n.unitId);
+      if (!unit) {
+        unit = { id: n.unitId, title: n.unitId, status: 'queued', log: [] };
+        view.units.push(unit);
+      }
+      const mapped = eventPhaseToUnitStatus(n.phase);
+      if (mapped) unit.status = mapped;
+      if (n.detail) {
+        const lines = n.detail.split('\n').map((l) => l.trim()).filter(Boolean);
+        unit.log = [...unit.log, ...lines].slice(-MAX_UNIT_LOG_LINES);
+      }
+      if (view.status !== 'conflicted' && view.units.length > 0) {
+        const allTerminal = view.units.every((u) => TERMINAL_UNIT_STATUSES.includes(u.status));
+        view.status = allTerminal
+          ? view.units.every((u) => u.status === 'done')
+            ? 'done'
+            : 'failed'
+          : 'running';
+      }
+    }
+    view.updatedAt = new Date().toISOString();
+  }
+
+  /** Toasts on unit/run transitions. Only fires on actual transitions —
+   *  subscribing mid-run never replays history as notifications. */
+  private notifyRunChanges(
+    before: OrchestrationRunView | undefined,
+    after: OrchestrationRunView | undefined,
+  ): void {
+    if (!before || !after) return;
+    for (const unit of after.units) {
+      const prev = before.units.find((u) => u.id === unit.id);
+      if (!prev || prev.status === unit.status) continue;
+      const label = unit.title || unit.id;
+      if (unit.status === 'done') {
+        vscode.window.showInformationMessage(`Sunday: unit "${label}" done.`);
+      } else if (unit.status === 'failed') {
+        vscode.window.showInformationMessage(
+          `Sunday: unit "${label}" failed${unit.error ? ` — ${unit.error}` : '.'}`,
+        );
+      } else if (unit.status === 'cancelled') {
+        vscode.window.showInformationMessage(`Sunday: unit "${label}" cancelled.`);
+      }
+    }
+    if (before.status === after.status || TERMINAL_RUN_STATUSES.includes(before.status)) return;
+    if (after.status === 'done') {
+      const merged = after.units.filter((u) => u.status === 'done').length;
+      vscode.window.showInformationMessage(
+        `Sunday: orchestration run finished — ${merged}/${after.units.length} units done.`,
+      );
+    } else if (after.status === 'conflicted') {
+      vscode.window.showInformationMessage(
+        'Sunday: orchestration run has merge conflicts — review them in the Manager.',
+      );
+    } else if (after.status === 'failed') {
+      vscode.window.showInformationMessage('Sunday: orchestration run failed.');
+    } else if (after.status === 'cancelled') {
+      vscode.window.showInformationMessage('Sunday: orchestration run cancelled.');
+    }
+  }
+
+  private postOrchestration(): void {
+    this.post({ type: ORCHESTRATION_STATE_MESSAGE, runs: [...this.runs.values()] });
+  }
+
+  /** Re-read one run from orchestrate/status and re-post (after stop/resolve). */
+  private async refreshOrchestrationRun(runId: string): Promise<void> {
+    const before = this.runs.get(runId);
+    try {
+      const state = await this.withBridge((b) => b.orchestrateStatus(runId));
+      this.setRunFromState(state);
+      this.notifyRunChanges(before, this.runs.get(runId));
+    } catch (err) {
+      this.postError(`orchestration refresh failed: ${(err as Error).message}`);
+    }
+    this.postOrchestration();
+  }
+
+  private async handleOrchestrationStopAll(): Promise<void> {
+    const runId = this.getActiveRunId();
+    if (!runId) {
+      this.postError('No active orchestration run.');
+      return;
+    }
+    const choice = await vscode.window.showWarningMessage(
+      `Stop all units of orchestration run "${runId}"?`,
+      'Stop all',
+      'Cancel',
+    );
+    if (choice !== 'Stop all') return;
+    const res = await this.withBridge((b) => b.orchestrateStop(runId));
+    this.deps.log(`manager view: stopAll ${runId} → stopped=${res.stopped}`);
+    await this.refreshOrchestrationRun(runId);
+  }
+
+  private async handleResolveConflict(
+    runId: string,
+    conflictIndex: number,
+    keepUnitId: string,
+  ): Promise<void> {
+    if (!runId) throw new Error('runId is required');
+    if (!Number.isInteger(conflictIndex) || conflictIndex < 0) {
+      throw new Error('conflictIndex must be a non-negative integer');
+    }
+    if (!keepUnitId) throw new Error('keepUnitId is required');
+    const res = await this.withBridge((b) =>
+      b.orchestrateResolveConflict(runId, [{ conflictIndex, keepUnitId }]),
+    );
+    this.deps.log(
+      `manager view: resolved conflict ${conflictIndex} in ${runId} (keep ${keepUnitId}); ` +
+        `${res.conflicts.length} conflict(s) remaining, ${res.merged.length} merged`,
+    );
+    await this.refreshOrchestrationRun(runId);
+  }
+
+  private async handleOpenDiff(runId: string, conflictIndex: number): Promise<void> {
+    const run = this.runs.get(runId);
+    const conflict = run?.conflicts.find((c) => c.index === conflictIndex);
+    if (!conflict) throw new Error(`conflict ${conflictIndex} not found in run ${runId || '(unknown)'}`);
+    const hunk = conflict.hunks[0];
+    if (!hunk) throw new Error(`conflict ${conflictIndex} has no hunks`);
+    const wtA = run!.units.find((u) => u.id === hunk.unitA)?.worktreePath;
+    const wtB = run!.units.find((u) => u.id === hunk.unitB)?.worktreePath;
+    if (!wtA || !wtB) {
+      throw new Error(`worktree path missing for conflict units ${hunk.unitA}/${hunk.unitB}`);
+    }
+    const uriA = vscode.Uri.file(path.join(wtA, hunk.file));
+    const uriB = vscode.Uri.file(path.join(wtB, hunk.file));
+    await vscode.commands.executeCommand(
+      'vscode.diff',
+      uriA,
+      uriB,
+      `Sunday conflict: ${hunk.unitA} ↔ ${hunk.unitB} — ${hunk.file}`,
+    );
   }
 
   private post(msg: unknown): void {
@@ -152,6 +452,7 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
         checkpoints: checkpoints.checkpoints,
         worktrees: worktrees.worktrees,
       });
+      this.postOrchestration();
     } catch (err) {
       this.postError(`refresh failed: ${(err as Error).message}`);
     }
@@ -190,6 +491,22 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
           await this.handleWorktreeMerge(
             typeof m.path === 'string' ? m.path : '',
             typeof m.target === 'string' ? m.target : undefined,
+          );
+          break;
+        case ORCHESTRATION_STOP_ALL_MESSAGE:
+          await this.handleOrchestrationStopAll();
+          break;
+        case ORCHESTRATION_RESOLVE_MESSAGE:
+          await this.handleResolveConflict(
+            typeof m.runId === 'string' ? m.runId : '',
+            typeof m.conflictIndex === 'number' ? m.conflictIndex : NaN,
+            typeof m.keepUnitId === 'string' ? m.keepUnitId : '',
+          );
+          break;
+        case ORCHESTRATION_OPEN_DIFF_MESSAGE:
+          await this.handleOpenDiff(
+            typeof m.runId === 'string' ? m.runId : '',
+            typeof m.conflictIndex === 'number' ? m.conflictIndex : NaN,
           );
           break;
         default:
@@ -284,6 +601,8 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
   private disposeView(): void {
     this.detachBridge?.();
     this.detachBridge = undefined;
+    this.detachOrchestrate?.();
+    this.detachOrchestrate = undefined;
     this.view = undefined;
     for (const d of this.disposables.splice(0)) {
       try {

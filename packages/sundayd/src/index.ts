@@ -17,3 +17,5 @@ export * from './trust.js';
 export * from './system-prompt.js';
 export * from './agent-tools.js';
 export * from './mcp-methods.js';
+// Parallel Agents phase: orchestration run persistence lifecycle (daemon setup).
+export * from './orchestration-lifecycle.js';

@@ -4,6 +4,10 @@ import { SundayDaemon } from './daemon.js';
 import { createContextHandlers } from '@sunday/context';
 import { registerManagerMethods } from './manager.js';
 import { registerOrchestrationMethods } from '@sunday/orchestrator';
+import {
+  setupOrchestrationPersistence,
+  type OrchestrationPersistenceModule,
+} from './orchestration-lifecycle.js';
 import { BrowserdManager } from './browserd.js';
 import { EnvSecretResolver, createSundaydTools } from './agent-tools.js';
 import { registerMcpMethods } from './mcp-methods.js';
@@ -95,6 +99,19 @@ async function main(): Promise<void> {
     addMethod: (name, handler) => daemon.registerMethod(name, handler),
     getOrchestratorHost: () => daemon.getOrchestratorHost(),
   });
+
+  // Parallel Agents phase: durable run registry. The store +
+  // reconcileOrchestrationRuns live in @sunday/orchestrator (Worker 1) and
+  // are loaded dynamically so sundayd keeps building — and starting —
+  // against an older orchestrator dist (persistence then degrades to a
+  // logged warning instead of crashing the daemon). The store is not passed
+  // into the handlers: Worker 1's registry is module-level and
+  // getOrchestrationRunState falls back to the persisted file, so
+  // stop/status/merge/resolveConflict work across restarts as-is.
+  await setupOrchestrationPersistence(
+    (await import('@sunday/orchestrator')) as unknown as OrchestrationPersistenceModule,
+    (msg) => console.error(msg),
+  );
 
   // MCP config load is additive — a failure is logged, never fatal.
   try {

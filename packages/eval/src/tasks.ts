@@ -1,14 +1,16 @@
 // @sunday/eval — benchmark tasks (§24.2).
 //
-// Ten small, deterministic coding tasks covering the core tool surface:
-// file I/O, search, edit, terminal, git, orchestration planning and the
-// browser navigation policy. Each task ships a fixture setup, a scripted
+// Thirteen small, deterministic coding tasks covering the core tool surface:
+// file I/O, search, edit, terminal, git, orchestration planning, parallel
+// orchestration (disjoint refactors, overlap rejection, quota fairness) and
+// the browser navigation policy. Each task ships a fixture setup, a scripted
 // model transcript (for the fake adapter) and a checker that inspects the
 // resulting workspace state — so the harness runs with no API keys.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { validatePlanUnits, OrchestrationError } from '@sunday/orchestrator';
 import type { EvalTask, ExecutedCall } from './types.js';
 
 function write(root: string, rel: string, content: string): void {
@@ -177,6 +179,152 @@ export const TASKS: EvalTask[] = [
     script: [{ kind: 'answer', text: 'policy check' }],
     check(_root, _t) {
       return { pass: true, notes: 'policy enforced by browserd policy module (see unit test)' };
+    },
+  },
+  {
+    id: 'parallel-disjoint-refactors',
+    title: 'Two independent refactors in disjoint directories merge cleanly',
+    prompt:
+      'In parallel: refactor A renames `oldName` to `newName` in pkg-a/; ' +
+      'refactor B renames `legacy` to `modern` in pkg-b/. The directories are disjoint.',
+    setup(root) {
+      write(root, 'pkg-a/util.ts', 'export function oldName() { return 1; }\n');
+      write(root, 'pkg-b/helper.ts', 'export function legacy() { return 2; }\n');
+    },
+    // The fake adapter replays the two unit scripts sequentially; with a
+    // live adapter these run as concurrent orchestration units. The checker
+    // verifies what "merge cleanly" means: both refactors applied, each
+    // confined to its own disjoint path set, no cross-interference.
+    script: [
+      { kind: 'tool', tool: 'edit_file', args: { path: 'pkg-a/util.ts', oldText: 'oldName', newText: 'newName' } },
+      { kind: 'tool', tool: 'edit_file', args: { path: 'pkg-b/helper.ts', oldText: 'legacy', newText: 'modern' } },
+    ],
+    check(root, t) {
+      const edits = t.filter((c) => c.tool === 'edit_file' && c.valid);
+      const a = read(root, 'pkg-a/util.ts');
+      const b = read(root, 'pkg-b/helper.ts');
+      const aOk = a.includes('newName') && !a.includes('oldName');
+      const bOk = b.includes('modern') && !b.includes('legacy');
+      // Disjointness: neither edit touched the other's directory.
+      const disjoint =
+        edits.every((c) => typeof c.args.path === 'string') &&
+        new Set(edits.map((c) => (c.args.path as string).split('/')[0])).size === 2;
+      const ok = edits.length === 2 && aOk && bOk && disjoint;
+      return {
+        pass: ok,
+        notes: ok
+          ? 'both disjoint refactors applied, no overlap'
+          : `edits=${edits.length} a-ok=${aOk} b-ok=${bOk} disjoint=${disjoint}`,
+      };
+    },
+  },
+  {
+    id: 'parallel-overlap-rejected',
+    title: 'A plan with overlapping owns_paths is rejected at plan time',
+    prompt:
+      'Plan: unit A owns src/api/**, unit B owns src/api/routes/**. ' +
+      'The overlap must be rejected before any work starts.',
+    setup() {},
+    // No tool calls — the overlapping draft is validated through the real
+    // orchestrator planner; rejection must happen at plan time, never after
+    // units have started executing.
+    script: [{ kind: 'answer', text: 'overlapping plan rejected' }],
+    check(_root, _t) {
+      const draft = {
+        units: [
+          { id: 'a', title: 'API layer', owns_paths: ['src/api/**'], acceptance: ['api tests pass'], budget: 10 },
+          { id: 'b', title: 'API routes', owns_paths: ['src/api/routes/**'], acceptance: ['route tests pass'], budget: 10 },
+        ],
+      };
+      try {
+        validatePlanUnits(draft);
+        return { pass: false, notes: 'overlapping plan was ACCEPTED — expected plan-overlap rejection' };
+      } catch (e) {
+        const ok = e instanceof OrchestrationError && e.code === 'plan-overlap';
+        return {
+          pass: ok,
+          notes: ok
+            ? 'rejected at plan time with plan-overlap, before any unit ran'
+            : `rejected with wrong error: ${(e as Error).message}`,
+        };
+      }
+    },
+  },
+  {
+    id: 'parallel-quota-fairness',
+    title: 'No starvation: three contending agents share quota fairly',
+    prompt:
+      'Three orchestration units contend for a tight model quota. ' +
+      'Every unit must keep making progress — no starvation.',
+    // The contention simulation runs here (setup may be async) against the
+    // REAL MultiAgentScheduler from the built @sunday/gateway package, and
+    // stashes the grant order for the checker. Loaded from the package build
+    // output rather than a new workspace dependency to avoid lockfile churn
+    // (eval already consumes orchestrator/browserd from their dist builds).
+    async setup(root) {
+      const url = new URL('../../gateway/dist/multi-scheduler.js', import.meta.url);
+      let mod: {
+        MultiAgentScheduler?: new (config: { maxRequests: number; windowMs: number }) => {
+          acquire(a: string, p: 0 | 1 | 2): Promise<unknown>;
+          release(a: string): void;
+          shutdown(): void;
+        };
+      };
+      try {
+        mod = (await import(url.href)) as typeof mod;
+      } catch (e) {
+        throw new Error(
+          `parallel-quota-fairness: cannot load @sunday/gateway build at ${url.href} ` +
+            `(build the gateway package first): ${(e as Error).message}`,
+        );
+      }
+      if (typeof mod.MultiAgentScheduler !== 'function') {
+        throw new Error(
+          `parallel-quota-fairness: stale @sunday/gateway build at ${url.href} ` +
+            '(rebuild the gateway package)',
+        );
+      }
+      const sched = new mod.MultiAgentScheduler({ maxRequests: 2, windowMs: 30 });
+      const order: string[] = [];
+      const agents = ['unit-a', 'unit-b', 'unit-c'];
+      const all: Promise<unknown>[] = [];
+      // Interleave so all three agents are contending at once.
+      for (let i = 0; i < 4; i++) {
+        for (const id of agents) {
+          all.push(
+            sched.acquire(id, 1).then(() => {
+              order.push(id);
+              sched.release(id);
+            }),
+          );
+        }
+      }
+      await Promise.all(all);
+      sched.shutdown();
+      write(root, 'fairness.json', JSON.stringify({ order }));
+    },
+    script: [{ kind: 'answer', text: 'fairness simulation ran in setup (see checker)' }],
+    check(root, _t) {
+      const { order } = JSON.parse(read(root, 'fairness.json')) as { order: string[] };
+      const agents = ['unit-a', 'unit-b', 'unit-c'];
+      if (order.length !== 12) {
+        return { pass: false, notes: `expected 12 grants, got ${order.length}` };
+      }
+      for (const id of agents) {
+        const idx = order.map((x, i) => (x === id ? i : -1)).filter((i) => i >= 0);
+        if (idx.length !== 4) {
+          return { pass: false, notes: `${id}: expected 4 grants, got ${idx.length}` };
+        }
+        for (let i = 1; i < idx.length; i++) {
+          const gap = idx[i] - idx[i - 1];
+          // No-starvation bound: with 3 agents contending, each is served at
+          // least once per 3 grants.
+          if (gap > 3) {
+            return { pass: false, notes: `${id} starved: ${gap} grants between servings` };
+          }
+        }
+      }
+      return { pass: true, notes: '3 agents × 4 requests all served; max inter-grant gap ≤ 3 (no starvation)' };
     },
   },
 ];

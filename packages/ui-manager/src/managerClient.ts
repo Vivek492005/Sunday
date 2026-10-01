@@ -30,6 +30,48 @@ export interface WorktreeView {
   head: string;
 }
 
+// -- orchestration (parallel agents) -------------------------------------------
+
+export type UnitRunStatus = 'queued' | 'running' | 'verifying' | 'done' | 'failed' | 'cancelled';
+export type RunStatus = 'running' | 'conflicted' | 'done' | 'failed' | 'cancelled' | 'interrupted';
+
+export interface UnitRunView {
+  id: string;
+  title: string;
+  status: UnitRunStatus;
+  worktreePath?: string;
+  model?: string;
+  steps?: number;
+  sha?: string;
+  error?: string;
+  /** Recent log lines from orchestrate/event details (newest last). */
+  log: string[];
+}
+
+export interface ConflictHunkView {
+  file: string;
+  unitA: string;
+  unitB: string;
+  rangeA: [number, number];
+  rangeB: [number, number];
+}
+
+export interface MergeConflictView {
+  index: number;
+  file: string;
+  hunks: ConflictHunkView[];
+}
+
+export interface OrchestrationRunView {
+  runId: string;
+  goal: string;
+  parallel: boolean;
+  status: RunStatus;
+  units: UnitRunView[];
+  conflicts: MergeConflictView[];
+  updatedAt: string;
+}
+
 /** Extension → webview. */
 export type InboundMessage =
   | {
@@ -40,7 +82,8 @@ export type InboundMessage =
       checkpoints: CheckpointView[];
       worktrees: WorktreeView[];
     }
-  | { type: 'sunday/manager/error'; message: string };
+  | { type: 'sunday/manager/error'; message: string }
+  | { type: 'sunday/manager/orchestration'; runs: OrchestrationRunView[] };
 
 /** Webview → extension. */
 export type OutboundMessage =
@@ -50,7 +93,10 @@ export type OutboundMessage =
   | { type: 'sunday/checkpoint/restore'; id: string }
   | { type: 'sunday/worktree/add'; branch: string; path?: string }
   | { type: 'sunday/worktree/remove'; path: string; force?: boolean }
-  | { type: 'sunday/worktree/merge'; path: string; target?: string };
+  | { type: 'sunday/worktree/merge'; path: string; target?: string }
+  | { type: 'sunday/orchestration/stopAll' }
+  | { type: 'sunday/orchestration/resolve'; runId: string; conflictIndex: number; keepUnitId: string }
+  | { type: 'sunday/orchestration/openDiff'; runId: string; conflictIndex: number };
 
 // -- view state ---------------------------------------------------------------
 
@@ -60,6 +106,7 @@ export interface ManagerState {
   agents: AgentView[];
   checkpoints: CheckpointView[];
   worktrees: WorktreeView[];
+  orchestration: OrchestrationRunView[];
   refreshing: boolean;
   /** Last error surfaced by the extension (daemon call failed…). */
   error: string | undefined;
@@ -70,6 +117,7 @@ export function createInitialState(): ManagerState {
     agents: [],
     checkpoints: [],
     worktrees: [],
+    orchestration: [],
     refreshing: true,
     error: undefined,
   };
@@ -94,6 +142,23 @@ export function applyManagerState(
 
 export function applyManagerError(state: ManagerState, message: string): ManagerState {
   return { ...state, refreshing: false, error: message || 'Manager request failed' };
+}
+
+/** Apply an orchestration runs snapshot pushed by the extension. Pure. */
+export function applyOrchestrationState(
+  state: ManagerState,
+  runs: OrchestrationRunView[],
+): ManagerState {
+  return {
+    ...state,
+    orchestration: Array.isArray(runs) ? runs : [],
+    refreshing: false,
+  };
+}
+
+/** The latest run that is still actionable (running/conflicted), if any. */
+export function activeOrchestrationRun(state: ManagerState): OrchestrationRunView | undefined {
+  return state.orchestration.find((r) => r.status === 'running' || r.status === 'conflicted');
 }
 
 export function setRefreshing(state: ManagerState, refreshing: boolean): ManagerState {
@@ -147,6 +212,28 @@ export function mergeWorktree(host: ManagerHost, wtPath: string, target?: string
   host.postMessage(
     t ? { type: 'sunday/worktree/merge', path: wtPath, target: t } : { type: 'sunday/worktree/merge', path: wtPath },
   );
+}
+
+/** Stop all units of the active orchestration run (extension confirms first). */
+export function stopAllOrchestration(host: ManagerHost): void {
+  host.postMessage({ type: 'sunday/orchestration/stopAll' });
+}
+
+/** Resolve one merge conflict in favour of a unit's version. */
+export function resolveConflict(
+  host: ManagerHost,
+  runId: string,
+  conflictIndex: number,
+  keepUnitId: string,
+): void {
+  if (!runId || !keepUnitId || !Number.isInteger(conflictIndex) || conflictIndex < 0) return;
+  host.postMessage({ type: 'sunday/orchestration/resolve', runId, conflictIndex, keepUnitId });
+}
+
+/** Open a vscode.diff between the two worktree files of a conflict. */
+export function openConflictDiff(host: ManagerHost, runId: string, conflictIndex: number): void {
+  if (!runId || !Number.isInteger(conflictIndex) || conflictIndex < 0) return;
+  host.postMessage({ type: 'sunday/orchestration/openDiff', runId, conflictIndex });
 }
 
 /** Shorten a sha for display. */

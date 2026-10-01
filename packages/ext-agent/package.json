@@ -71,6 +71,21 @@
         "category": "Sunday",
         "command": "sunday.terminal.explainError",
         "title": "Explain Last Terminal Error"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.orchestration.run",
+        "title": "Run Orchestration…"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.orchestration.stopAll",
+        "title": "Stop All Orchestration Units"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.orchestration.openManager",
+        "title": "Open Orchestration Manager"
       }
     ],
     "keybindings": [
@@ -107,6 +122,11 @@
           "default": "groq:llama-3.1-8b-instant",
           "description": "Model ref (\"provider:model\") used for inline completions. Fast/cheap models recommended; providers without a native FIM endpoint fall back to a prefix-only chat continuation.",
           "type": "string"
+        },
+        "sunday.orchestration.parallel": {
+          "default": false,
+          "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",
+          "type": "boolean"
         }
       },
       "title": "Sunday"

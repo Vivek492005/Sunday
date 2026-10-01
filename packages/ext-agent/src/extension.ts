@@ -28,6 +28,7 @@ import { registerInlineEdit } from './inlineEdit.js';
 import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
+import { registerOrchestrationCommands } from './orchestrationCommands.js';
 
 const EXT_ID = 'sunday.sunday-agent';
 
@@ -347,6 +348,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('sunday.workspace.trust', () => trustWorkspaceCommand()),
     vscode.commands.registerCommand('sunday.mcp.storeSecret', () => storeMcpSecretCommand()),
   );
+
+  // -- orchestration commands (parallel agents phase) -------------------------
+  registerOrchestrationCommands(context, {
+    getBridge: getBridgeForCommands,
+    getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    getActiveRunId: () => managerProvider?.getActiveRunId(),
+    openManagerView: () => {
+      void vscode.commands.executeCommand('sunday.managerView.focus');
+    },
+    log,
+  });
 
   // === Part B (editor intelligence: workers 1-3) ==============================
   // Worker 1 — ghost-text inline completions. registerInlineCompletion closes

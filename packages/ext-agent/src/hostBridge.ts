@@ -6,10 +6,13 @@
 import {
   METHODS,
   chatEventNotificationSchema,
+  orchestrationEventSchema,
   type ChatEventNotification,
+  type ConflictResolution,
   type MethodName,
   type MethodParams,
   type MethodResult,
+  type OrchestrationEvent,
 } from '@sunday/protocol';
 import { RpcClient } from './rpc.js';
 
@@ -21,6 +24,8 @@ import { RpcClient } from './rpc.js';
 export class HostBridge {
   private readonly disposeChatEvent: () => void;
   private readonly chatListeners = new Set<(n: ChatEventNotification) => void>();
+  private readonly disposeOrchestrateEvent: () => void;
+  private readonly orchestrateListeners = new Set<(n: OrchestrationEvent) => void>();
   private activeTurnId: string | undefined;
 
   constructor(
@@ -28,6 +33,9 @@ export class HostBridge {
     private readonly defaultTimeoutMs = 30000,
   ) {
     this.disposeChatEvent = rpc.onNotification('chat/event', (params) => this.dispatchChatEvent(params));
+    this.disposeOrchestrateEvent = rpc.onNotification('orchestrate/event', (params) =>
+      this.dispatchOrchestrateEvent(params),
+    );
   }
 
   private async call<M extends MethodName>(
@@ -211,10 +219,64 @@ export class HostBridge {
     return this.call('policy/list', {});
   }
 
+  // -- orchestration (parallel agents) -------------------------------------------
+
+  /**
+   * Start an orchestration run. Keeps the Phase-5 blocking contract (resolves
+   * with the final run result), but with a generous timeout — a full run can
+   * take many minutes. Progress streams through onOrchestrateEvent.
+   */
+  orchestrateRun(
+    params: MethodParams<'orchestrate/run'>,
+  ): Promise<MethodResult<'orchestrate/run'>> {
+    return this.call('orchestrate/run', params, 30 * 60 * 1000);
+  }
+
+  orchestrateStop(runId: string): Promise<MethodResult<'orchestrate/stop'>> {
+    return this.call('orchestrate/stop', { runId }, 15000);
+  }
+
+  orchestrateStatus(runId: string): Promise<MethodResult<'orchestrate/status'>> {
+    return this.call('orchestrate/status', { runId }, 15000);
+  }
+
+  orchestrateMerge(runId: string): Promise<MethodResult<'orchestrate/merge'>> {
+    return this.call('orchestrate/merge', { runId }, 60000);
+  }
+
+  orchestrateResolveConflict(
+    runId: string,
+    resolutions: ConflictResolution[],
+  ): Promise<MethodResult<'orchestrate/resolveConflict'>> {
+    return this.call('orchestrate/resolveConflict', { runId, resolutions }, 60000);
+  }
+
+  /** Subscribe to `orchestrate/event` notifications. Returns an unsubscribe fn. */
+  onOrchestrateEvent(listener: (n: OrchestrationEvent) => void): () => void {
+    this.orchestrateListeners.add(listener);
+    return () => {
+      this.orchestrateListeners.delete(listener);
+    };
+  }
+
   dispose(): void {
     this.disposeChatEvent();
     this.chatListeners.clear();
+    this.disposeOrchestrateEvent();
+    this.orchestrateListeners.clear();
     this.activeTurnId = undefined;
+  }
+
+  private dispatchOrchestrateEvent(params: unknown): void {
+    const parsed = orchestrationEventSchema.safeParse(params);
+    if (!parsed.success) return; // malformed daemon event — drop, don't crash UI
+    for (const l of [...this.orchestrateListeners]) {
+      try {
+        l(parsed.data);
+      } catch {
+        /* one bad listener must not break dispatch */
+      }
+    }
   }
 
   private dispatchChatEvent(params: unknown): void {

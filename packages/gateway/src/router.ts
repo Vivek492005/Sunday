@@ -2,6 +2,7 @@ import type { ProviderRegistry } from './registry.js';
 import type { ChatChunk, ChatProvider, ChatRequest } from './types.js';
 import { ProviderHttpError } from './openai-compatible.js';
 import { RateLimiter, getRetryAfterMs, DEFAULT_RATE_LIMIT } from './scheduler.js';
+import { MultiAgentScheduler, PRIORITY_AGENT_STEP } from './multi-scheduler.js';
 import {
   classifyFailure,
   resolveCandidates,
@@ -50,15 +51,20 @@ export const DEFAULT_429_COOLDOWN_MS = 60_000;
 
 export class Router {
   private readonly limiter: RateLimiter | undefined;
+  private readonly scheduler: MultiAgentScheduler | undefined;
 
   constructor(
     private registry: ProviderRegistry,
     private defaultModel = 'openrouter:meta-llama/llama-3.3-70b-instruct',
     private policy?: RouterPolicyConfig,
     limiter?: RateLimiter,
+    scheduler?: MultiAgentScheduler,
   ) {
     // A limiter is only meaningful with a policy (failover needs an order).
-    this.limiter = limiter ?? (policy ? new RateLimiter(DEFAULT_RATE_LIMIT) : undefined);
+    // When a MultiAgentScheduler is supplied it wraps the shared pool, so
+    // the router falls back to the scheduler's pool as its limiter.
+    this.scheduler = scheduler;
+    this.limiter = limiter ?? scheduler?.pool ?? (policy ? new RateLimiter(DEFAULT_RATE_LIMIT) : undefined);
   }
 
   route(req: RouteRequest = {}): RouteResult {
@@ -103,12 +109,23 @@ export class Router {
     let relayReason: RelayAttempt['reason'] | undefined;
     let lastError: unknown;
 
+    // Parallel-agents fair scheduling: one fair-queued slot from the shared
+    // pool covers the whole call (failover candidates share it). Without an
+    // agent context the legacy per-candidate limiter path below runs, so
+    // single-agent behaviour is unchanged.
+    const agentCtx = req.agent?.id ? req.agent : undefined;
+    let releaseSlot: (() => void) | undefined;
+    if (this.scheduler && agentCtx) {
+      await this.scheduler.acquire(agentCtx.id, agentCtx.priority ?? PRIORITY_AGENT_STEP);
+      releaseSlot = () => this.scheduler!.release(agentCtx.id);
+    }
+
     for (const pid of candidates) {
       const provider = this.registry.get(pid);
       const perProvider = this.policy?.perProvider[pid];
       const maxAttempts = 1 + Math.max(0, perProvider?.maxRetries ?? 0);
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (this.limiter) {
+        if (!releaseSlot && this.limiter) {
           const gate = this.limiter.acquire(pid, bareModel);
           if (!gate.ok) {
             attempts.push({
@@ -136,14 +153,16 @@ export class Router {
             pid === primaryId
               ? undefined
               : { from: primaryId, to: pid, reason: relayReason ?? 'rate-limit' };
-          return { provider, model: bareModel, stream: prepend(first, it), relay, attempts };
+          const out = releaseSlot ? trackRelease(prepend(first, it), releaseSlot) : prepend(first, it);
+          return { provider, model: bareModel, stream: out, relay, attempts };
         } catch (err) {
           lastError = err;
           const kind = classifyFailure(err);
-          if (kind === 'rate-limit' && this.limiter) {
+          if (kind === 'rate-limit') {
             const retryAfter =
               err instanceof ProviderHttpError ? getRetryAfterMs(err.headers) : undefined;
-            this.limiter.noteRateLimited(pid, bareModel, retryAfter ?? DEFAULT_429_COOLDOWN_MS);
+            if (releaseSlot) this.scheduler!.noteRateLimited(retryAfter ?? DEFAULT_429_COOLDOWN_MS);
+            else this.limiter?.noteRateLimited(pid, bareModel, retryAfter ?? DEFAULT_429_COOLDOWN_MS);
           }
           attempts.push({ providerId: pid, ok: false, error: (err as Error)?.message });
           const failover = this.policy?.failover;
@@ -153,11 +172,13 @@ export class Router {
             relayReason ??= kind;
             continue; // next attempt / next provider
           }
+          releaseSlot?.();
           throw err;
         }
       }
     }
 
+    releaseSlot?.();
     if (lastError) throw lastError;
     throw new Error(
       `router: all providers unavailable for model '${bareModel}' ` +
@@ -176,6 +197,21 @@ async function* prepend(
     const n = await it.next();
     if (n.done) return;
     yield n.value;
+  }
+}
+
+/**
+ * Wrap a stream so `onDone` runs exactly once when the consumer finishes,
+ * errors, or abandons iteration (scheduler slot release for throughput/ETA).
+ */
+async function* trackRelease(
+  stream: AsyncIterable<ChatChunk>,
+  onDone: () => void,
+): AsyncGenerator<ChatChunk> {
+  try {
+    yield* stream;
+  } finally {
+    onDone();
   }
 }
 

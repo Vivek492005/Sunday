@@ -89,7 +89,11 @@ describe('method params', () => {
       // Part A: the mcp/* family uses a second namespace segment
       // (mcp/<resource>/<action>) because the MCP surface groups servers,
       // tools, and call history.
-      if (name.startsWith('mcp/')) {
+      // Parallel agents: orchestrate/resolveConflict is camelCase per the
+      // shared worker contract (00-contract.md) — the one exception.
+      if (name === 'orchestrate/resolveConflict') {
+        expect(name).toBe('orchestrate/resolveConflict');
+      } else if (name.startsWith('mcp/')) {
         expect(name).toMatch(/^mcp\/[a-z]+\/[a-z]+$/);
       } else {
         expect(name).toMatch(/^[a-z]+\/[a-z-_]+$/);

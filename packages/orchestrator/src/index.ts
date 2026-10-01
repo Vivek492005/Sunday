@@ -8,3 +8,5 @@ export * from './host.js';
 export * from './planner.js';
 export * from './runner.js';
 export * from './handlers.js';
+export * from './state.js';
+export * from './merge.js';

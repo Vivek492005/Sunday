@@ -108,6 +108,10 @@ function toErrorResponse(id: JsonRpcId, e: unknown): ReturnType<typeof errorResp
     if (code === 'invalid-params' || code === 'plan-invalid' || code === 'too-many-units' || code === 'plan-overlap') {
       return errorResponse(id, ErrorCode.InvalidParams, e.message);
     }
+    // Parallel Agents phase: unknown runId → application-level 404.
+    if (code === 'unknown-run') {
+      return errorResponse(id, ErrorCode.RunNotFound, e.message);
+    }
   }
   return errorResponse(id, ErrorCode.InternalError, (e as Error)?.message ?? 'internal error');
 }

@@ -6,7 +6,11 @@ export type OrchestrationErrorCode =
   | 'plan-invalid'
   | 'too-many-units'
   | 'plan-overlap'
-  | 'dispatch-failed';
+  | 'dispatch-failed'
+  // Parallel-mode codes.
+  | 'unknown-run'
+  | 'invalid-state'
+  | 'resolve-failed';
 
 export class OrchestrationError extends Error {
   readonly code: OrchestrationErrorCode;

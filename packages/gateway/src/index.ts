@@ -8,4 +8,5 @@ export * from './registry.js';
 export * from './router.js';
 export * from './policies.js';
 export * from './scheduler.js';
+export * from './multi-scheduler.js';
 export * from './testing.js';

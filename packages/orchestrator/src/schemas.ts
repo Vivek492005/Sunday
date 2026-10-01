@@ -36,6 +36,19 @@ export {
   ORCHESTRATE_NOTIFICATIONS,
   MAX_PLAN_UNITS,
   MAX_UNIT_RETRIES,
+  // Parallel-agents run registry state + merge conflicts (shared contract).
+  unitRunStatusSchema,
+  runStatusSchema,
+  unitRunStateSchema,
+  conflictHunkSchema,
+  mergeConflictSchema,
+  conflictResolutionSchema,
+  orchestrationRunStateSchema,
+  orchestrateStopParamsSchema,
+  orchestrateStopResultSchema,
+  orchestrateStatusParamsSchema,
+  orchestrateMergeResultSchema,
+  orchestrateResolveConflictParamsSchema,
 } from '@sunday/protocol';
 export type {
   PlannedUnit,
@@ -48,6 +61,18 @@ export type {
   UnitResult,
   OrchestrationRunResult,
   OrchestrateMethodName,
+  UnitRunStatus,
+  RunStatus,
+  UnitRunState,
+  ConflictHunk,
+  MergeConflict,
+  ConflictResolution,
+  OrchestrationRunState,
+  OrchestrateStopParams,
+  OrchestrateStopResult,
+  OrchestrateStatusParams,
+  OrchestrateMergeResult,
+  OrchestrateResolveConflictParams,
 } from '@sunday/protocol';
 
 import { z } from 'zod';

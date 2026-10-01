@@ -143,6 +143,26 @@ fail → two retries, then continue. The daemon implements
 `DaemonOrchestratorHost.runSubAgent` so the orchestrator never imports the
 daemon (no import cycle).
 
+Parallel mode (`orchestrate/run` with `parallel: true`, pool default 3):
+units run concurrently, each in its own worktree (`sunday/feat/<unit-id>`)
+with the same Feature-Agent + Verifier-retry flow; merging is deferred to a
+separate phase after all units settle. The plan-time `owns_paths` overlap
+gate is fail-fast — parallel mode refuses overlapping plans before any
+dispatch. Merge phase: collect every successful unit's diff, detect textual
+conflicts (same file + overlapping old-line ranges + differing new-side
+content → structured `MergeConflict`; identical hunks merge cleanly); any
+conflict → run `conflicted`, event emitted, nothing merged. Clean plans merge
+in plan order via `worktree/merge` + per-unit checkpoint, then a single
+Verifier pass runs over the merged result (fail → run `failed` with evidence,
+no re-delegation in v1). `orchestrate/resolveConflict` applies
+`{conflictIndex, keepUnitId}` resolutions (kept unit's file content wins) and
+re-runs the merge phase. Merge is a write op: it goes through the daemon's
+`worktree/merge`, which the daemon's policy gate approves, and per-unit merge
+events carry a `merge-write` detail tag. Run state persists as one JSON per
+run under `~/.sunday/orchestrations/<runId>.json`; `orchestrate/stop` aborts
+in-flight units (per-unit `AbortController`, best-effort worktree cleanup);
+daemon start reconciles non-terminal runs to `interrupted`.
+
 ## Checkpoints & worktrees
 
 Shadow-git repos live outside user repositories
