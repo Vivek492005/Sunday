@@ -1,0 +1,182 @@
+import { randomUUID } from 'node:crypto';
+import { ErrorCode, type ChatEvent, type ContentPart, type ToolCall } from '@sunday/protocol';
+import { ProviderRegistry, Router } from '@sunday/gateway';
+import type { ToolRegistry } from '@sunday/tools';
+import { PolicyGate } from './policy.js';
+import type { StoredSession } from './sessions.js';
+
+export const DEFAULT_MODEL = 'openrouter:meta-llama/llama-3.3-70b-instruct';
+export const DEFAULT_MAX_ITERATIONS = 25;
+
+export interface AgentLoopDeps {
+  tools: ToolRegistry;
+  providers: ProviderRegistry;
+}
+
+export interface AgentLoopOptions {
+  router?: Router;
+  policy?: PolicyGate;
+  defaultModel?: string;
+  maxIterations?: number;
+}
+
+export interface TurnEvents {
+  event(sessionId: string, turnId: string, event: ChatEvent): void;
+}
+
+export interface RunTurnOptions {
+  model?: string;
+  signal?: AbortSignal;
+}
+
+interface PendingCall {
+  call: ToolCall;
+  /** Set when the model emitted non-JSON arguments. */
+  parseError?: string;
+}
+
+/**
+ * The agent loop (§9): stream a turn from the routed model, execute tool
+ * calls through the policy gate + tool registry, feed results back until the
+ * model stops calling tools. Every step is emitted as a `chat/event`
+ * ChatEvent so the extension can render it live. Errors (including
+ * cancellation) are terminal `turn-error` events — runTurn itself never throws.
+ */
+export class AgentLoop {
+  private readonly router: Router;
+  private readonly policy: PolicyGate;
+  private readonly defaultModel: string;
+  private readonly maxIterations: number;
+
+  constructor(
+    private readonly deps: AgentLoopDeps,
+    private readonly events: TurnEvents,
+    opts: AgentLoopOptions = {},
+  ) {
+    this.router = opts.router ?? new Router(deps.providers);
+    this.policy = opts.policy ?? new PolicyGate();
+    this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
+    this.maxIterations = opts.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+  }
+
+  async runTurn(
+    turnId: string,
+    session: StoredSession,
+    message: string | ContentPart[],
+    opts: RunTurnOptions = {},
+  ): Promise<void> {
+    const emit = (event: ChatEvent) => this.events.event(session.id, turnId, event);
+    const content: ContentPart[] =
+      typeof message === 'string' ? [{ type: 'text', text: message }] : message;
+    session.messages.push({ role: 'user', content });
+
+    const modelRef = opts.model ?? session.model ?? this.defaultModel;
+    const cwd = session.cwd ?? process.cwd();
+
+    try {
+      for (let i = 0; i < this.maxIterations; i++) {
+        throwIfAborted(opts.signal);
+        const { provider, model } = this.router.route({ model: modelRef });
+        const stream = provider.chat({
+          model,
+          messages: session.messages,
+          tools: this.deps.tools.definitions(),
+          signal: opts.signal,
+        });
+
+        let text = '';
+        const calls: PendingCall[] = [];
+        for await (const chunk of stream) {
+          throwIfAborted(opts.signal);
+          if (chunk.type === 'text-delta') {
+            text += chunk.delta;
+            emit({ type: 'text-delta', delta: chunk.delta });
+          } else if (chunk.type === 'tool-call') {
+            const call: ToolCall = {
+              id: chunk.call.id,
+              name: chunk.call.name,
+              arguments: chunk.call.arguments,
+            };
+            calls.push({ call, parseError: chunk.call.argumentsParseError });
+            emit({ type: 'tool-call', call });
+          } else if (chunk.type === 'usage') {
+            emit({ type: 'usage', usage: chunk.usage });
+          }
+          // 'done' needs no action — the loop below decides what happens next.
+        }
+
+        if (calls.length === 0) {
+          if (text) session.messages.push({ role: 'assistant', content: [{ type: 'text', text }] });
+          emit({ type: 'turn-end', finishReason: 'stop' });
+          return;
+        }
+
+        session.messages.push({
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+          toolCalls: calls.map((c) => c.call),
+        });
+
+        for (const { call, parseError } of calls) {
+          throwIfAborted(opts.signal);
+          const result = await this.executeCall(call, parseError, cwd, opts.signal);
+          emit({ type: 'tool-result', result });
+          session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });
+        }
+        // Loop: the model sees the tool results on the next iteration.
+      }
+      emit({ type: 'turn-end', finishReason: 'max-steps' });
+    } catch (e) {
+      if (isAbort(e, opts.signal)) {
+        emit({ type: 'turn-error', code: ErrorCode.TurnCancelled, message: 'turn cancelled' });
+      } else {
+        emit({
+          type: 'turn-error',
+          code: ErrorCode.InternalError,
+          message: (e as Error)?.message ?? 'turn failed',
+        });
+      }
+    }
+  }
+
+  private async executeCall(
+    call: ToolCall,
+    parseError: string | undefined,
+    cwd: string,
+    signal: AbortSignal | undefined,
+  ): Promise<{ toolCallId: string; content: ContentPart[]; isError: boolean }> {
+    if (parseError) {
+      return {
+        toolCallId: call.id,
+        content: [{ type: 'text', text: `arguments parse error: ${parseError} — retry the call with valid JSON arguments` }],
+        isError: true,
+      };
+    }
+    const decision = this.policy.evaluate(call.name);
+    if (!decision.allow) {
+      return {
+        toolCallId: call.id,
+        content: [{ type: 'text', text: `Policy denied tool call '${call.name}': ${decision.reason}` }],
+        isError: true,
+      };
+    }
+    const r = await this.deps.tools.call(call.name, call.arguments, { cwd, signal });
+    return {
+      toolCallId: call.id,
+      content: [{ type: 'text', text: r.output }],
+      isError: r.isError ?? false,
+    };
+  }
+}
+
+export function newTurnId(): string {
+  return randomUUID();
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new DOMException('turn cancelled', 'AbortError');
+}
+
+function isAbort(e: unknown, signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true || (e as Error)?.name === 'AbortError';
+}
