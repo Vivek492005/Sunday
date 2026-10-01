@@ -1,17 +1,26 @@
 {
-  "name": "@sunday/browserd",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+  "bin": {
+    "browserd": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@sunday/protocol": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
-  }
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "main": "dist/index.js",
+  "name": "@sunday/browserd",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "version": "0.0.1"
 }

@@ -21,6 +21,8 @@ import { RpcError, StdioTransport } from './transport.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
 import { PolicyGate, type PolicyOptions } from './policy.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
+import { BrowserdManager } from './browserd.js';
+import { registerBrowserTools } from './browser-tools.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
@@ -101,6 +103,10 @@ export interface DaemonOptions {
    *  doesn't depend on @sunday/context. When absent, `context/*` calls fail
    *  with MethodNotFound. */
   contextHandlers?: DaemonContextHandlers;
+  /** Phase 6: browser — managed browserd child. When present, the daemon
+   *  registers the `browser_*` agent tools (opt-in, dangerous) and stops the
+   *  child on graceful exit. Injected by the composition root (cli.ts). */
+  browserd?: BrowserdManager;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -127,6 +133,8 @@ export class SundayDaemon {
   private readonly loop: AgentLoop;
   private readonly turns = new Map<string, AbortController>();
   private readonly onShutdown: () => void;
+  /** Phase 6: managed browserd child (if the composition root opted in). */
+  private readonly browserdManager: BrowserdManager | undefined;
   /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
   private readonly contextHandlers: DaemonContextHandlers | undefined;
   /** Phase 4: dynamically registered method handlers (manager methods).
@@ -159,6 +167,12 @@ export class SundayDaemon {
     const policy = new PolicyGate(opts.policy);
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
     this.contextHandlers = opts.contextHandlers;
+    // Phase 6: opt-in browser tools. browserd stays a lazy child — it only
+    // spawns on first tool use — and is stopped with the daemon.
+    this.browserdManager = opts.browserd;
+    if (opts.browserd) {
+      registerBrowserTools(this.tools, opts.browserd);
+    }
     this.loop = new AgentLoop(
       { tools: this.tools, providers: this.providers },
       {
@@ -263,6 +277,8 @@ export class SundayDaemon {
     this.shuttingDown = true;
     try {
       await Promise.allSettled([...this.pendingPersists]);
+      // Phase 6: stop the browser child (no-op when never started).
+      await this.browserdManager?.stop().catch(() => undefined);
     } finally {
       this.onShutdown();
     }

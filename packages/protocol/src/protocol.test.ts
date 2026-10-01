@@ -81,7 +81,9 @@ describe('method params', () => {
     for (const [name, def] of Object.entries(METHODS)) {
       expect(typeof def.params.parse).toBe('function');
       expect(typeof def.result.parse).toBe('function');
-      expect(name).toMatch(/^[a-z]+\/[a-z-]+$/);
+      // Phase 6: browser/verify_ui carries an underscore (composed macro
+      // name); method names are otherwise kebab-case.
+      expect(name).toMatch(/^[a-z]+\/[a-z-_]+$/);
     }
   });
 

@@ -3,6 +3,7 @@
     "sundayd": "./dist/cli.js"
   },
   "dependencies": {
+    "@sunday/browserd": "workspace:*",
     "@sunday/context": "workspace:*",
     "@sunday/gateway": "workspace:*",
     "@sunday/orchestrator": "workspace:*",

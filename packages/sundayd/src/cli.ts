@@ -3,6 +3,7 @@ import { SundayDaemon } from './daemon.js';
 import { createContextHandlers } from '@sunday/context';
 import { registerManagerMethods } from './manager.js';
 import { registerOrchestrationMethods } from '@sunday/orchestrator';
+import { BrowserdManager } from './browserd.js';
 
 // sundayd entrypoint: JSON-RPC over stdio. Logs go to stderr so the NDJSON
 // frame stream on stdout stays clean.
@@ -31,12 +32,19 @@ function bindPerCall<K extends 'context/map' | 'context/index' | 'context/search
   };
 }
 
+// Phase 6: browserd stays a lazy child process — it only spawns on first
+// browser_* tool use — and is stopped with the daemon (see gracefulExit).
+const browserdManager = new BrowserdManager({
+  log: (msg) => console.error(`[browserd] ${msg}`),
+});
+
 const daemon = new SundayDaemon({
   contextHandlers: {
     'context/map': bindPerCall('context/map'),
     'context/index': bindPerCall('context/index'),
     'context/search': bindPerCall('context/search'),
   },
+  browserd: browserdManager,
 });
 
 // Phase 4: checkpoints + worktrees. Registered first — the orchestration

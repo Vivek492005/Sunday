@@ -13,6 +13,7 @@ export * from './tools.js';
 export * from './models.js';
 export * from './context.js';
 export * from './manager.js';
+export * from './browser.js';
 export * from './orchestrate.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
@@ -22,6 +23,7 @@ import { TOOLS_METHODS } from './tools.js';
 import { MODELS_METHODS } from './models.js';
 import { CONTEXT_METHODS } from './context.js';
 import { MANAGER_METHODS } from './manager.js';
+import { BROWSER_METHODS } from './browser.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
 
 export const METHODS = {
@@ -32,6 +34,7 @@ export const METHODS = {
   ...MODELS_METHODS,
   ...CONTEXT_METHODS,
   ...MANAGER_METHODS,
+  ...BROWSER_METHODS,
   ...ORCHESTRATE_METHODS,
 } as const;
 export type MethodName = keyof typeof METHODS;
