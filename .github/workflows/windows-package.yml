@@ -47,12 +47,16 @@ jobs:
       - name: Package .vsix
         run: node scripts/package-vsix.mjs --out dist-package
 
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
       - name: Build NSIS installer
         shell: pwsh
         run: |
           $version = (node -p "require('./packages/ext-agent/package.json').version")
           $vsix = "sunday-agent-$version.vsix"
-          makensis "/DVERSION=$version" "/DVSIX=dist-package\$vsix" packaging/windows/sunday.nsi
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" "/DVSIX=dist-package\$vsix" packaging/windows/sunday.nsi
           echo "SUNDAY_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Upload artifacts
