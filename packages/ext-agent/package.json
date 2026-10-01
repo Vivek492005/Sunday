@@ -1,46 +1,79 @@
 {
-  "name": "sunday-agent",
-  "displayName": "Sunday Agent",
-  "version": "0.0.1",
-  "private": true,
-  "description": "Built-in extension: agent chat UI glue + tool executors needing the VS Code API. Talks JSON-RPC to the sundayd sidecar.",
-  "publisher": "sunday",
-  "engines": {
-    "vscode": "^1.140.0"
-  },
-  "categories": [
-    "Other"
-  ],
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./dist/extension.js",
-  "scripts": {
-    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.js --external:vscode",
-    "test": "echo 'extension tests run against the built fork (see \u00a724.1)'",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
+  "categories": [
+    "Other"
+  ],
   "contributes": {
     "commands": [
       {
+        "category": "Sunday",
         "command": "sunday.chat.focus",
-        "title": "Focus Agent Chat",
-        "category": "Sunday"
+        "title": "Focus Agent Chat"
       },
       {
+        "category": "Sunday",
         "command": "sunday.manager.open",
-        "title": "Open Agent Manager",
-        "category": "Sunday"
+        "title": "Open Agent Manager"
       },
       {
+        "category": "Sunday",
         "command": "sunday.turn.stop",
-        "title": "Stop Agent",
-        "category": "Sunday"
+        "title": "Stop Agent"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.sidecar.restart",
+        "title": "Restart Sidecar"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.sidecar.status",
+        "title": "Show Sidecar Status"
       }
-    ]
+    ],
+    "configuration": {
+      "properties": {
+        "sunday.sidecar.autoStart": {
+          "default": true,
+          "description": "Start the sundayd sidecar automatically when the extension activates.",
+          "type": "boolean"
+        },
+        "sunday.sidecar.path": {
+          "default": "",
+          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
+          "type": "string"
+        }
+      },
+      "title": "Sunday"
+    }
   },
+  "dependencies": {
+    "@sunday/protocol": "workspace:*"
+  },
+  "description": "Built-in extension: agent chat UI glue + tool executors needing the VS Code API. Talks JSON-RPC to the sundayd sidecar.",
   "devDependencies": {
-    "esbuild": "^0.24.0"
-  }
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.138.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "displayName": "Sunday Agent",
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "main": "./dist/extension.cjs",
+  "name": "sunday-agent",
+  "private": true,
+  "type": "module",
+  "publisher": "sunday",
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.cjs --external:vscode",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "version": "0.0.1"
 }

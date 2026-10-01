@@ -27,10 +27,26 @@ importers:
         version: 5.9.3
 
   packages/ext-agent:
+    dependencies:
+      '@sunday/protocol':
+        specifier: workspace:*
+        version: link:../protocol
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.4
+      '@types/vscode':
+        specifier: ^1.138.0
+        version: 1.138.0
       esbuild:
         specifier: ^0.24.0
         version: 0.24.2
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.4)
 
   packages/gateway:
     dependencies:
@@ -712,6 +728,9 @@ packages:
 
   '@types/node@22.20.4':
     resolution: {integrity: sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA==}
+
+  '@types/vscode@1.138.0':
+    resolution: {integrity: sha512-DhlvrucJa8n6EHst7qQcXOcjLKs/VRTQy55plLO+RN74jonYsr/t9dd66zBnAyz1tpDig0okQAxuoPHpVNje2g==}
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -1457,6 +1476,8 @@ snapshots:
   '@types/node@22.20.4':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/vscode@1.138.0': {}
 
   '@vitejs/plugin-react@4.7.0(vite@6.4.3(@types/node@22.20.4))':
     dependencies:
