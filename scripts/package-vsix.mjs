@@ -44,21 +44,29 @@ need(join(ROOT, 'packages/ext-agent/dist/extension.cjs'), 'extension bundle');
 need(join(ROOT, 'packages/ui-chat/dist/index.html'), 'ui-chat build');
 need(join(ROOT, 'packages/ui-manager/dist/index.html'), 'ui-manager build');
 
-// 1. bundle the sidecars
-const esbuild = join(ROOT, 'packages/ext-agent/node_modules/.bin/esbuild');
-need(esbuild, 'esbuild');
+// 1. bundle the sidecars (via esbuild's JS API — cross-platform, no .bin
+//    shell-script resolution issues on Windows)
+const { buildSync } = await import(
+  join(ROOT, 'packages/ext-agent/node_modules/esbuild/lib/main.js')
+);
+function bundle(entry, outfile, extra = {}) {
+  console.log(`$ esbuild ${entry} -> ${outfile}`);
+  buildSync({
+    entryPoints: [join(ROOT, entry)],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    outfile, // already absolute (under STAGE)
+    logLevel: 'warning',
+    ...extra,
+  });
+}
 mkdirSync(join(STAGE, 'sundayd'), { recursive: true });
-sh(esbuild, [
-  'packages/sundayd/src/cli.ts', '--bundle', '--platform=node', '--format=esm',
-  '--outfile=' + join(STAGE, 'sundayd/sundayd.mjs'),
-  '--log-level=warning',
-]);
-sh(esbuild, [
-  'packages/browserd/src/cli.ts', '--bundle', '--platform=node', '--format=esm',
-  '--outfile=' + join(STAGE, 'sundayd/browserd.mjs'),
-  '--external:playwright', // lazy optional dep — resolved at runtime if installed
-  '--log-level=warning',
-]);
+bundle('packages/sundayd/src/cli.ts', join(STAGE, 'sundayd/sundayd.mjs'));
+bundle('packages/browserd/src/cli.ts', join(STAGE, 'sundayd/browserd.mjs'), {
+  // lazy optional dep — resolved at runtime if installed
+  external: ['playwright'],
+});
 
 // 2. stage the extension
 mkdirSync(join(STAGE, 'dist'), { recursive: true });
