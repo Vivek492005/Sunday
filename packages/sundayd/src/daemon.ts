@@ -12,6 +12,7 @@ import {
   ProviderRegistry,
   Router,
   createDefaultRegistry as createDefaultProviders,
+  type RouterPolicyConfig,
 } from '@sunday/gateway';
 import { ToolRegistry, createDefaultRegistry as createDefaultTools } from '@sunday/tools';
 import { RpcError, StdioTransport } from './transport.js';
@@ -43,6 +44,13 @@ export interface DaemonOptions {
   providers?: ProviderRegistry;
   onShutdown?: () => void;
   onStdinClose?: () => void;
+  /**
+   * Phase 3: router policy for provider selection + Relay failover. Defaults
+   * to registry order (openrouter → groq) with failover on rate-limit — this
+   * is what makes the visible Relay reachable in production. Tests inject
+   * their own (e.g. mock providers with forced 429s).
+   */
+  routerPolicy?: RouterPolicyConfig;
   /** Phase 2: context — bound `context/*` handlers from @sunday/context
    *  (e.g. `createContextHandlers(workspaceRoot)`), injected so sundayd
    *  doesn't depend on @sunday/context. When absent, `context/*` calls fail
@@ -84,15 +92,37 @@ export class SundayDaemon {
     this.sessions = new SessionStore(opts.sessionsDir ?? defaultSessionsDir());
     this.tools = opts.tools ?? createDefaultTools();
     this.providers = opts.providers ?? createDefaultProviders();
-    const router = new Router(this.providers);
+    // Phase 3: without a policy the router never fails over, so the visible
+    // Relay would be dead code in production. Default: registry order with
+    // failover on rate-limit (429s), Relay surfaced on chat/event via the
+    // sink above.
+    const routerPolicy: RouterPolicyConfig = opts.routerPolicy ?? {
+      order: this.providers.ids(),
+      perProvider: {},
+      failover: { enabled: true, on: ['rate-limit'] },
+    };
+    const router = new Router(this.providers, opts.defaultModel, routerPolicy);
     const policy = new PolicyGate(opts.policy);
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
     this.contextHandlers = opts.contextHandlers;
     this.loop = new AgentLoop(
       { tools: this.tools, providers: this.providers },
       {
-        event: (sessionId, turnId, event) =>
-          this.transport.notify('chat/event', { turnId, sessionId, event }),
+        // Phase 3: visible Relay — when the loop relays mid-turn, the
+        // notification carries via:'relay' + from/to/reason (never silent).
+        event: (sessionId, turnId, event, relay) =>
+          this.transport.notify(
+            'chat/event',
+            relay
+              ? {
+                  turnId,
+                  sessionId,
+                  event,
+                  via: 'relay' as const,
+                  relay: { from: relay.from, to: relay.to, reason: relay.reason },
+                }
+              : { turnId, sessionId, event },
+          ),
       },
       { router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations },
     );

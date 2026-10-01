@@ -3,18 +3,24 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ErrorCode } from '@sunday/protocol';
+import { ErrorCode, chatEventNotificationSchema, type ChatEvent } from '@sunday/protocol';
 import {
   ProviderRegistry,
+  Router,
+  RateLimiter,
+  MockChatProvider,
   type ChatChunk,
   type ChatProvider,
   type ChatRequest,
   type ModelEntry,
+  type RelayAttempt,
+  type RouterPolicyConfig,
 } from '@sunday/gateway';
 import { createDefaultRegistry as createDefaultTools } from '@sunday/tools';
 import { SundayDaemon, type DaemonOptions } from './daemon.js';
-import { SessionStore } from './sessions.js';
+import { SessionStore, type StoredSession } from './sessions.js';
 import { PolicyGate } from './policy.js';
+import { AgentLoop } from './loop.js';
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -71,7 +77,7 @@ interface Harness {
   close(): void;
 }
 
-async function makeHarness(provider: MockProvider, extra: Partial<DaemonOptions> = {}): Promise<Harness> {
+async function makeHarness(provider: ChatProvider, extra: Partial<DaemonOptions> = {}): Promise<Harness> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sundayd-test-'));
   const input = new PassThrough();
   const output = new PassThrough();
@@ -481,5 +487,179 @@ describe('catalogues', () => {
     expect(models).toHaveLength(1);
     expect(models[0].provider).toBe('mock');
     h.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: visible Relay fallback
+// ---------------------------------------------------------------------------
+
+describe('relay visibility', () => {
+  it('marks chat/event notifications with via=relay when the primary 429s', async () => {
+    const primary = new MockChatProvider({ id: 'primary', force429: true, retryAfterSec: 30 });
+    const secondary = new MockChatProvider({
+      id: 'secondary',
+      scripts: [
+        [
+          { type: 'text-delta', delta: 'hello' },
+          { type: 'usage', usage: { inputTokens: 3, outputTokens: 7 } },
+          { type: 'done', finishReason: 'stop' },
+        ],
+      ],
+    });
+    const registry = new ProviderRegistry();
+    registry.register(primary);
+    registry.register(secondary);
+    const policy: RouterPolicyConfig = {
+      order: ['primary', 'secondary'],
+      perProvider: {},
+      failover: { enabled: true, on: ['rate-limit'] },
+    };
+    const router = new Router(registry, 'primary:mock-model', policy, new RateLimiter());
+
+    interface Captured {
+      turnId: string;
+      sessionId: string;
+      event: ChatEvent;
+      via?: 'direct' | 'relay';
+      relay?: RelayAttempt;
+    }
+    const captured: Captured[] = [];
+    const loop = new AgentLoop(
+      { tools: createDefaultTools(), providers: registry },
+      {
+        // Assemble the notification exactly like the daemon does, and validate
+        // every one against the protocol schema (via/relay are optional).
+        event: (sessionId, turnId, event, relay) => {
+          const n: Captured = {
+            turnId,
+            sessionId,
+            event,
+            ...(relay ? { via: 'relay' as const, relay } : {}),
+          };
+          chatEventNotificationSchema.parse(n);
+          captured.push(n);
+        },
+      },
+      { router, defaultModel: 'primary:mock-model' },
+    );
+
+    const session: StoredSession = {
+      id: 'sess-relay',
+      title: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+    };
+    await loop.runTurn('turn-relay', session, 'hi');
+
+    expect(captured.length).toBeGreaterThan(0);
+    // The relay happens before any chunk, so every event in the turn is marked.
+    expect(captured.every((n) => n.via === 'relay')).toBe(true);
+    expect(captured[0].relay).toEqual({ from: 'primary', to: 'secondary', reason: 'rate-limit' });
+    expect(captured.find((n) => n.event.type === 'usage')?.via).toBe('relay');
+    const turnEnd = captured.find((n) => n.event.type === 'turn-end');
+    expect(turnEnd?.via).toBe('relay');
+    expect(turnEnd?.relay).toEqual({ from: 'primary', to: 'secondary', reason: 'rate-limit' });
+  });
+
+  it('emits no relay metadata on a direct (non-relayed) turn', async () => {
+    const direct = new MockChatProvider({
+      id: 'direct',
+      scripts: [[{ type: 'text-delta', delta: 'ok' }, { type: 'done', finishReason: 'stop' }]],
+    });
+    const registry = new ProviderRegistry();
+    registry.register(direct);
+    const router = new Router(
+      registry,
+      'direct:mock-model',
+      {
+        order: ['direct'],
+        perProvider: {},
+        failover: { enabled: true, on: ['rate-limit'] },
+      },
+      new RateLimiter(),
+    );
+    const seen: Array<{ via?: string }> = [];
+    const loop = new AgentLoop(
+      { tools: createDefaultTools(), providers: registry },
+      {
+        event: (sessionId, turnId, event, relay) => {
+          seen.push(relay ? { via: 'relay' } : {});
+        },
+      },
+      { router, defaultModel: 'direct:mock-model' },
+    );
+    const session: StoredSession = {
+      id: 'sess-direct',
+      title: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+    };
+    await loop.runTurn('turn-direct', session, 'hi');
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((n) => n.via === undefined)).toBe(true);
+  });
+
+  it('daemon wire: chat/event frames carry via=relay when the primary 429s', async () => {
+    // End-to-end through the real daemon sink (not a hand-assembled one):
+    // stdio in, NDJSON frames out. Uses the daemon's DEFAULT router policy
+    // (registry order + failover on rate-limit) — no test policy injected.
+    const primary = new MockChatProvider({ id: 'openrouter', force429: true, retryAfterSec: 30 });
+    const secondary = new MockChatProvider({
+      id: 'groq',
+      scripts: [
+        [
+          { type: 'text-delta', delta: 'served by groq' },
+          { type: 'done', finishReason: 'stop' },
+        ],
+      ],
+    });
+    const h = await makeHarness(primary, {
+      // makeHarness defaults defaultModel to 'mock:mock-model'; point it at
+      // the relay pair instead.
+      defaultModel: 'openrouter:mock-model',
+      providers: (() => {
+        const r = new ProviderRegistry();
+        r.register(primary);
+        r.register(secondary);
+        return r;
+      })(),
+    });
+    try {
+      const sessionId = await createSession(h);
+      const sendId = h.call('chat/send', { sessionId, message: 'hi' });
+      await waitFor(() => !!response(h, sendId));
+      const turnId = (response(h, sendId)!.result as { turnId: string }).turnId;
+      await waitFor(() =>
+        notifications(h).some(
+          (f) => f.params?.turnId === turnId && f.params?.event?.type === 'turn-end',
+        ),
+      );
+      const wire = notifications(h).filter((f) => f.params?.turnId === turnId);
+      expect(wire.length).toBeGreaterThan(0);
+      // Every frame validates against the protocol notification schema…
+      for (const f of wire) {
+        chatEventNotificationSchema.parse({
+          turnId: f.params.turnId,
+          sessionId: f.params.sessionId,
+          event: f.params.event,
+          ...(f.params.via ? { via: f.params.via } : {}),
+          ...(f.params.relay ? { relay: f.params.relay } : {}),
+        });
+      }
+      // …and the relay is visible on the wire.
+      expect(wire.every((f) => f.params.via === 'relay')).toBe(true);
+      expect(wire[0].params.relay).toEqual({
+        from: 'openrouter',
+        to: 'groq',
+        reason: 'rate-limit',
+      });
+      const text = wire.find((f) => f.params?.event?.type === 'text-delta');
+      expect(text?.params?.event?.delta).toBe('served by groq');
+    } finally {
+      h.close();
+    }
   });
 });

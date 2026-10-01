@@ -46,8 +46,20 @@ export const chatEventNotificationSchema = z.object({
   turnId: z.string().min(1),
   sessionId: z.string().min(1),
   event: chatEventSchema,
+  // Relay visibility (§10.6, Phase 3): when the router fails over to another
+  // provider mid-turn, notifications carry `via: 'relay'` plus which provider
+  // was swapped and why. Optional so every existing message still validates.
+  via: z.enum(['direct', 'relay']).optional(),
+  relay: z
+    .object({
+      from: z.string().min(1),
+      to: z.string().min(1),
+      reason: z.string().min(1),
+    })
+    .optional(),
 });
 export type ChatEventNotification = z.infer<typeof chatEventNotificationSchema>;
+export type ChatEventRelay = NonNullable<ChatEventNotification['relay']>;
 
 export const CHAT_METHODS = {
   'chat/send': {

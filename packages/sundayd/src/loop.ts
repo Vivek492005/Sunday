@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ErrorCode, type ChatEvent, type ContentPart, type ToolCall } from '@sunday/protocol';
-import { ProviderRegistry, Router } from '@sunday/gateway';
+import { ProviderRegistry, Router, type RelayAttempt } from '@sunday/gateway';
 import type { ToolRegistry } from '@sunday/tools';
 import { PolicyGate } from './policy.js';
 import type { StoredSession } from './sessions.js';
@@ -21,7 +21,14 @@ export interface AgentLoopOptions {
 }
 
 export interface TurnEvents {
-  event(sessionId: string, turnId: string, event: ChatEvent): void;
+  /**
+   * A chat event for the turn. `relay` is set (from the first relay on) on
+   * every event after the router failed over to another provider — the sink
+   * forwards it as `via: 'relay'` + `relay: {from,to,reason}` on the
+   * `chat/event` notification so the Relay stays visible. Sinks that ignore
+   * the parameter keep working unchanged.
+   */
+  event(sessionId: string, turnId: string, event: ChatEvent, relay?: RelayAttempt): void;
 }
 
 export interface RunTurnOptions {
@@ -65,7 +72,11 @@ export class AgentLoop {
     message: string | ContentPart[],
     opts: RunTurnOptions = {},
   ): Promise<void> {
-    const emit = (event: ChatEvent) => this.events.event(session.id, turnId, event);
+    // Per-turn relay state: once the router fails over, every subsequent
+    // event in this turn carries the relay metadata (never silent).
+    let turnRelay: RelayAttempt | undefined;
+    const emit = (event: ChatEvent) =>
+      this.events.event(session.id, turnId, event, turnRelay);
     const content: ContentPart[] =
       typeof message === 'string' ? [{ type: 'text', text: message }] : message;
     session.messages.push({ role: 'user', content });
@@ -76,13 +87,14 @@ export class AgentLoop {
     try {
       for (let i = 0; i < this.maxIterations; i++) {
         throwIfAborted(opts.signal);
-        const { provider, model } = this.router.route({ model: modelRef });
-        const stream = provider.chat({
-          model,
+        const routed = await this.router.chat({
+          model: modelRef,
           messages: session.messages,
           tools: this.deps.tools.definitions(),
           signal: opts.signal,
         });
+        if (routed.relay && !turnRelay) turnRelay = routed.relay;
+        const stream = routed.stream;
 
         let text = '';
         const calls: PendingCall[] = [];

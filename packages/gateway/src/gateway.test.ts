@@ -8,6 +8,10 @@ import {
   GroqProvider,
   ProviderHttpError,
   parseSseStream,
+  MockChatProvider,
+  RateLimiter,
+  getRetryAfterMs,
+  type RouterPolicyConfig,
 } from './index.js';
 
 function sseStream(lines: string[]): ReadableStream<Uint8Array> {
@@ -189,5 +193,203 @@ describe('OpenRouter adapter', () => {
     await expect(
       drain(new GroqProvider().chat({ model: 'groq:m', messages: [] })),
     ).rejects.toThrow(/GROQ_API_KEY/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: router policies, rate-limit scheduler, visible Relay fallback
+// ---------------------------------------------------------------------------
+
+function relayPolicy(
+  order: string[],
+  on: Array<'rate-limit' | 'server-error'> = ['rate-limit'],
+  enabled = true,
+): RouterPolicyConfig {
+  return { order, perProvider: {}, failover: { enabled, on } };
+}
+
+describe('rate-limit scheduler', () => {
+  it('parks a provider+model in cooldown after a 429 until the clock passes', () => {
+    const rl = new RateLimiter({ maxRequests: 100, windowMs: 1000 });
+    const t0 = 1_000_000;
+    expect(rl.acquire('p', 'm', t0)).toEqual({ ok: true });
+    rl.noteRateLimited('p', 'm', 60_000, t0); // Retry-After: 60
+    const during = rl.acquire('p', 'm', t0 + 59_999);
+    expect(during.ok).toBe(false);
+    if (!during.ok) expect(during.retryAfterMs).toBe(1);
+    expect(rl.acquire('p', 'm', t0 + 60_000)).toEqual({ ok: true });
+    // Other models on the same provider are unaffected.
+    expect(rl.acquire('p', 'other', t0 + 1)).toEqual({ ok: true });
+  });
+
+  it('blocks the (N+1)th request inside the sliding window', () => {
+    const rl = new RateLimiter({ maxRequests: 2, windowMs: 1000 });
+    const t0 = 5_000_000;
+    expect(rl.acquire('p', 'm', t0).ok).toBe(true);
+    expect(rl.acquire('p', 'm', t0 + 10).ok).toBe(true);
+    const third = rl.acquire('p', 'm', t0 + 20);
+    expect(third.ok).toBe(false);
+    if (!third.ok) expect(third.retryAfterMs).toBe(980);
+    // The window slides: the first request expires 1000ms after t0.
+    expect(rl.acquire('p', 'm', t0 + 1000).ok).toBe(true);
+  });
+
+  it('parses Retry-After seconds, HTTP dates, and ms header variants', () => {
+    expect(getRetryAfterMs(new Headers({ 'retry-after': '60' }))).toBe(60_000);
+    expect(getRetryAfterMs({ 'Retry-After': '2' })).toBe(2000);
+    expect(getRetryAfterMs(new Headers({ 'retry-after-ms': '1500' }))).toBe(1500);
+    expect(getRetryAfterMs(new Headers({ 'x-retry-after-ms': '250' }))).toBe(250);
+    const future = new Date(Date.now() + 30_000).toUTCString();
+    const parsed = getRetryAfterMs(new Headers({ 'retry-after': future }));
+    expect(parsed).toBeGreaterThan(0);
+    expect(parsed).toBeLessThanOrEqual(30_000);
+    expect(getRetryAfterMs(new Headers())).toBeUndefined();
+    expect(getRetryAfterMs(undefined)).toBeUndefined();
+    expect(getRetryAfterMs(new Headers({ 'retry-after': 'not-a-value' }))).toBeUndefined();
+  });
+});
+
+describe('router failover / visible relay', () => {
+  function twoProviders() {
+    const primary = new MockChatProvider({ id: 'primary', force429: true, retryAfterSec: 30 });
+    const secondary = new MockChatProvider({
+      id: 'secondary',
+      scripts: [
+        [
+          { type: 'text-delta', delta: 'hello from secondary' },
+          { type: 'done', finishReason: 'stop' } as const,
+        ],
+      ],
+    });
+    const registry = new ProviderRegistry();
+    registry.register(primary);
+    registry.register(secondary);
+    return { registry };
+  }
+
+  it('relays to the next provider on forced 429 and returns from/to/reason', async () => {
+    const { registry } = twoProviders();
+    const router = new Router(
+      registry,
+      'primary:mock-model',
+      relayPolicy(['primary', 'secondary']),
+      new RateLimiter(),
+    );
+    const res = await router.chat({ model: 'primary:mock-model', messages: [] });
+    expect(res.provider.id).toBe('secondary');
+    expect(res.model).toBe('mock-model');
+    expect(res.relay).toEqual({ from: 'primary', to: 'secondary', reason: 'rate-limit' });
+    const text = (await drain(res.stream))
+      .filter((c: any) => c.type === 'text-delta')
+      .map((c: any) => c.delta)
+      .join('');
+    expect(text).toBe('hello from secondary');
+    expect(res.attempts[0]).toMatchObject({ providerId: 'primary', ok: false });
+    expect(res.attempts[res.attempts.length - 1]).toMatchObject({
+      providerId: 'secondary',
+      ok: true,
+    });
+  });
+
+  it('respects policy order: first usable provider wins, no relay', async () => {
+    const { registry } = twoProviders();
+    const router = new Router(
+      registry,
+      'secondary:mock-model',
+      relayPolicy(['secondary', 'primary']),
+      new RateLimiter(),
+    );
+    const res = await router.chat({ model: 'secondary:mock-model', messages: [] });
+    expect(res.provider.id).toBe('secondary');
+    expect(res.relay).toBeUndefined();
+  });
+
+  it('with failover disabled, the 429 surfaces as an error (no silent relay)', async () => {
+    const { registry } = twoProviders();
+    const router = new Router(
+      registry,
+      'primary:mock-model',
+      relayPolicy(['primary', 'secondary'], ['rate-limit'], false),
+      new RateLimiter(),
+    );
+    await expect(router.chat({ model: 'primary:mock-model', messages: [] })).rejects.toMatchObject(
+      { name: 'ProviderHttpError', status: 429 },
+    );
+  });
+
+  it('relays on 5xx only when failover.on includes server-error', async () => {
+    const bad = new MockChatProvider({ id: 'bad', forceStatus: 503 });
+    const good = new MockChatProvider({
+      id: 'good',
+      scripts: [[{ type: 'done', finishReason: 'stop' } as const]],
+    });
+    const registry = new ProviderRegistry();
+    registry.register(bad);
+    registry.register(good);
+
+    const withServerError = new Router(
+      registry,
+      'bad:mock-model',
+      relayPolicy(['bad', 'good'], ['rate-limit', 'server-error']),
+      new RateLimiter(),
+    );
+    const res = await withServerError.chat({ model: 'bad:mock-model', messages: [] });
+    expect(res.provider.id).toBe('good');
+    expect(res.relay).toEqual({ from: 'bad', to: 'good', reason: 'server-error' });
+
+    const without = new Router(
+      registry,
+      'bad:mock-model',
+      relayPolicy(['bad', 'good'], ['rate-limit']),
+      new RateLimiter(),
+    );
+    await expect(without.chat({ model: 'bad:mock-model', messages: [] })).rejects.toMatchObject({
+      status: 503,
+    });
+  });
+
+  it('skips a cooled-down provider and reports the relay visibly', async () => {
+    const { registry } = twoProviders();
+    const limiter = new RateLimiter();
+    limiter.noteRateLimited('primary', 'mock-model', 60_000); // parked by an earlier 429
+    const router = new Router(
+      registry,
+      'primary:mock-model',
+      relayPolicy(['primary', 'secondary']),
+      limiter,
+    );
+    const res = await router.chat({ model: 'primary:mock-model', messages: [] });
+    expect(res.provider.id).toBe('secondary');
+    expect(res.relay).toEqual({ from: 'primary', to: 'secondary', reason: 'rate-limit' });
+    expect(res.attempts[0]).toMatchObject({ providerId: 'primary', skipped: 'cooldown' });
+  });
+
+  it('honours per-provider model allowlists when resolving by bare model id', async () => {
+    const { registry } = twoProviders();
+    const policy: RouterPolicyConfig = {
+      order: ['primary', 'secondary'],
+      perProvider: { primary: { models: ['other-model'] } },
+      failover: { enabled: true, on: ['rate-limit'] },
+    };
+    const router = new Router(registry, 'primary:mock-model', policy, new RateLimiter());
+    // Bare ref: primary cannot serve 'mock-model', so secondary is preferred — no relay.
+    const res = await router.chat({ model: 'mock-model', messages: [] });
+    expect(res.provider.id).toBe('secondary');
+    expect(res.relay).toBeUndefined();
+  });
+
+  it('legacy path without a policy still routes a single provider', async () => {
+    const secondary = new MockChatProvider({
+      id: 'secondary',
+      scripts: [[{ type: 'done', finishReason: 'stop' } as const]],
+    });
+    const registry = new ProviderRegistry();
+    registry.register(secondary);
+    const router = new Router(registry, 'secondary:mock-model');
+    const res = await router.chat({ model: 'secondary:mock-model', messages: [] });
+    expect(res.provider.id).toBe('secondary');
+    expect(res.relay).toBeUndefined();
+    const chunks = await drain(res.stream);
+    expect(chunks[chunks.length - 1]).toMatchObject({ type: 'done' });
   });
 });

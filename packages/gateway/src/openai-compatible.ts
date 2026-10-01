@@ -14,12 +14,17 @@ export interface OpenAICompatibleConfig {
 }
 
 export class ProviderHttpError extends Error {
+  /** Response headers, when available — the router reads `Retry-After` off
+   *  these for the rate-limit scheduler. */
+  readonly headers: Headers;
   constructor(
     readonly status: number,
     readonly bodyText: string,
+    headers?: HeadersInit,
   ) {
     super(`provider HTTP ${status}: ${bodyText.slice(0, 300)}`);
     this.name = 'ProviderHttpError';
+    this.headers = new Headers(headers);
   }
 }
 
@@ -73,7 +78,7 @@ export async function* streamChatCompletion(
     throw err;
   }
   if (!res.ok || !res.body) {
-    throw new ProviderHttpError(res.status, await safeBodyText(res));
+    throw new ProviderHttpError(res.status, await safeBodyText(res), res.headers);
   }
   yield* parseSseStream(res.body);
 }
