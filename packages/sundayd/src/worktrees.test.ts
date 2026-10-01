@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { WorktreeManager } from './worktrees.js';
+import { WorktreeManager, canonicalWorktreePath } from './worktrees.js';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -42,7 +42,7 @@ describe('WorktreeManager', () => {
     expect(fs.readFileSync(path.join(wtPath, 'a.txt'), 'utf8')).toBe('v1\n');
 
     const { worktrees } = await mgr.list(root);
-    const wt = worktrees.find((w) => path.resolve(w.path) === path.resolve(wtPath));
+    const wt = worktrees.find((w) => canonicalWorktreePath(w.path) === canonicalWorktreePath(wtPath));
     expect(wt).toBeDefined();
     expect(wt!.branch).toBe('feature/x');
     expect(wt!.head).toMatch(/^[0-9a-f]{40}$/);
@@ -58,7 +58,7 @@ describe('WorktreeManager', () => {
     const res = await mgr.add({ repoRoot: root, branch: 'existing', path: explicit });
     expect(res.path).toBe(path.resolve(explicit));
     const { worktrees } = await mgr.list(root);
-    expect(worktrees.some((w) => path.resolve(w.path) === path.resolve(explicit) && w.branch === 'existing')).toBe(true);
+    expect(worktrees.some((w) => canonicalWorktreePath(w.path) === canonicalWorktreePath(explicit) && w.branch === 'existing')).toBe(true);
   });
 
   it('rejects invalid branch names', async () => {
@@ -75,7 +75,7 @@ describe('WorktreeManager', () => {
     const { removed } = await mgr.remove({ repoRoot: root, path: wtPath });
     expect(removed).toBe(true);
     const { worktrees } = await mgr.list(root);
-    expect(worktrees.some((w) => path.resolve(w.path) === path.resolve(wtPath))).toBe(false);
+    expect(worktrees.some((w) => canonicalWorktreePath(w.path) === canonicalWorktreePath(wtPath))).toBe(false);
 
     await expect(mgr.remove({ repoRoot: root, path: path.join(root, 'nope') })).rejects.toThrow(
       /not a registered worktree/,

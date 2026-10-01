@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -101,14 +102,26 @@ function parseWorktreeList(out: string): WorktreeInfo[] {
   return worktrees;
 }
 
+/**
+ * Canonical form for comparing worktree paths.
+ * Node and git often spell the same directory differently on Windows:
+ * `os.tmpdir()` yields `C:\Users\runneradmin\...` while git reports the
+ * 8.3 short form `C:\Users\RUNNER~1\...`, and drive-letter case may differ.
+ * `realpathSync.native` expands short names; the lowercase fold handles
+ * Windows' case-insensitive filesystem.
+ */
+export function canonicalWorktreePath(p: string): string {
+  let r: string;
+  try {
+    r = realpathSync.native(path.resolve(p));
+  } catch {
+    r = path.resolve(p);
+  }
+  return process.platform === 'win32' ? r.toLowerCase() : r;
+}
+
 function samePath(a: string, b: string): boolean {
-  const ra = path.resolve(a);
-  const rb = path.resolve(b);
-  // Windows paths are case-insensitive (and git may report a different
-  // drive-letter case than Node).
-  return process.platform === 'win32'
-    ? ra.toLowerCase() === rb.toLowerCase()
-    : ra === rb;
+  return canonicalWorktreePath(a) === canonicalWorktreePath(b);
 }
 
 /**
