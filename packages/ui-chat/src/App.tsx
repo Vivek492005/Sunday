@@ -87,7 +87,7 @@ export function App(): JSX.Element {
           onSelect={(id) => dispatch({ kind: 'select-model', id })}
         />
       </header>
-      {state.error && <div className="conn-error">{state.error}</div>}
+      {state.error && <div className="conn-error" role="alert">{state.error}</div>}
       <MessageList messages={state.messages} />
       <div className="composer-row">
         <Composer onSend={send} disabled={false} />

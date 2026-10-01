@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@sunday/protocol';
+import type { SandboxConfig } from './sandbox.js';
 
 /** Tool framework (§7). Tools are the agent's hands: the model picks them via
  *  their JSON-Schema definitions, sundayd executes them through a registry. */
@@ -7,6 +8,12 @@ export interface ToolContext {
   /** Workspace root. Every file tool is confined to this directory. */
   cwd: string;
   signal?: AbortSignal;
+  /**
+   * Sandbox execution for `run_terminal`. Stamped by sundayd from
+   * `sunday.sandbox.*` (default: mode 'off' = host execution). Only
+   * `run_terminal` reads this — other tools ignore it.
+   */
+  sandbox?: SandboxConfig;
 }
 
 export interface ToolResult {

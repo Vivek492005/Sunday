@@ -151,7 +151,7 @@ export function Composer({
   return (
     <div className="composer">
       {images.length > 0 && (
-        <div className="attachment-row" aria-label="Attached images">
+        <div className="attachment-row" role="group" aria-label="Attached images">
           {images.map((img) => (
             <span key={img.id} className="attachment-chip">
               <img src={img.dataUrl} alt={img.name} className="attachment-thumb" />
@@ -188,6 +188,11 @@ export function Composer({
           rows={3}
           disabled={disabled}
           aria-label="Chat input"
+          role="combobox"
+          aria-expanded={popup !== null}
+          aria-controls={popup ? 'mention-popup' : undefined}
+          aria-activedescendant={popup ? `mention-opt-${popup.selected}` : undefined}
+          aria-autocomplete="list"
         />
       </div>
       <button

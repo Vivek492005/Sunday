@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SidecarManager, BROWSER_ENABLED_ENV, type SidecarStatus } from './sidecar.js';
+import { SidecarManager, BROWSER_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
 import { ManagerViewProvider } from './managerView.js';
@@ -88,6 +88,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ...(vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)
         ? { [BROWSER_ENABLED_ENV]: '1' }
         : {}),
+      // Sandbox execution for agent shell commands (Hardening phase):
+      // sundayd reads SUNDAY_SANDBOX_MODE/DOCKER_IMAGE via sandboxConfigFromEnv.
+      // Always stamped (default 'off'); applies on the next sidecar (re)start.
+      ...(() => {
+        const scfg = vscode.workspace.getConfiguration('sunday.sandbox');
+        const env: Record<string, string> = {
+          [SANDBOX_MODE_ENV]: scfg.get<string>('mode', 'off'),
+        };
+        const image = scfg.get<string>('dockerImage', '').trim();
+        if (image) env[SANDBOX_DOCKER_IMAGE_ENV] = image;
+        return env;
+      })(),
       ...mcpSecretEnv,
     }),
   });

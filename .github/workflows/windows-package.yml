@@ -18,6 +18,32 @@ permissions:
   contents: write # needed to create the release + upload artifacts on tags
 
 jobs:
+  # Hardening: fail the workflow if anything looking like a real credential
+  # was committed to the product tree. Deliberate fixtures are excluded:
+  #   - packages/skills/src/memory.ts (the secret-pattern regex definitions)
+  #   - packages/skills/src/memory.test.ts (redaction test fixtures)
+  #   - packages/sundayd/src/agent-tools.test.ts (remember-refusal fixture)
+  # Docs must describe patterns with placeholders (e.g. github_pat_<…>)
+  # so they never match.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for leaked secrets
+        shell: pwsh
+        run: |
+          $pattern = 'github_pat_[A-Za-z0-9_]{8,}|ghp_[A-Za-z0-9]{8,}|gho_[A-Za-z0-9]{8,}|sk-[A-Za-z0-9]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'
+          $hits = git grep -n -E $pattern -- packages scripts docs packaging branding .github `
+            ':!packages/skills/src/memory.ts' `
+            ':!packages/skills/src/memory.test.ts' `
+            ':!packages/sundayd/src/agent-tools.test.ts'
+          if ($hits) {
+            Write-Error "Secret scan failed — possible leaked credentials:`n$hits"
+            exit 1
+          }
+          Write-Host 'Secret scan clean.'
+
   package-windows:
     runs-on: windows-latest
     steps:

@@ -191,3 +191,70 @@ describe('EnvSecretResolver', () => {
     await expect(new EnvSecretResolver().resolve('missing-key')).rejects.toThrow(/not available/);
   });
 });
+
+describe('SEC-04: workspace MCP trust gating (fail-closed)', () => {
+  async function writeWorkspaceMcp(ws: string) {
+    await writeFile(
+      join(ws, '.sunday', 'mcp.json'),
+      JSON.stringify({
+        servers: {
+          evil: {
+            transport: 'stdio',
+            command: ['node', '-e', 'process.exit(1)'],
+            defaultApproval: 'allow',
+          },
+        },
+      }),
+      'utf8',
+    );
+  }
+
+  function makeToolsWithWsMcp(ws: string, home: string, workspaceTrusted?: boolean) {
+    const mcp: { userConfigPath: string; workspaceConfigPath: string; workspaceTrusted?: boolean } = {
+      userConfigPath: join(ws, 'no-user-mcp.json'),
+      workspaceConfigPath: join(ws, '.sunday', 'mcp.json'),
+    };
+    if (workspaceTrusted !== undefined) mcp.workspaceTrusted = workspaceTrusted;
+    return createSundaydTools({ workspaceDir: ws, userDir: home, mcp });
+  }
+
+  it('ignores the workspace mcp.json when the trust verdict is absent (fail-closed)', async () => {
+    const { ws, home } = await makeDirs();
+    await writeWorkspaceMcp(ws);
+    delete process.env[TRUST_ENV];
+    const { hub, policy, ready } = makeToolsWithWsMcp(ws, home);
+    await ready;
+    expect(hub.workspaceConfigIgnored).toBe(true);
+    expect(hub.listServers().map((s) => s.name)).not.toContain('evil');
+    expect(policy.dangerousTools()).not.toContain('mcp__evil__anything');
+  });
+
+  it('ignores the workspace mcp.json when the workspace is untrusted', async () => {
+    const { ws, home } = await makeDirs();
+    await writeWorkspaceMcp(ws);
+    process.env[TRUST_ENV] = '0';
+    const { hub, ready } = makeToolsWithWsMcp(ws, home);
+    await ready;
+    expect(hub.workspaceConfigIgnored).toBe(true);
+    expect(hub.listServers().map((s) => s.name)).not.toContain('evil');
+  });
+
+  it('loads the workspace mcp.json when the workspace is trusted', async () => {
+    const { ws, home } = await makeDirs();
+    await writeWorkspaceMcp(ws);
+    process.env[TRUST_ENV] = '1';
+    const { hub, ready } = makeToolsWithWsMcp(ws, home);
+    await ready;
+    expect(hub.workspaceConfigIgnored).toBe(false);
+    expect(hub.listServers().map((s) => s.name)).toContain('evil');
+  });
+
+  it('an explicit workspaceTrusted=true still overrides the env verdict', async () => {
+    const { ws, home } = await makeDirs();
+    await writeWorkspaceMcp(ws);
+    process.env[TRUST_ENV] = '0';
+    const { hub, ready } = makeToolsWithWsMcp(ws, home, true);
+    await ready;
+    expect(hub.listServers().map((s) => s.name)).toContain('evil');
+  });
+});

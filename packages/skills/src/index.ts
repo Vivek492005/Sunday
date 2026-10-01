@@ -21,5 +21,5 @@ export type {
 export { AGENTS_MD, RuleLoader } from './rules.js';
 export type { ActiveRule, RuleLoaderOptions, SystemRule } from './rules.js';
 
-export { SecretRefusedError, SECRET_PATTERNS, assertNoSecrets, loadMemory, remember } from './memory.js';
+export { SecretRefusedError, SECRET_PATTERNS, assertNoSecrets, loadMemory, remember, redactSecrets, redactionMarker } from './memory.js';
 export type { MemoryDiff, MemoryOptions, MemoryScope } from './memory.js';

@@ -306,7 +306,11 @@ describe('sessions', () => {
     expect(raw.length).toBeGreaterThan(0);
     const parsed = JSON.parse(raw);
     expect(parsed.id).toBe(sid);
-    expect(parsed.messages).toEqual([]);
+    // session/create always injects the standing injection-guard system
+    // message (§15.4), even in skill-less workspaces.
+    expect(parsed.messages).toHaveLength(1);
+    expect(parsed.messages[0].role).toBe('system');
+    expect(parsed.messages[0].content).toContain('UNTRUSTED DATA');
     h.close();
   });
 });

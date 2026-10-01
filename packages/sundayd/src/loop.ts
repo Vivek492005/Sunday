@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { ErrorCode, type ChatEvent, type ContentPart, type ToolCall } from '@sunday/protocol';
 import { ProviderRegistry, Router, type RelayAttempt } from '@sunday/gateway';
-import type { ToolRegistry } from '@sunday/tools';
+import type { SandboxConfig, ToolRegistry } from '@sunday/tools';
+import { redactSecrets } from '@sunday/skills';
 import { PolicyGate } from './policy.js';
+import { wrapUntrustedToolOutput } from './untrusted.js';
 import type { StoredSession } from './sessions.js';
 
 export const DEFAULT_MODEL = 'openrouter:meta-llama/llama-3.3-70b-instruct';
@@ -18,6 +20,12 @@ export interface AgentLoopOptions {
   policy?: PolicyGate;
   defaultModel?: string;
   maxIterations?: number;
+  /**
+   * Hardening: sandbox execution for agent shell commands. Stamped onto
+   * every ToolContext in executeCall; `run_terminal` routes to the sandbox
+   * when mode !== 'off'. Undefined = host execution (current behavior).
+   */
+  sandbox?: SandboxConfig;
 }
 
 export interface TurnEvents {
@@ -54,6 +62,7 @@ export class AgentLoop {
   private readonly policy: PolicyGate;
   private readonly defaultModel: string;
   private readonly maxIterations: number;
+  private readonly sandbox: SandboxConfig | undefined;
 
   constructor(
     private readonly deps: AgentLoopDeps,
@@ -64,6 +73,7 @@ export class AgentLoop {
     this.policy = opts.policy ?? new PolicyGate();
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
     this.maxIterations = opts.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+    this.sandbox = opts.sandbox;
   }
 
   async runTurn(
@@ -172,10 +182,20 @@ export class AgentLoop {
         isError: true,
       };
     }
-    const r = await this.deps.tools.call(call.name, call.arguments, { cwd, signal });
+    const r = await this.deps.tools.call(call.name, call.arguments, {
+      cwd,
+      signal,
+      // Hardening: sandbox config rides on the context; run_terminal is the
+      // only tool that reads it (single decision point in terminal.ts).
+      sandbox: this.sandbox,
+    });
+    // §15.4: tool output is untrusted data — redact secret shapes before it
+    // can reach the provider, and wrap it in explicit delimiters so the
+    // model cannot mistake it for instructions.
+    const safeOutput = wrapUntrustedToolOutput(call.name, redactSecrets(r.output));
     return {
       toolCallId: call.id,
-      content: [{ type: 'text', text: r.output }],
+      content: [{ type: 'text', text: safeOutput }],
       isError: r.isError ?? false,
     };
   }

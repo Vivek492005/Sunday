@@ -248,6 +248,7 @@ button { background: var(--vscode-button-secondaryBackground); color: var(--vsco
 button:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
 button:disabled { opacity: 0.4; cursor: default; }
 button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 1px; }
 #banner { min-height: 18px; margin-bottom: 6px; }
 .err { color: var(--vscode-testing-iconFailed); font-size: 11px; white-space: pre-wrap; word-break: break-word; }
 .notice { background: var(--vscode-inputValidation-warningBackground); border: 1px solid var(--vscode-inputValidation-warningBorder);
@@ -267,15 +268,15 @@ h3 { margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; letter-spac
   color: var(--vscode-descriptionForeground); }
 </style></head>
 <body>
-<div id="banner"></div>
+<div id="banner" role="alert"></div>
 <div id="toolbar">
-  <input id="url" type="text" placeholder="https://…" spellcheck="false" />
+  <input id="url" type="text" placeholder="https://…" spellcheck="false" aria-label="Browser URL" />
   <button id="open" class="primary">Open</button>
   <button id="reload" title="Re-open the current URL">Reload</button>
   <button id="close" title="Stop the screencast and close the browser session">Close session</button>
 </div>
 <div id="controlRow">
-  <span id="controlBadge" class="badge">…</span>
+  <span id="controlBadge" class="badge" role="status">…</span>
   <button id="takeover" title="Hand browser control to yourself; agent actions pause">Take over</button>
   <button id="resume" title="Hand browser control back to the agent">Resume agent</button>
   <button id="shotBtn" title="Capture a one-shot screenshot">Screenshot</button>

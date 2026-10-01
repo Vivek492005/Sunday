@@ -2,6 +2,7 @@
 // PowerShell-aware terminal proxy, read-only git. All file access is
 // confined to the workspace root (see paths.ts).
 export * from './types.js';
+export * from './sandbox.js';
 export * from './paths.js';
 export * from './validate.js';
 export * from './fs-tools.js';

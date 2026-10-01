@@ -104,6 +104,24 @@ afterEach(() => {
 });
 
 describe('BrowserViewProvider', () => {
+  it('serves accessible panel markup: labelled URL input, alert banner, status badge', () => {
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    const view = makeWebviewView();
+    provider.resolveWebviewView(view.view as never);
+    const html: string = view.webview.html;
+    // Placeholder text is not a label for screen readers.
+    expect(html).toContain('aria-label="Browser URL"');
+    // Error/notice banner is announced.
+    expect(html).toContain('id="banner" role="alert"');
+    // Control handover state is a live status, not a decorative span.
+    expect(html).toContain('role="status"');
+    // Controls that matter have visible text or titles.
+    for (const label of ['Take over', 'Resume agent', 'Screenshot', 'Open', 'Reload', 'Close session']) {
+      expect(html).toContain(label);
+    }
+    provider.dispose();
+  });
   it('resolves the view with scripts enabled and posts the control state', async () => {
     const bridge = makeBridge();
     const { provider } = makeProvider(bridge);

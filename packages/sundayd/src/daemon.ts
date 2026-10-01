@@ -20,8 +20,9 @@ import {
   type RouterPolicyConfig,
 } from '@sunday/gateway';
 import { homedir } from 'node:os';
-import { ToolRegistry, createDefaultRegistry as createDefaultTools } from '@sunday/tools';
+import { ToolRegistry, createDefaultRegistry as createDefaultTools, type SandboxConfig } from '@sunday/tools';
 import { RpcError, StdioTransport } from './transport.js';
+import { sandboxConfigFromEnv } from './sandbox.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
 import { PolicyGate, syncDangerousFlags, type PolicyOptions } from './policy.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
@@ -131,6 +132,12 @@ export interface DaemonOptions {
    *  registers the `browser_*` agent tools (opt-in, dangerous) and stops the
    *  child on graceful exit. Injected by the composition root (cli.ts). */
   browserd?: BrowserdManager;
+  /**
+   * Hardening: sandbox execution for agent shell commands (`run_terminal`).
+   * Defaults to the environment (`SUNDAY_SANDBOX_MODE`, stamped by the
+   * extension from `sunday.sandbox.*`); mode 'off' = host execution.
+   */
+  sandbox?: SandboxConfig;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -159,12 +166,19 @@ export class SundayDaemon {
   /** Part B: lazy completion orchestrator (debounce/cache/coalescing). */
   private completionOrchestrator: CompletionOrchestrator | undefined;
   private readonly loop: AgentLoop;
+  /** Shared approval gate: the main agent loop AND every orchestrator
+   *  sub-agent loop evaluate through this instance, so a dangerous tool can
+   *  never run in a sub-agent without the session approval the main loop
+   *  would require (SEC-01). */
+  private readonly policyGate: PolicyGate;
   private readonly turns = new Map<string, AbortController>();
   private readonly onShutdown: () => void;
   /** Phase 6: managed browserd child (if the composition root opted in). */
   private readonly browserdManager: BrowserdManager | undefined;
   /** Home dir for user skills/rules/memory (system prompt injection). */
   private readonly userDir: string;
+  /** Hardening: sandbox config for agent shell commands (from opts or env). */
+  private readonly sandbox: SandboxConfig;
   /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
   private readonly contextHandlers: DaemonContextHandlers | undefined;
   /** Phase 4: dynamically registered method handlers (manager methods).
@@ -196,7 +210,12 @@ export class SundayDaemon {
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
     this.completionModel = opts.completionModel ?? DEFAULT_COMPLETION_MODEL;
     const policy = opts.policyGate ?? new PolicyGate(opts.policy);
+    this.policyGate = policy;
     this.userDir = opts.userDir ?? homedir();
+    // Hardening: sandbox mode for agent shell commands. Env-sourced by
+    // default (SUNDAY_SANDBOX_MODE, stamped by the extension); an invalid
+    // value throws here — fail closed, never silently unsandboxed.
+    this.sandbox = opts.sandbox ?? sandboxConfigFromEnv();
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
     this.contextHandlers = opts.contextHandlers;
     // Phase 6: opt-in browser tools. browserd stays a lazy child — it only
@@ -227,7 +246,7 @@ export class SundayDaemon {
               : { turnId, sessionId, event },
           ),
       },
-      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations },
+      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
     );
     this.transport = new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
@@ -275,10 +294,15 @@ export class SundayDaemon {
   private async runSubAgent(opts: DaemonSubAgentOptions): Promise<void> {
     const session = this.sessions.create({ title: opts.title, cwd: opts.cwd, model: opts.model });
     session.messages.push({ role: 'system', content: opts.systemPrompt });
+    // SEC-01: sub-agent loops share the daemon's PolicyGate (with the
+    // sub-agent's own tool registry synced for dangerous flags) — a fresh
+    // default gate would have an empty dangerous set and silently approve
+    // dangerous tools.
+    syncDangerousFlags(this.policyGate, opts.tools);
     const loop = new AgentLoop(
       { tools: opts.tools, providers: this.providers },
       { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
-      { router: this.router, maxIterations: opts.maxIterations },
+      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
     );
     await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal });
   }
@@ -296,9 +320,9 @@ export class SundayDaemon {
 
   /**
    * Part A: prepend the skills/rules/memory system prompt to a fresh
-   * session. Skipped entirely when there is nothing to inject, so sessions
-   * in skill-less workspaces behave exactly as before. Failures are logged,
-   * never fatal to session creation.
+   * session. Always injected — at minimum the INJECTION_GUARD (§15.4), so
+   * the untrusted-content rule is standing even in skill-less workspaces.
+   * Failures are logged, never fatal to session creation.
    */
   private async injectSystemPrompt(s: StoredSession): Promise<void> {
     try {
@@ -306,9 +330,7 @@ export class SundayDaemon {
         workspaceDir: s.cwd ?? process.cwd(),
         userDir: this.userDir,
       });
-      if (prompt !== undefined) {
-        s.messages.push({ role: 'system', content: prompt });
-      }
+      s.messages.push({ role: 'system', content: prompt });
     } catch (e) {
       console.error(`[sundayd] system prompt build failed: ${(e as Error).message}`);
     }

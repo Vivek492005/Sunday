@@ -45,11 +45,13 @@ export interface SundaydMcpOptions {
   workspaceConfigPath?: string;
   secretResolver?: SecretResolver;
   /**
-   * The hub loads the workspace-scope mcp.json when true. sundayd passes
-   * true unconditionally: the trust decision lives in the extension, which
-   * prompts (Allow/Deny) before starting a workspace-scope server in an
-   * untrusted workspace. Model-driven skill content stays hard-gated on
-   * `isWorkspaceTrusted()` (see load_skill below).
+   * The hub loads the workspace-scope mcp.json only when the workspace is
+   * trusted. Fail-closed: when the caller passes no verdict, the daemon's
+   * own SUNDAY_WORKSPACE_TRUSTED verdict decides (SEC-04). The extension
+   * still owns the interactive Allow/Deny prompt for *starting* a
+   * workspace-scope server — the hub only controls which configs load.
+   * Model-driven skill content stays hard-gated on `isWorkspaceTrusted()`
+   * (see load_skill below).
    */
   workspaceTrusted?: boolean;
   /** Cap for MCP tools registered directly (default: hub's DEFAULT_MAX_TOOLS). */
@@ -219,7 +221,10 @@ export function createSundaydTools(opts: SundaydToolsOptions = {}): SundaydTools
   const workspaceDir = resolve(opts.workspaceDir ?? process.cwd());
   const userDir = resolve(opts.userDir ?? homedir());
   const mcpOpts = opts.mcp ?? {};
-  const workspaceTrusted = mcpOpts.workspaceTrusted ?? true;
+  // SEC-04: fail closed — an untrusted (or verdict-less) workspace never
+  // loads workspace-scope MCP servers, which could otherwise spawn
+  // arbitrary local processes via stdio `command` entries.
+  const workspaceTrusted = mcpOpts.workspaceTrusted ?? isWorkspaceTrusted();
   const workspaceConfigPath =
     mcpOpts.workspaceConfigPath ?? defaultWorkspaceConfigPath(workspaceDir);
 

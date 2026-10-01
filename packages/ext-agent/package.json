@@ -142,6 +142,17 @@
           "default": false,
           "description": "Opt in to the agent browser (browserd). When off, browser_* tools return a disabled error.",
           "type": "boolean"
+        },
+        "sunday.sandbox.mode": {
+          "default": "off",
+          "description": "Sandbox for agent-run shell commands. off = run on the host (current behavior); docker = disposable container with networking disabled; bubblewrap = Linux bwrap with an unshared network namespace. Applies on the next sidecar restart.",
+          "enum": ["off", "docker", "bubblewrap"],
+          "type": "string"
+        },
+        "sunday.sandbox.dockerImage": {
+          "default": "",
+          "description": "Container image for sunday.sandbox.mode=docker. Must be present locally (docker pull it once); empty = alpine:latest.",
+          "type": "string"
         }
       },
       "title": "Sunday"

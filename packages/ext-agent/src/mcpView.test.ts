@@ -131,6 +131,18 @@ describe('McpViewProvider rendering', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toMatch(/not running/);
   });
+
+  it('serves accessible panel markup: alert banner and focusable controls', async () => {
+    await flush();
+    const html: string = view.webview.html;
+    // The banner region must announce errors/notices to screen readers.
+    expect(html).toContain('id="banner" role="alert"');
+    // Action buttons are native <button>s with visible text — keyboard
+    // operable by construction.
+    expect(html).toContain('<button id="refresh">Refresh</button>');
+    // Visible keyboard focus indicator (a11y: no outline-less focus).
+    expect(html).toContain('button:focus-visible');
+  });
 });
 
 describe('McpViewProvider messages', () => {

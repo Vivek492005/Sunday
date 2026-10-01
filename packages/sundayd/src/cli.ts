@@ -61,10 +61,11 @@ async function main(): Promise<void> {
     workspaceDir,
     userDir: homedir(),
     mcp: {
-      // The hub always loads the workspace config; the trust decision lives
-      // in the extension, which prompts (Allow/Deny) before starting a
-      // workspace-scope server in an untrusted workspace.
-      workspaceTrusted: true,
+      // SEC-04: fail closed — the hub loads the workspace-scope mcp.json
+      // only when the extension stamped SUNDAY_WORKSPACE_TRUSTED=1 at
+      // spawn. The extension still prompts (Allow/Deny) before *starting*
+      // a workspace-scope server.
+      workspaceTrusted: isWorkspaceTrusted(),
       secretResolver: new EnvSecretResolver(),
     },
   });

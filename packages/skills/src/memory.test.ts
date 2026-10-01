@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SecretRefusedError, loadMemory, remember } from './memory.js';
+import { SecretRefusedError, loadMemory, remember, redactSecrets, redactionMarker } from './memory.js';
 
 let ws: string;
 let user: string;
@@ -83,5 +83,47 @@ describe('remember', () => {
   it('does not mistake ordinary prose for a secret', async () => {
     const { appended } = await remember('ask about the password policy doc', 'workspace', opts());
     expect(appended).toContain('password policy doc');
+  });
+});
+
+describe('redactSecrets', () => {
+  it('replaces full-token patterns with labelled markers', () => {
+    const out = redactSecrets('key=sk-abcdef1234567890 and ghp_abcdefghijklmnopqrst');
+    expect(out).toContain('[REDACTED:openai-key]');
+    expect(out).toContain('[REDACTED:github-pat]');
+    expect(out).not.toContain('sk-abcdef1234567890');
+    expect(out).not.toContain('ghp_abcdefghijklmnopqrst');
+  });
+
+  it('redacts the value of assignment-style patterns too', () => {
+    const out = redactSecrets('config: password = hunter2; api_key: "abc123def456"');
+    expect(out).not.toContain('hunter2');
+    expect(out).not.toContain('abc123def456');
+    expect(out).toContain('[REDACTED:password-assignment]');
+    expect(out).toContain('[REDACTED:api-key-assignment]');
+  });
+
+  it('redacts a whole PEM private-key block, not just the header', () => {
+    const pem = [
+      '-----BEGIN RSA PRIVATE KEY-----',
+      'MIIEpAIBAAKCAQEA7b...',
+      '...more base64...',
+      '-----END RSA PRIVATE KEY-----',
+    ].join('\n');
+    const out = redactSecrets(`before\n${pem}\nafter`);
+    expect(out).not.toContain('MIIEpAIBAAKCAQEA7b');
+    expect(out).not.toContain('BEGIN RSA PRIVATE KEY');
+    expect(out).toContain('[REDACTED:private-key-block]');
+    expect(out).toContain('before');
+    expect(out).toContain('after');
+  });
+
+  it('leaves ordinary prose untouched', () => {
+    const prose = 'ask about the password policy doc';
+    expect(redactSecrets(prose)).toBe(prose);
+  });
+
+  it('redactionMarker names the pattern, never the value', () => {
+    expect(redactionMarker('openai-key')).toBe('[REDACTED:openai-key]');
   });
 });

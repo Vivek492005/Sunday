@@ -200,3 +200,12 @@
   padding: 6px 8px;
   margin-bottom: 6px;
 }
+
+/* Visible focus indicators (a11y): unit cards are role=button toggles, so
+ * they need an explicit focus ring just like buttons and inputs. */
+.mgr-btn:focus-visible,
+.mgr-input:focus-visible,
+.mgr-unit-card:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
+}

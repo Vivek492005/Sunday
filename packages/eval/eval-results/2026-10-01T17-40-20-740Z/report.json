@@ -1,0 +1,150 @@
+{
+  "adapter": "fake-scripted",
+  "startedAt": "2026-10-01T17:40:20.740Z",
+  "durationMs": 1367,
+  "tasks": [
+    {
+      "taskId": "read-file",
+      "title": "Read a file and report its contents",
+      "pass": true,
+      "notes": "file read, content matches",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 13
+    },
+    {
+      "taskId": "list-glob",
+      "title": "List a directory tree",
+      "pass": true,
+      "notes": "both files listed",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 67
+    },
+    {
+      "taskId": "grep-search",
+      "title": "Search file contents with a pattern",
+      "pass": true,
+      "notes": "marker found in app.ts",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 6
+    },
+    {
+      "taskId": "edit-file",
+      "title": "Make a precise edit",
+      "pass": true,
+      "notes": "port updated, rest intact",
+      "toolCalls": 2,
+      "validCalls": 2,
+      "toolReliability": 1,
+      "durationMs": 2
+    },
+    {
+      "taskId": "write-file",
+      "title": "Create a new file",
+      "pass": true,
+      "notes": "file created with exact content",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 1
+    },
+    {
+      "taskId": "read-edit-verify",
+      "title": "Multi-step: read, edit, verify with search",
+      "pass": true,
+      "notes": "bumped and verified absent",
+      "toolCalls": 3,
+      "validCalls": 3,
+      "toolReliability": 1,
+      "durationMs": 2
+    },
+    {
+      "taskId": "terminal-run",
+      "title": "Run a command and capture output",
+      "pass": true,
+      "notes": "command output captured",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 255
+    },
+    {
+      "taskId": "git-status",
+      "title": "Inspect git status in a fixture repo",
+      "pass": true,
+      "notes": "modified file reported",
+      "toolCalls": 1,
+      "validCalls": 1,
+      "toolReliability": 1,
+      "durationMs": 138
+    },
+    {
+      "taskId": "orchestrate-plan",
+      "title": "Produce a valid 2-unit orchestration plan",
+      "pass": true,
+      "notes": "plan validated by orchestrator planner (see unit test)",
+      "toolCalls": 0,
+      "validCalls": 0,
+      "toolReliability": 1,
+      "durationMs": 0
+    },
+    {
+      "taskId": "browser-policy",
+      "title": "Browser navigation policy blocks file:// and private IPs",
+      "pass": true,
+      "notes": "policy enforced by browserd policy module (see unit test)",
+      "toolCalls": 0,
+      "validCalls": 0,
+      "toolReliability": 1,
+      "durationMs": 0
+    },
+    {
+      "taskId": "parallel-disjoint-refactors",
+      "title": "Two independent refactors in disjoint directories merge cleanly",
+      "pass": true,
+      "notes": "both disjoint refactors applied, no overlap",
+      "toolCalls": 2,
+      "validCalls": 2,
+      "toolReliability": 1,
+      "durationMs": 2
+    },
+    {
+      "taskId": "parallel-overlap-rejected",
+      "title": "A plan with overlapping owns_paths is rejected at plan time",
+      "pass": true,
+      "notes": "rejected at plan time with plan-overlap, before any unit ran",
+      "toolCalls": 0,
+      "validCalls": 0,
+      "toolReliability": 1,
+      "durationMs": 5
+    },
+    {
+      "taskId": "parallel-quota-fairness",
+      "title": "No starvation: three contending agents share quota fairly",
+      "pass": true,
+      "notes": "3 agents × 4 requests all served; max inter-grant gap ≤ 3 (no starvation)",
+      "toolCalls": 0,
+      "validCalls": 0,
+      "toolReliability": 1,
+      "durationMs": 165
+    },
+    {
+      "taskId": "browser-seeded-ui-bug",
+      "title": "Fix a seeded visible UI bug via the agent browser (fake driver)",
+      "pass": true,
+      "notes": "server served buggy page; snapshot→console→edit→verify_ui→walkthrough in order; typo fixed; walkthrough.md written",
+      "toolCalls": 8,
+      "validCalls": 8,
+      "toolReliability": 1,
+      "durationMs": 706
+    }
+  ],
+  "passed": 14,
+  "total": 14,
+  "meanToolReliability": 1
+}

@@ -17,6 +17,15 @@ import { RpcClient } from './rpc.js';
  */
 export const BROWSER_ENABLED_ENV = 'SUNDAY_BROWSER_ENABLED';
 
+/**
+ * Env vars handed to the sundayd child for sandbox execution of agent shell
+ * commands. Stamped from the `sunday.sandbox.mode` / `sunday.sandbox.dockerImage`
+ * settings in extension.ts extraEnv() (same pattern as BROWSER_ENABLED_ENV).
+ * sundayd reads them via sandboxConfigFromEnv(); mode 'off' = host execution.
+ */
+export const SANDBOX_MODE_ENV = 'SUNDAY_SANDBOX_MODE';
+export const SANDBOX_DOCKER_IMAGE_ENV = 'SUNDAY_SANDBOX_DOCKER_IMAGE';
+
 /** The sidecar binary/script could not be found anywhere we look. */
 export class SidecarNotFoundError extends Error {
   constructor(detail: string) {

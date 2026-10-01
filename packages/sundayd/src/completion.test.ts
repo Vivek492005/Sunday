@@ -226,6 +226,26 @@ describe('latency instrumentation', () => {
   });
 });
 
+// Perf regression gate (§A.5): the orchestration path itself (debounce timer
+// already fired, no cache) must add negligible latency on top of the
+// provider. With an instant fake provider this bounds sundayd-side overhead;
+// real provider latency is a gateway concern, measured separately.
+describe('latency budget (perf gate)', () => {
+  it('p50 completion latency stays under the 150ms budget', async () => {
+    const { orch } = makeOrch(async () => ({ completion: 'x;', nativeFim: false }));
+    const N = 30;
+    for (let i = 0; i < N; i++) {
+      // Distinct docVersion so every request takes the provider path.
+      await orch.complete(params({ docVersion: 1000 + i }));
+    }
+    const s = orch.stats();
+    expect(s.count).toBe(N);
+    expect(s.p50Ms).toBeLessThan(150);
+    expect(s.p95Ms).toBeLessThan(150);
+    orch.dispose();
+  });
+});
+
 describe('error handling', () => {
   it('rejects when the provider fails (non-abort)', async () => {
     const { orch } = makeOrch(async () => {

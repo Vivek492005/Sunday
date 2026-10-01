@@ -221,6 +221,7 @@ h3 { margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spac
 button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 3px 10px; cursor: pointer; font-size: 11px; }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 1px; }
 .err { color: var(--vscode-testing-iconFailed); font-size: 11px; white-space: pre-wrap; word-break: break-word; }
 .muted { color: var(--vscode-descriptionForeground); font-size: 11px; }
 .mono { font-family: var(--vscode-editor-font-family); }
@@ -231,7 +232,7 @@ td, th { text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--vsco
 #banner { min-height: 18px; margin-bottom: 4px; }
 </style></head>
 <body>
-<div id="banner"></div>
+<div id="banner" role="alert"></div>
 <div id="trust"></div>
 <h3>MCP servers</h3>
 <div id="servers"><span class="muted">loading…</span></div>

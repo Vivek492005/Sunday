@@ -114,7 +114,7 @@ export function App(): JSX.Element {
         </div>
       )}
       {state.error && (
-        <div className="mgr-error">
+        <div className="mgr-error" role="alert">
           {state.error}
           <button className="mgr-btn mgr-btn-sm" onClick={() => dispatch({ kind: 'clear-error' })}>
             Dismiss
@@ -167,6 +167,7 @@ export function App(): JSX.Element {
           <input
             className="mgr-input"
             placeholder="Label (optional)"
+            aria-label="Checkpoint label"
             value={ckptLabel}
             onChange={(e) => setCkptLabel(e.target.value)}
           />
@@ -210,12 +211,14 @@ export function App(): JSX.Element {
           <input
             className="mgr-input"
             placeholder="Branch name"
+            aria-label="Worktree branch name"
             value={wtBranch}
             onChange={(e) => setWtBranch(e.target.value)}
           />
           <input
             className="mgr-input"
             placeholder="Path (optional)"
+            aria-label="Worktree path"
             value={wtPath}
             onChange={(e) => setWtPath(e.target.value)}
           />
@@ -272,6 +275,18 @@ export function App(): JSX.Element {
 
 // -- orchestration run cards (parallel agents) ----------------------------------
 
+/** Keyboard activation for UnitCard (role="button"): Enter/Space toggles the
+ *  card. Exported so the a11y suite can assert key behavior without a DOM. */
+export function unitCardKeyDown(
+  e: { key: string; preventDefault(): void },
+  onToggle: () => void,
+): void {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    onToggle();
+  }
+}
+
 function statusBadgeClass(status: string): string {
   switch (status) {
     case 'running':
@@ -305,8 +320,19 @@ function UnitCard({
   expanded: boolean;
   onToggle: () => void;
 }): JSX.Element {
+  const toggleExpanded = (): void => onToggle();
+  const onCardKeyDown = (e: { key: string; preventDefault(): void }): void =>
+    unitCardKeyDown(e, onToggle);
   return (
-    <div className="mgr-unit-card" onClick={onToggle} role="button" tabIndex={0}>
+    <div
+      className="mgr-unit-card"
+      onClick={toggleExpanded}
+      onKeyDown={onCardKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={`${unit.title || unit.id} — ${unit.status}`}
+    >
       <div className="mgr-card-head">
         <span className="mgr-card-title">{unit.title || unit.id}</span>
         <span className={statusBadgeClass(unit.status)}>{unit.status}</span>

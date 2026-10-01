@@ -1,6 +1,6 @@
-import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { resolveWithinRoot } from './paths.js';
+import { runCommand, runSandboxed } from './sandbox.js';
 import { err, type Tool, type ToolContext, type ToolResult } from './types.js';
 
 /** Terminal proxy (§7.4). PowerShell-aware: on Windows commands run under
@@ -24,88 +24,6 @@ function shellForPlatform(): { cmd: string; argv: (command: string) => string[] 
     };
   }
   return { cmd: 'sh', argv: (command) => ['-c', command] };
-}
-
-/** Kill the whole process tree. Plain child.kill() (SIGTERM) is not enough:
- *  shells like bash defer SIGTERM while waiting for a foreground child, so a
- *  timed-out `sleep 30` would linger for the full duration. SIGKILL cannot be
- *  deferred; on POSIX we target the process group so grandchildren die too. */
-function killTree(child: ChildProcess): void {
-  const pid = child.pid;
-  if (pid === undefined) {
-    try {
-      child.kill('SIGKILL');
-    } catch {
-      /* already dead */
-    }
-    return;
-  }
-  try {
-    if (process.platform === 'win32') {
-      execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, () => undefined);
-    } else {
-      process.kill(-pid, 'SIGKILL'); // negative pid = process group
-    }
-  } catch {
-    try {
-      child.kill('SIGKILL');
-    } catch {
-      /* already dead */
-    }
-  }
-}
-
-function runCommand(
-  cmd: string,
-  argv: string[],
-  cwd: string,
-  timeoutMs: number,
-  maxOut: number,
-  signal?: AbortSignal,
-): Promise<ToolResult> {
-  return new Promise((resolve) => {
-    // detached (POSIX): child becomes a process-group leader so killTree can
-    // reap grandchildren (e.g. a dev server) along with the shell.
-    const child = spawn(cmd, argv, { cwd, windowsHide: true, detached: process.platform !== 'win32' });
-    let out = Buffer.alloc(0);
-    let truncated = false;
-    let timedOut = false;
-    const push = (chunk: Buffer) => {
-      if (out.length >= maxOut) {
-        truncated = true;
-        return;
-      }
-      const room = maxOut - out.length;
-      out = Buffer.concat([out, chunk.subarray(0, room)]);
-      if (chunk.length > room) truncated = true;
-    };
-    child.stdout.on('data', push);
-    child.stderr.on('data', push);
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killTree(child);
-    }, timeoutMs);
-    const onAbort = () => killTree(child);
-    signal?.addEventListener('abort', onAbort, { once: true });
-    const done = (result: ToolResult) => {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
-      resolve(result);
-    };
-    child.on('error', (e) =>
-      done(err(`failed to start ${cmd}: ${(e as Error).message}`)),
-    );
-    child.on('close', (code) => {
-      const text = out.toString('utf8');
-      const tail = truncated ? `\n…[truncated to ${maxOut} bytes]` : '';
-      const output = (text + tail).trim() || (timedOut ? '(no output before timeout)' : '(no output)');
-      done({
-        output,
-        isError: timedOut || code !== 0,
-        metadata: { exitCode: code, timedOut, truncated },
-      });
-    });
-  });
 }
 
 export const runTerminalTool: Tool = {
@@ -139,7 +57,21 @@ export const runTerminalTool: Tool = {
     const st = await fs.stat(workdir).catch(() => null);
     if (!st?.isDirectory()) return err(`cwd is not a directory: ${args.cwd ?? '.'}`);
     const timeoutMs = Math.min(args.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
+    const maxOut = args.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+    // Hardening: the single sandbox decision point. Every agent shell command
+    // flows through here; ctx.sandbox is stamped by sundayd from
+    // `sunday.sandbox.*` (default mode 'off' = host execution, unchanged).
+    if (ctx.sandbox && ctx.sandbox.mode !== 'off') {
+      return runSandboxed({
+        command: args.command,
+        sandbox: ctx.sandbox,
+        cwd: workdir,
+        timeoutMs,
+        maxOut,
+        signal: ctx.signal,
+      });
+    }
     const { cmd, argv } = shellForPlatform();
-    return runCommand(cmd, argv(args.command), workdir, timeoutMs, args.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES, ctx.signal);
+    return runCommand(cmd, argv(args.command), workdir, timeoutMs, maxOut, ctx.signal);
   },
 };

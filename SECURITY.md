@@ -1,5 +1,8 @@
 # Security Policy
 
+> Full policy: [`docs/SECURITY.md`](docs/SECURITY.md) — supported
+> versions, reporting channel, trust boundaries, and key practices.
+
 ## Threat model (summary)
 
 Sunday runs an AI agent loop with tool access inside the user's workspace.

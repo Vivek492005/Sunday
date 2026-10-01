@@ -14,11 +14,11 @@ function Message({ msg }: { key?: unknown; msg: ChatMessageView }): JSX.Element 
       <div className="msg-head">
         <span className="msg-role">{msg.role === 'user' ? 'You' : 'Sunday'}</span>
         {msg.via === 'relay' && (
-          <span className="relay-badge" title={relayTitle(msg)}>
+          <span className="relay-badge" aria-label={relayTitle(msg)}>
             ⟳ Relay
           </span>
         )}
-        {msg.status === 'streaming' && <span className="streaming-dot" title="Streaming…" />}
+        {msg.status === 'streaming' && <span className="streaming-dot" role="img" aria-label="Streaming…" />}
       </div>
       {msg.role === 'assistant' ? (
         <div className="msg-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
@@ -52,7 +52,7 @@ export function MessageList({ messages }: { messages: ChatMessageView[] }): JSX.
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
   return (
-    <div className="msg-list" role="log" aria-live="polite">
+    <div className="msg-list" role="log" aria-label="Sunday chat messages" aria-live="polite">
       {messages.length === 0 && (
         <div className="empty">
           <div className="empty-title">Sunday Chat</div>

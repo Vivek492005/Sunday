@@ -13,10 +13,11 @@ export function MentionPopup({
 }): JSX.Element | null {
   if (items.length === 0) return null;
   return (
-    <div className="mention-popup" role="listbox" aria-label="Mention suggestions">
+    <div className="mention-popup" id="mention-popup" role="listbox" aria-label="Mention suggestions">
       {items.map((item, i) => (
         <div
           key={item.kind}
+          id={`mention-opt-${i}`}
           role="option"
           aria-selected={i === selected}
           className={'mention-item' + (i === selected ? ' selected' : '')}

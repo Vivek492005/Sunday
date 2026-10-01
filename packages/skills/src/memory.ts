@@ -51,6 +51,12 @@ export class SecretRefusedError extends Error {
 interface SecretPattern {
   label: string;
   re: RegExp;
+  /**
+   * When true the pattern only matches the *label* of an assignment
+   * (`password=`, `api_key:` …) — redaction then also swallows the value
+   * that follows it.
+   */
+  includeValue?: boolean;
 }
 
 /**
@@ -62,12 +68,12 @@ export const SECRET_PATTERNS: SecretPattern[] = [
   { label: 'github-oauth', re: /\bgho_[A-Za-z0-9]{8,}\b/ },
   { label: 'github-fine-grained-pat', re: /\bgithub_pat_[A-Za-z0-9_]{8,}\b/ },
   { label: 'aws-access-key', re: /\bAKIA[0-9A-Z]{16}\b/ },
-  { label: 'aws-secret-key', re: /\baws_secret_access_key\s*[:=]/i },
+  { label: 'aws-secret-key', re: /\baws_secret_access_key\s*[:=]/i, includeValue: true },
   { label: 'private-key-block', re: /-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----/ },
-  { label: 'password-assignment', re: /\bpassword\s*[:=]/i },
-  { label: 'passwd-assignment', re: /\bpasswd\s*[:=]/i },
-  { label: 'secret-assignment', re: /\bclient_secret\s*[:=]/i },
-  { label: 'api-key-assignment', re: /\bapi[_-]?key\s*[:=]/i },
+  { label: 'password-assignment', re: /\bpassword\s*[:=]/i, includeValue: true },
+  { label: 'passwd-assignment', re: /\bpasswd\s*[:=]/i, includeValue: true },
+  { label: 'secret-assignment', re: /\bclient_secret\s*[:=]/i, includeValue: true },
+  { label: 'api-key-assignment', re: /\bapi[_-]?key\s*[:=]/i, includeValue: true },
   { label: 'bearer-token', re: /\bbearer\s+[A-Za-z0-9\-._~+/]{16,}={0,3}\b/i },
   { label: 'slack-token', re: /\bxox[baprs]-[A-Za-z0-9-]{8,}\b/ },
   { label: 'google-api-key', re: /\bAIza[0-9A-Za-z\-_]{20,}\b/ },
@@ -79,6 +85,41 @@ export function assertNoSecrets(text: string): void {
   for (const p of SECRET_PATTERNS) {
     if (p.re.test(text)) throw new SecretRefusedError(p.label);
   }
+}
+
+/** Replacement marker used by {@link redactSecrets} — the label, never the value. */
+export function redactionMarker(label: string): string {
+  return `[REDACTED:${label}]`;
+}
+
+/** A full PEM private-key block (header … footer), redacted as one unit. */
+const PEM_BLOCK_RE =
+  /-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----/g;
+
+/** Value tail appended to label-only assignment patterns during redaction. */
+const ASSIGNMENT_VALUE_SUFFIX = '\\s*["\']?[^\\s"\']+["\']?';
+
+function withGlobalFlags(re: RegExp): string {
+  return re.flags.includes('g') ? re.flags : `${re.flags}g`;
+}
+
+/**
+ * Redact every known secret shape in `text` (§15.4 "Secrets leakage to model
+ * providers"). Each match is replaced with `[REDACTED:<label>]` — the label
+ * is safe to surface (it names the pattern, not the value). Assignment-style
+ * patterns (`password=…`) redact the value too, and PEM blocks are redacted
+ * whole. Use before tool results, errors, or log lines reach a prompt or a
+ * log sink.
+ */
+export function redactSecrets(text: string): string {
+  let out = text.replace(PEM_BLOCK_RE, () => redactionMarker('private-key-block'));
+  for (const p of SECRET_PATTERNS) {
+    const source = p.includeValue === true ? `${p.re.source}${ASSIGNMENT_VALUE_SUFFIX}` : p.re.source;
+    out = out.replace(new RegExp(source, withGlobalFlags(p.re)), () =>
+      redactionMarker(p.label),
+    );
+  }
+  return out;
 }
 
 const MEMORY_FILE = 'memory.md';

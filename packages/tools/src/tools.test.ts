@@ -37,6 +37,31 @@ describe('paths', () => {
     expect(() => resolveWithinRoot(tmp, 'a/../../evil')).toThrow(PathEscapeError);
     expect(() => resolveWithinRoot(tmp, '/etc/passwd')).toThrow(PathEscapeError);
   });
+  it('rejects symlink escapes (§15.2 realpath rule)', async () => {
+    // A symlink inside the workspace pointing outside it must not be
+    // dereferenceable through the file tools.
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'sunday-tools-outside-'));
+    await fs.writeFile(path.join(outside, 'secret.txt'), 'top secret');
+    await fs.symlink(path.join(outside, 'secret.txt'), path.join(tmp, 'link.txt'));
+    expect(() => resolveWithinRoot(tmp, 'link.txt')).toThrow(PathEscapeError);
+    // A symlink to a directory outside the root is an escape too.
+    await fs.symlink(outside, path.join(tmp, 'dirlink'));
+    expect(() => resolveWithinRoot(tmp, path.join('dirlink', 'secret.txt'))).toThrow(
+      PathEscapeError,
+    );
+    // Symlinks that stay inside the workspace keep working.
+    await fs.mkdir(path.join(tmp, 'sub'));
+    await fs.writeFile(path.join(tmp, 'sub', 'ok.txt'), 'fine');
+    await fs.symlink(path.join(tmp, 'sub'), path.join(tmp, 'inner'));
+    expect(resolveWithinRoot(tmp, path.join('inner', 'ok.txt'))).toBe(
+      path.join(tmp, 'sub', 'ok.txt'),
+    );
+  });
+  it('resolves not-yet-existing paths against the nearest ancestor', () => {
+    expect(resolveWithinRoot(tmp, path.join('newdir', 'newfile.txt'))).toBe(
+      path.join(tmp, 'newdir', 'newfile.txt'),
+    );
+  });
 });
 
 describe('validateArgs', () => {

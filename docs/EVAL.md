@@ -57,8 +57,8 @@ Playwright Chromium install before the browserd tests:
 - run: pnpm --filter @sunday/browserd test
 ```
 
-## Current baseline (0.1.0, fake-scripted)
+## Current baseline (hardening phase, fake-scripted)
 
-10/10 tasks passed · mean tool reliability 100.0%.
+14/14 tasks passed · mean tool reliability 100.0%.
 
 Live-model baselines are recorded per release in the release notes.

@@ -36,7 +36,9 @@ export class SessionStore {
   constructor(private dir: string = defaultSessionsDir()) {}
 
   async init(): Promise<void> {
-    await fs.mkdir(this.dir, { recursive: true });
+    // Owner-only: session files contain full conversation history, which
+    // may include secrets the user pasted or the model echoed (SEC-12).
+    await fs.mkdir(this.dir, { recursive: true, mode: 0o700 });
     // Clean up temp files orphaned by a crashed persist.
     for (const f of await fs.readdir(this.dir).catch(() => [] as string[])) {
       if (f.endsWith('.tmp')) await fs.unlink(path.join(this.dir, f)).catch(() => undefined);
@@ -101,12 +103,13 @@ export class SessionStore {
   }
 
   /** Persist one session (history included). The write is atomic (temp file +
-   *  rename) so a crash or racing shutdown can never leave a truncated file. */
+   *  rename) so a crash or racing shutdown can never leave a truncated file.
+   *  Files are owner-only (0600): history may contain pasted secrets. */
   async persist(s: StoredSession): Promise<void> {
     s.updatedAt = new Date().toISOString();
     const full = path.join(this.dir, `${s.id}.json`);
     const tmp = `${full}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(s));
+    await fs.writeFile(tmp, JSON.stringify(s), { mode: 0o600 });
     await fs.rename(tmp, full);
   }
 
