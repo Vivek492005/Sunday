@@ -1,2 +1,8 @@
-// @sunday/gateway — see merged_step1.md for the full design.
-export const PACKAGE = '@sunday/gateway';
+// @sunday/gateway — provider adapters, registry, router (§10).
+// API-first: OpenRouter + Groq over OpenAI-compatible streaming endpoints.
+// Keys come from the environment, never from the repo.
+export * from './types.js';
+export * from './openai-compatible.js';
+export * from './providers.js';
+export * from './registry.js';
+export * from './router.js';
