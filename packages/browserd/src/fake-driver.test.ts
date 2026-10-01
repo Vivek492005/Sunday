@@ -1,8 +1,12 @@
+import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FakeDriver, type FakePage } from './fake-driver.js';
 import { DriverError } from './driver.js';
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_MAGIC = Buffer.from([0xff, 0xd8]);
 
 function loginPage(): FakePage {
   return {
@@ -100,5 +104,67 @@ describe('FakeDriver', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ type: 'error', text: 'boom' });
     expect(typeof entries[0].ts).toBe('number');
+  });
+
+  it('tracks a history stack for goBack/goForward/reload', async () => {
+    const d = new FakeDriver([loginPage()]);
+    await d.open('http://localhost:3000/login');
+    await d.open('http://localhost:3000/other');
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/other');
+
+    await d.goBack();
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/login');
+
+    // At the start of history: no-op, not an error.
+    await d.goBack();
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/login');
+
+    await d.goForward();
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/other');
+
+    // Past the end: no-op.
+    await d.goForward();
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/other');
+
+    await d.reload();
+    expect((await d.snapshot()).url).toBe('http://localhost:3000/other');
+    await d.close();
+  });
+
+  it('emits synthetic JPEG frames on a screencast interval until stopped', async () => {
+    const d = new FakeDriver([loginPage()]);
+    await d.open('http://localhost:3000/login');
+    const frames: Buffer[] = [];
+    await d.startScreencast((jpeg) => frames.push(jpeg));
+    expect(d.screencastActive).toBe(true);
+    const start = Date.now();
+    for (;;) {
+      if (frames.length >= 2) break;
+      if (Date.now() - start > 5000) throw new Error('timed out waiting for fake screencast frames');
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    for (const f of frames) expect(f.subarray(0, 2)).toEqual(JPEG_MAGIC);
+    await d.stopScreencast();
+    expect(d.screencastActive).toBe(false);
+    const count = frames.length;
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(frames.length).toBe(count);
+    await d.close();
+  });
+
+  it('writes recording placeholders into the given dir', async () => {
+    const d = new FakeDriver([loginPage()]);
+    await d.open('http://localhost:3000/login');
+    const dir = await mkdtemp(join(tmpdir(), 'fake-rec-'));
+    await d.startRecording({ video: true, trace: true, dir });
+    expect((await stat(join(dir, 'video.webm'))).isFile()).toBe(true);
+    expect((await readFile(join(dir, 'video.webm'))).length).toBeGreaterThan(0);
+    expect((await stat(join(dir, 'trace.zip'))).isFile()).toBe(true);
+    const stopped = await d.stopRecording();
+    expect(stopped.videoPath).toBe(join(dir, 'video.webm'));
+    expect(stopped.tracePath).toBe(join(dir, 'trace.zip'));
+    // Stopping again with nothing recording returns empty paths.
+    expect(await d.stopRecording()).toEqual({});
+    await d.close();
   });
 });

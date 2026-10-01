@@ -8,6 +8,15 @@ class StubManager {
   calls: Array<{ method: string; params: unknown; timeoutMs: number }> = [];
   handler: (method: string, params: unknown) => unknown = () => ({ ok: true });
   failWith: Error | undefined;
+  /** Browser Agent UI phase: master switch + takeover state. */
+  browserEnabled = true;
+  control: 'agent' | 'user' = 'agent';
+  isBrowserEnabled(): boolean {
+    return this.browserEnabled;
+  }
+  async controlState(): Promise<'agent' | 'user'> {
+    return this.control;
+  }
   async rpc(method: string, params: unknown = {}, timeoutMs = 30_000): Promise<unknown> {
     this.calls.push({ method, params, timeoutMs });
     if (this.failWith) throw this.failWith;
@@ -149,5 +158,46 @@ describe('browser tools', () => {
     expect(() => registerBrowserTools(registry, stub as unknown as BrowserdManager)).toThrow(
       /already registered/,
     );
+  });
+
+  it('refuses every tool when the browser is disabled', async () => {
+    const { registry, stub } = registered();
+    stub.browserEnabled = false;
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['browser_open', { url: 'http://localhost:3000/' }],
+      ['browser_snapshot', {}],
+      ['browser_click', { ref: 'e1' }],
+      ['browser_verify_ui', { url: 'http://localhost:3000/', checks: [{ kind: 'no_console_errors' }] }],
+    ];
+    for (const [name, args] of cases) {
+      const r = await registry.call(name, args, CTX);
+      expect(r.isError).toBe(true);
+      expect(r.output).toBe('browser is disabled — set sunday.browser.enabled to true to opt in');
+    }
+    // Nothing reached the child.
+    expect(stub.calls).toHaveLength(0);
+  });
+
+  it('blocks action tools during user takeover but allows observation', async () => {
+    const { registry, stub } = registered();
+    stub.control = 'user';
+    stub.handler = () => ({ url: 'http://localhost:3000/', title: 'App', nodes: [] });
+    const click = await registry.call('browser_click', { ref: 'e1' }, CTX);
+    expect(click.isError).toBe(true);
+    expect(click.output).toBe('user has taken over the browser — ask them to resume agent control');
+
+    // Observation tools still go through.
+    const snap = await registry.call('browser_snapshot', {}, CTX);
+    expect(snap.isError).toBeFalsy();
+    expect(snap.output).toContain('http://localhost:3000/');
+    expect(stub.calls.map((c) => c.method)).toEqual(['browser/snapshot']);
+  });
+
+  it('action tools proceed when control is with the agent', async () => {
+    const { registry, stub } = registered();
+    stub.control = 'agent';
+    const r = await registry.call('browser_click', { ref: 'e1' }, CTX);
+    expect(r.isError).toBeFalsy();
+    expect(stub.calls.map((c) => c.method)).toEqual(['browser/click']);
   });
 });

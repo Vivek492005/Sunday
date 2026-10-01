@@ -95,6 +95,12 @@ describe('method params', () => {
         expect(name).toBe('orchestrate/resolveConflict');
       } else if (name.startsWith('mcp/')) {
         expect(name).toMatch(/^mcp\/[a-z]+\/[a-z]+$/);
+      } else if (name.startsWith('browser/')) {
+        // Browser Agent UI phase: browser/<area>/<action> three-segment
+        // names (browser/screencast/*, browser/frame/latest,
+        // browser/panel/*) per the phase contract; the original browser/*
+        // surface stays two-segment.
+        expect(name).toMatch(/^browser\/([a-z]+\/)?[a-z-_]+$/);
       } else {
         expect(name).toMatch(/^[a-z]+\/[a-z-_]+$/);
       }

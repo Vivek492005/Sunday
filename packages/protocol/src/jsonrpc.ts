@@ -65,6 +65,7 @@ export const ErrorCode = {
   SessionNotFound: -32003,
   TurnCancelled: -32004,
   RunNotFound: -32005, // Parallel Agents phase: orchestrate/status|merge|resolveConflict on an unknown runId
+  BrowserTakeover: -32006, // Browser Agent UI phase: action RPC while the user has taken over the browser
   ProtocolMismatch: -32010, // sunday/hello version negotiation failed
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

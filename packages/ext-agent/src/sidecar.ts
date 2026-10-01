@@ -8,6 +8,15 @@ import * as path from 'node:path';
 import { PROTOCOL_VERSION, helloResultSchema, type HelloResult, ErrorCode } from '@sunday/protocol';
 import { RpcClient } from './rpc.js';
 
+/**
+ * Env var handed to the sundayd child to opt in to the agent browser
+ * (browserd). Set to '1' when the `sunday.browser.enabled` setting is true;
+ * BrowserdManager.isBrowserEnabled() reads it. Follows the SUNDAY_WORKSPACE
+ * pattern: the value is decided in extension.ts extraEnv() (config can
+ * change between restarts) and merged into the spawn env in doStart().
+ */
+export const BROWSER_ENABLED_ENV = 'SUNDAY_BROWSER_ENABLED';
+
 /** The sidecar binary/script could not be found anywhere we look. */
 export class SidecarNotFoundError extends Error {
   constructor(detail: string) {

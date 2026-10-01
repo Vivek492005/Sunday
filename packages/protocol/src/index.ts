@@ -15,6 +15,7 @@ export * from './models.js';
 export * from './context.js';
 export * from './manager.js';
 export * from './browser.js';
+export * from './browser-panel.js';
 export * from './orchestrate.js';
 export * from './mcp.js';
 export * from './policy.js';
@@ -28,6 +29,7 @@ import { MODELS_METHODS } from './models.js';
 import { CONTEXT_METHODS } from './context.js';
 import { MANAGER_METHODS } from './manager.js';
 import { BROWSER_METHODS } from './browser.js';
+import { BROWSER_PANEL_METHODS } from './browser-panel.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
 import { MCP_METHODS } from './mcp.js';
 import { POLICY_METHODS } from './policy.js';
@@ -42,6 +44,7 @@ export const METHODS = {
   ...CONTEXT_METHODS,
   ...MANAGER_METHODS,
   ...BROWSER_METHODS,
+  ...BROWSER_PANEL_METHODS,
   ...ORCHESTRATE_METHODS,
   ...MCP_METHODS,
   ...POLICY_METHODS,

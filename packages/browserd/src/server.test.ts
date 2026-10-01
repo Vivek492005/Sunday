@@ -1,4 +1,7 @@
 import { PassThrough } from 'node:stream';
+import { mkdtemp, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ErrorCode } from '@sunday/protocol';
 import { BrowserdServer, type BrowserdConfig } from './server.js';
@@ -7,12 +10,16 @@ import { FakeDriver, type FakePage } from './fake-driver.js';
 interface Frame {
   jsonrpc: string;
   id?: number;
+  method?: string;
+  params?: any;
   result?: any;
   error?: { code: number; message: string };
 }
 
 interface Harness {
   call(method: string, params?: unknown): Promise<Frame>;
+  /** Inbound notifications (no id), e.g. browser/screencastFrame. */
+  notifications: Frame[];
 }
 
 const harnesses: Array<{ input: PassThrough }> = [];
@@ -38,6 +45,7 @@ async function makeHarness(pages: FakePage[] = [dashboardPage()], config: Browse
   const input = new PassThrough();
   const output = new PassThrough();
   const frames: Frame[] = [];
+  const notifications: Frame[] = [];
   let buf = '';
   output.on('data', (d: Buffer) => {
     buf += d.toString();
@@ -45,7 +53,11 @@ async function makeHarness(pages: FakePage[] = [dashboardPage()], config: Browse
     while ((idx = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, idx).trim();
       buf = buf.slice(idx + 1);
-      if (line) frames.push(JSON.parse(line) as Frame);
+      if (!line) continue;
+      const frame = JSON.parse(line) as Frame;
+      // Notifications (e.g. browser/screencastFrame) carry no id.
+      if (frame.id === undefined) notifications.push(frame);
+      else frames.push(frame);
     }
   });
   const server = new BrowserdServer({
@@ -57,6 +69,7 @@ async function makeHarness(pages: FakePage[] = [dashboardPage()], config: Browse
   harnesses.push({ input });
   let nextId = 1;
   return {
+    notifications,
     async call(method: string, params: unknown = {}): Promise<Frame> {
       const id = nextId++;
       input.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
@@ -217,5 +230,87 @@ describe('BrowserdServer', () => {
     const f = await h.call('browser/click', { ref: 'e1' });
     expect(f.error?.code).toBe(ErrorCode.InternalError);
     expect(f.error?.message).toMatch(/no page open/);
+  });
+
+  it('screencast pushes JPEG frames as notifications and caches the latest', async () => {
+    const h = await makeHarness();
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+    // No frame before the screencast starts.
+    expect((await h.call('browser/frame/latest')).result).toEqual({ data: null });
+
+    expect((await h.call('browser/screencast/start')).result).toEqual({ ok: true });
+    const start = Date.now();
+    for (;;) {
+      if (h.notifications.length >= 2) break;
+      if (Date.now() - start > 5000) throw new Error('timed out waiting for screencast frames');
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const frames = h.notifications.filter((n) => n.method === 'browser/screencastFrame');
+    expect(frames.length).toBeGreaterThanOrEqual(2);
+    for (const f of frames) {
+      expect(typeof f.params.data).toBe('string');
+      expect(typeof f.params.ts).toBe('number');
+      // JPEG magic bytes FF D8 → base64 "/9j/".
+      expect(f.params.data.startsWith('/9j/')).toBe(true);
+    }
+
+    // The cache holds the most recent frame.
+    const latest = await h.call('browser/frame/latest');
+    expect(latest.result.data).toBe(frames[frames.length - 1].params.data);
+
+    // Stopping halts the flow.
+    expect((await h.call('browser/screencast/stop')).result).toEqual({ ok: true });
+    const count = h.notifications.length;
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(h.notifications.length).toBe(count);
+  });
+
+  it('takeover blocks action RPCs but allows observation', async () => {
+    const h = await makeHarness();
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+
+    expect((await h.call('browser/takeover')).result).toEqual({ ok: true, control: 'user' });
+    expect((await h.call('browser/control')).result).toEqual({ control: 'user' });
+
+    for (const [method, params] of [
+      ['browser/open', { url: 'http://localhost:3000/other' }],
+      ['browser/click', { ref: 'e2' }],
+      ['browser/type', { ref: 'e1', text: 'x' }],
+      ['browser/press', { key: 'Enter' }],
+      ['browser/scroll', { dy: 100 }],
+      ['browser/wait', { ms: 5 }],
+    ] as Array<[string, unknown]>) {
+      const f = await h.call(method, params);
+      expect(f.error?.code).toBe(ErrorCode.BrowserTakeover);
+      expect(f.error?.message).toMatch(/taken over/);
+    }
+
+    // Observation RPCs keep working during takeover.
+    expect((await h.call('browser/snapshot')).result.nodes).toHaveLength(3);
+    expect((await h.call('browser/screenshot')).result.bytes).toBeGreaterThan(0);
+    expect((await h.call('browser/console')).result.entries).toEqual([]);
+    expect((await h.call('browser/network')).result.requests).toHaveLength(1);
+
+    expect((await h.call('browser/release')).result).toEqual({ ok: true, control: 'agent' });
+    expect((await h.call('browser/control')).result).toEqual({ control: 'agent' });
+    expect((await h.call('browser/click', { ref: 'e2' })).result).toEqual({ ok: true });
+  });
+
+  it('recording writes artifacts into the session media dir', async () => {
+    const mediaBase = await mkdtemp(join(tmpdir(), 'browserd-media-'));
+    const h = await makeHarness([dashboardPage()], { mediaBaseDir: mediaBase, sessionId: 'sess-1' });
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+
+    expect((await h.call('browser/recording/start', { video: true, trace: true })).result).toEqual({
+      ok: true,
+    });
+    const mediaDir = join(mediaBase, 'sess-1', 'media');
+    expect((await stat(join(mediaDir, 'video.webm'))).isFile()).toBe(true);
+    expect((await stat(join(mediaDir, 'trace.zip'))).isFile()).toBe(true);
+
+    const stopped = await h.call('browser/recording/stop');
+    expect(stopped.result.ok).toBe(true);
+    expect(stopped.result.videoPath).toBe(join(mediaDir, 'video.webm'));
+    expect(stopped.result.tracePath).toBe(join(mediaDir, 'trace.zip'));
   });
 });

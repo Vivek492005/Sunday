@@ -9,6 +9,8 @@ import {
   type OrchestrationPersistenceModule,
 } from './orchestration-lifecycle.js';
 import { BrowserdManager } from './browserd.js';
+import { registerBrowserPanelMethods } from './browser-panel.js';
+import { registerBrowserWalkthroughTools } from './browser-walkthrough.js';
 import { EnvSecretResolver, createSundaydTools } from './agent-tools.js';
 import { registerMcpMethods } from './mcp-methods.js';
 import { isWorkspaceTrusted } from './trust.js';
@@ -67,6 +69,10 @@ async function main(): Promise<void> {
     },
   });
 
+  // Browser Agent UI phase: walkthrough artifact tool (markdown + screenshots).
+  // Registered before the daemon so syncDangerousFlags picks up its dangerous flag.
+  registerBrowserWalkthroughTools(agentTools.registry, browserdManager, { workspaceDir });
+
   const daemon = new SundayDaemon({
     tools: agentTools.registry,
     policyGate: agentTools.policy,
@@ -90,6 +96,11 @@ async function main(): Promise<void> {
     workspaceConfigPath: agentTools.workspaceConfigPath,
     workspaceTrusted: isWorkspaceTrusted(),
   });
+
+  // Browser Agent UI phase: the Agent Browser panel (`browser/panel/*`).
+  // Opt-in only — every handler returns a disabled error unless
+  // SUNDAY_BROWSER_ENABLED=1 (set from the `sunday.browser.enabled` setting).
+  registerBrowserPanelMethods(daemon, browserdManager);
 
   // Phase 5: hierarchical orchestration (Orchestrator → Feature Agents →
   // Verifier, sequential-only v1). The adapter keeps the package edge

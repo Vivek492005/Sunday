@@ -6,11 +6,12 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SidecarManager, type SidecarStatus } from './sidecar.js';
+import { SidecarManager, BROWSER_ENABLED_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
 import { ManagerViewProvider } from './managerView.js';
 import { McpViewProvider } from './mcpView.js';
+import { BrowserViewProvider } from './browserPanel.js';
 import {
   WORKSPACE_ENV,
   WORKSPACE_TRUSTED_ENV,
@@ -82,6 +83,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     extraEnv: () => ({
       ...(wsRoot ? { [WORKSPACE_ENV]: wsRoot } : {}),
       [WORKSPACE_TRUSTED_ENV]: isTrusted() ? '1' : '0',
+      // Agent browser opt-in (Browser Agent UI phase): sundayd only enables
+      // browserd when this is '1'. Applies on the next sidecar (re)start.
+      ...(vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)
+        ? { [BROWSER_ENABLED_ENV]: '1' }
+        : {}),
       ...mcpSecretEnv,
     }),
   });
@@ -90,6 +96,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let chatProvider: ChatViewProvider | undefined;
   let managerProvider: ManagerViewProvider | undefined;
   let mcpProvider: McpViewProvider | undefined;
+  let browserProvider: BrowserViewProvider | undefined;
   const refreshBridge = () => {
     const rpc = manager.getRpc();
     if (rpc && !bridge) {
@@ -103,6 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     chatProvider?.notifyBridgeChanged();
     managerProvider?.notifyBridgeChanged();
     mcpProvider?.notifyBridgeChanged();
+    browserProvider?.notifyBridgeChanged();
   };
 
   // -- status bar: sidecar health ------------------------------------------------
@@ -218,6 +226,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  // -- agent browser panel (Browser Agent UI phase) ---------------------------
+  browserProvider = new BrowserViewProvider({
+    getBridge: () => bridge,
+    ensureBridge,
+    log,
+  });
+
   const pickMcpServer = async (b: HostBridge, title: string) => {
     const { servers } = await b.mcpServersList();
     if (!servers.length) {
@@ -312,6 +327,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     chatProvider,
     managerProvider,
     mcpProvider,
+    browserProvider,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
@@ -319,6 +335,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.window.registerWebviewViewProvider(McpViewProvider.viewType, mcpProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.registerWebviewViewProvider(BrowserViewProvider.viewType, browserProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand('sunday.chat.focus', () => {
@@ -347,6 +366,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('sunday.mcp.restartServer', () => mcpServerCommand('restart')),
     vscode.commands.registerCommand('sunday.workspace.trust', () => trustWorkspaceCommand()),
     vscode.commands.registerCommand('sunday.mcp.storeSecret', () => storeMcpSecretCommand()),
+    vscode.commands.registerCommand('sunday.browser.open', () => {
+      // Revealing the panel resolves the WebviewView; the panel then drives
+      // the browser through the HostBridge `browser/panel/*` methods.
+      void vscode.commands.executeCommand('sunday.browserView.focus');
+    }),
+    vscode.commands.registerCommand('sunday.browser.takeover', async () => {
+      void vscode.commands.executeCommand('sunday.browserView.focus');
+      const b = await getBridgeForCommands();
+      if (!b || !browserProvider) return;
+      try {
+        await browserProvider.takeOver();
+        vscode.window.showInformationMessage('You now control the agent browser. Agent browser actions are paused.');
+      } catch (err) {
+        vscode.window.showErrorMessage(`Take over failed: ${(err as Error).message}`);
+      }
+    }),
   );
 
   // -- orchestration commands (parallel agents phase) -------------------------

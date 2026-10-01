@@ -133,6 +133,11 @@ export type BrowserdStatus = 'stopped' | 'starting' | 'ready' | 'crashed';
 export interface BrowserdManagerOptions {
   /** Absolute path to the browserd entrypoint; empty = auto-discover. */
   browserdPath?: string;
+  /**
+   * Master switch for the browser. Defaults to the SUNDAY_BROWSER_ENABLED
+   * env var ('1' = enabled); the browser is off unless opted in.
+   */
+  browserEnabled?: boolean;
   /** Extra env for the child (merged over process.env). The browserd CLI
    *  reads SUNDAY_WORKSPACE_ROOT, SUNDAY_BROWSER_APPROVED_DOMAINS,
    *  SUNDAY_BROWSER_ALLOW_EVAL, SUNDAY_BROWSER_HEADLESS. */
@@ -263,8 +268,24 @@ export class BrowserdManager {
   private startTime = 0;
   private rapidCrashes = 0;
   private intentionalStop = false;
+  private browserEnabled: boolean;
 
-  constructor(private readonly opts: BrowserdManagerOptions = {}) {}
+  constructor(private readonly opts: BrowserdManagerOptions = {}) {
+    this.browserEnabled = opts.browserEnabled ?? process.env.SUNDAY_BROWSER_ENABLED === '1';
+  }
+
+  /**
+   * Master switch for the browser_* tools. Reads SUNDAY_BROWSER_ENABLED='1'
+   * at construction (default false); the host (or config) can flip it at
+   * runtime via setBrowserEnabled().
+   */
+  setBrowserEnabled(v: boolean): void {
+    this.browserEnabled = v;
+  }
+
+  isBrowserEnabled(): boolean {
+    return this.browserEnabled;
+  }
 
   getStatus(): BrowserdStatus {
     return this.status;
@@ -317,6 +338,82 @@ export class BrowserdManager {
   async rpc(method: string, params: unknown = {}, timeoutMs = 30_000): Promise<unknown> {
     const client = await this.ensureReady();
     return client.request(method, params, timeoutMs);
+  }
+
+  /**
+   * Browser Agent UI phase — session controls. These are passthroughs to the
+   * browserd child and need it LIVE: unlike rpc() they do NOT lazy-spawn,
+   * and throw BrowserdClosedError with a clear message when browserd isn't
+   * running.
+   */
+  private requireLiveClient(): ChildRpcClient {
+    const rpc = this.rpcClient;
+    if (this.status !== 'ready' || !rpc || rpc.isClosed) {
+      throw new BrowserdClosedError('browserd is not running — start the browser before using session controls');
+    }
+    return rpc;
+  }
+
+  /** The user takes over the browser; agent action RPCs are blocked until
+   *  releaseControl(). Returns the new control state. */
+  async takeover(): Promise<'agent' | 'user'> {
+    const r = BROWSER_METHODS['browser/takeover'].result.parse(
+      await this.requireLiveClient().request('browser/takeover', {}),
+    );
+    return r.control;
+  }
+
+  /** Hand control back to the agent. Returns the new control state. */
+  async releaseControl(): Promise<'agent' | 'user'> {
+    const r = BROWSER_METHODS['browser/release'].result.parse(
+      await this.requireLiveClient().request('browser/release', {}),
+    );
+    return r.control;
+  }
+
+  /** Who currently drives the browser: 'agent' or 'user'. */
+  async controlState(): Promise<'agent' | 'user'> {
+    const r = BROWSER_METHODS['browser/control'].result.parse(
+      await this.requireLiveClient().request('browser/control', {}),
+    );
+    return r.control;
+  }
+
+  /** Start the live JPEG screencast (frames via browser/frame/latest). */
+  async startScreencast(): Promise<void> {
+    BROWSER_METHODS['browser/screencast/start'].result.parse(
+      await this.requireLiveClient().request('browser/screencast/start', {}),
+    );
+  }
+
+  /** Stop the live screencast. */
+  async stopScreencast(): Promise<void> {
+    BROWSER_METHODS['browser/screencast/stop'].result.parse(
+      await this.requireLiveClient().request('browser/screencast/stop', {}),
+    );
+  }
+
+  /** Latest cached screencast frame (base64 JPEG), or null when none yet. */
+  async latestFrame(): Promise<string | null> {
+    const r = BROWSER_METHODS['browser/frame/latest'].result.parse(
+      await this.requireLiveClient().request('browser/frame/latest', {}),
+    );
+    return r.data;
+  }
+
+  /** Start recording into the session media dir. */
+  async startRecording(opts: { video?: boolean; trace?: boolean } = {}): Promise<void> {
+    BROWSER_METHODS['browser/recording/start'].result.parse(
+      await this.requireLiveClient().request('browser/recording/start', opts),
+    );
+  }
+
+  /** Stop recording; returns the artifact paths under the media dir. */
+  async stopRecording(): Promise<{ ok: true; videoPath?: string; tracePath?: string }> {
+    const r = BROWSER_METHODS['browser/recording/stop'].result.parse(
+      await this.requireLiveClient().request('browser/recording/stop', {}),
+    );
+    return r;
   }
 
   /**

@@ -1,11 +1,12 @@
 // @sunday/eval — benchmark tasks (§24.2).
 //
-// Thirteen small, deterministic coding tasks covering the core tool surface:
+// Fourteen small, deterministic coding tasks covering the core tool surface:
 // file I/O, search, edit, terminal, git, orchestration planning, parallel
-// orchestration (disjoint refactors, overlap rejection, quota fairness) and
-// the browser navigation policy. Each task ships a fixture setup, a scripted
-// model transcript (for the fake adapter) and a checker that inspects the
-// resulting workspace state — so the harness runs with no API keys.
+// orchestration (disjoint refactors, overlap rejection, quota fairness), the
+// browser navigation policy, and the browser UI bug-fix loop. Each task ships
+// a fixture setup, a scripted model transcript (for the fake adapter) and a
+// checker that inspects the resulting workspace state — so the harness runs
+// with no API keys.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -325,6 +326,144 @@ export const TASKS: EvalTask[] = [
         }
       }
       return { pass: true, notes: '3 agents × 4 requests all served; max inter-grant gap ≤ 3 (no starvation)' };
+    },
+  },
+  {
+    id: 'browser-seeded-ui-bug',
+    title: 'Fix a seeded visible UI bug via the agent browser (fake driver)',
+    prompt:
+      'The page served at http://localhost:34567/ has a visible bug: the main heading reads "Welcom" ' +
+      'instead of "Welcome". Serve it, open it in the agent browser, confirm the bug via snapshot and ' +
+      'console, fix the typo, run the verify_ui checks, and record a short walkthrough.',
+    setup(root) {
+      write(
+        root,
+        'index.html',
+        [
+          '<!doctype html>',
+          '<html lang="en">',
+          '<head><meta charset="utf-8"><title>Sunday Shop</title></head>',
+          '<body>',
+          '  <h1>Welcom to Sunday</h1>',
+          '  <p>Everything you need, one Sunday at a time.</p>',
+          '  <button>Buy now</button>',
+          '</body>',
+          '</html>',
+          '',
+        ].join('\n'),
+      );
+    },
+    // Hermetic by design: a real node static server on loopback (started and
+    // stopped in-script), but every browser_* call goes through the
+    // deterministic eval stubs in adapters.ts — no real Chromium needed.
+    script: [
+      {
+        kind: 'tool',
+        tool: 'run_terminal',
+        args: {
+          command:
+            `node -e "const http=require('http'),fs=require('fs');` +
+            `http.createServer((q,r)=>{r.setHeader('Content-Type','text/html');` +
+            `r.end(fs.readFileSync('index.html'))}).listen(34567,'127.0.0.1');" ` +
+            `>server.log 2>&1 & echo $! > server.pid; sleep 0.5; ` +
+            `node -e "fetch('http://127.0.0.1:34567/').then(r=>r.text())` +
+            `.then(t=>console.log('served '+t.length+' bytes; bug-present='+t.includes('Welcom')))` +
+            `.catch(e=>{console.error('unreachable: '+e.message);process.exit(1)})"`,
+        },
+      },
+      { kind: 'tool', tool: 'browser_open', args: { url: 'http://localhost:34567/' } },
+      { kind: 'tool', tool: 'browser_snapshot', args: {} },
+      { kind: 'tool', tool: 'browser_console', args: {} },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'index.html', oldText: '>Welcom to Sunday<', newText: '>Welcome to Sunday<' },
+      },
+      {
+        kind: 'tool',
+        tool: 'browser_verify_ui',
+        args: {
+          url: 'http://localhost:34567/',
+          checks: [{ kind: 'text_present', text: 'Welcome' }, { kind: 'no_console_errors' }],
+        },
+      },
+      {
+        kind: 'tool',
+        tool: 'browser_walkthrough',
+        args: {
+          title: 'Fix "Welcom" heading typo',
+          steps: [
+            { narration: 'Opened the page: the main heading reads "Welcom", a typo.', screenshot: true },
+            {
+              narration: 'Fixed the typo to "Welcome"; verify_ui checks passed with no console errors.',
+              screenshot: true,
+            },
+          ],
+        },
+      },
+      {
+        kind: 'tool',
+        tool: 'run_terminal',
+        args: { command: 'kill "$(cat server.pid)" 2>/dev/null; rm -f server.pid server.log; echo "server stopped"' },
+      },
+    ],
+    check(root, t) {
+      // Defensive: never leak the fixture server if an earlier step failed.
+      try {
+        const pid = Number(read(root, 'server.pid').trim());
+        if (Number.isInteger(pid) && pid > 0) process.kill(pid, 'SIGKILL');
+      } catch {
+        /* best effort — pid file may already be gone */
+      }
+      // 1. The tool calls happened in a sane order.
+      const expected = [
+        'run_terminal',
+        'browser_open',
+        'browser_snapshot',
+        'browser_console',
+        'edit_file',
+        'browser_verify_ui',
+        'browser_walkthrough',
+      ];
+      let last = -1;
+      for (const name of expected) {
+        const idx = t.findIndex((c, i) => i > last && c.tool === name && c.valid);
+        if (idx === -1) return { pass: false, notes: `tool call missing or out of order: ${name}` };
+        last = idx;
+      }
+      // 2. The static server genuinely served the buggy page.
+      const startCall = t.find((c) => c.tool === 'run_terminal' && c.valid);
+      if (!(startCall?.result.output ?? '').includes('bug-present=true')) {
+        return { pass: false, notes: 'fixture server did not serve the buggy page' };
+      }
+      // 3. browser_verify_ui was called with the required checks.
+      const verifyCall = t.find((c) => c.tool === 'browser_verify_ui' && c.valid);
+      const checks = (verifyCall?.args.checks as Array<{ kind?: string; text?: string }>) ?? [];
+      const kinds = checks.map((c) => c.kind);
+      const checksOk =
+        kinds.includes('text_present') &&
+        kinds.includes('no_console_errors') &&
+        checks.some((c) => c.kind === 'text_present' && c.text === 'Welcome');
+      if (!checksOk) {
+        return { pass: false, notes: `browser_verify_ui missing required checks: ${JSON.stringify(checks)}` };
+      }
+      // 4. The bug is fixed on disk.
+      const html = read(root, 'index.html');
+      if (!html.includes('>Welcome to Sunday<') || html.includes('>Welcom to Sunday<')) {
+        return { pass: false, notes: 'index.html still has the typo' };
+      }
+      // 5. The walkthrough doc exists under .sunday/artifacts/.
+      let walkOk = false;
+      try {
+        walkOk = read(root, '.sunday/artifacts/walkthrough.md').includes('Welcome');
+      } catch {
+        walkOk = false;
+      }
+      if (!walkOk) return { pass: false, notes: 'walkthrough.md missing under .sunday/artifacts/' };
+      return {
+        pass: true,
+        notes: 'server served buggy page; snapshot→console→edit→verify_ui→walkthrough in order; typo fixed; walkthrough.md written',
+      };
     },
   },
 ];

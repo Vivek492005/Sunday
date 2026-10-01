@@ -13,12 +13,12 @@ import { runBenchmark } from './runner.js';
 import { TASKS } from './tasks.js';
 
 describe('eval harness (fake-scripted adapter)', () => {
-  it('all 13 benchmark tasks pass with 100% tool reliability', async () => {
+  it('all 14 benchmark tasks pass with 100% tool reliability', async () => {
     const report = await runBenchmark(new FakeModelAdapter(), {
       outDir: '/tmp/sunday-eval-test',
     });
-    expect(report.total).toBe(13);
-    expect(report.passed).toBe(13);
+    expect(report.total).toBe(14);
+    expect(report.passed).toBe(14);
     expect(report.meanToolReliability).toBe(1);
     for (const t of report.tasks) {
       expect(t.pass, `${t.taskId}: ${t.notes}`).toBe(true);

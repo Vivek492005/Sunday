@@ -9,6 +9,9 @@ import { BrowserdServer } from './server.js';
 //   SUNDAY_BROWSER_APPROVED_DOMAINS    comma-separated user-approved domains
 //   SUNDAY_BROWSER_ALLOW_EVAL=1        enable the restricted browser/eval
 //   SUNDAY_BROWSER_HEADLESS=0          run headed (default headless)
+//   SUNDAY_BROWSER_SESSION_ID          session id for the recording media dir
+//                                      (~/.sunday/browser-sessions/<id>/media;
+//                                      defaults to a random UUID)
 
 function parseDomains(raw: string | undefined): string[] {
   return (raw ?? '')
@@ -22,5 +25,6 @@ const server = new BrowserdServer({
   approvedDomains: parseDomains(process.env.SUNDAY_BROWSER_APPROVED_DOMAINS),
   allowEval: process.env.SUNDAY_BROWSER_ALLOW_EVAL === '1',
   headless: process.env.SUNDAY_BROWSER_HEADLESS !== '0',
+  sessionId: process.env.SUNDAY_BROWSER_SESSION_ID || undefined,
 });
 server.start();

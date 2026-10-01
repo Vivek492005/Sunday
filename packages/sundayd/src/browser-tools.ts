@@ -62,6 +62,11 @@ interface BrowserToolSpec {
   parameters: Record<string, unknown>;
   /** Per-tool RPC timeout override. */
   timeoutMs?: number;
+  /**
+   * True for ACTION tools (they drive the page). While the user has taken
+   * over the browser these are blocked; observation tools stay allowed.
+   */
+  action?: boolean;
   format: (result: any) => { output: string; metadata?: Record<string, unknown> };
 }
 
@@ -74,6 +79,27 @@ function defineTool(manager: BrowserdManager, spec: BrowserToolSpec): Tool {
       dangerous: true,
     },
     async execute(rawArgs) {
+      // Browser Agent UI phase: the browser is opt-in. Every tool refuses
+      // before touching browserd when it is disabled.
+      if (!manager.isBrowserEnabled()) {
+        return err('browser is disabled — set sunday.browser.enabled to true to opt in');
+      }
+      if (spec.action === true) {
+        // While the user has taken over, action tools are blocked. browserd
+        // not running yet means no takeover is possible — the rpc() below
+        // will lazy-spawn it as before.
+        let control: 'agent' | 'user' = 'agent';
+        try {
+          control = await manager.controlState();
+        } catch (e) {
+          if (!(e instanceof BrowserdClosedError)) {
+            return err(`browser tool ${spec.name} failed: ${rpcErrorMessage(e)}`);
+          }
+        }
+        if (control === 'user') {
+          return err('user has taken over the browser — ask them to resume agent control');
+        }
+      }
       const args = rawArgs as Record<string, unknown>;
       try {
         const timeout =
@@ -98,6 +124,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_open',
       method: 'browser/open',
+      action: true,
       description:
         'Open a URL in the agent browser. Returns needsApproval when navigating to a new origin for the first time — re-run with approve:true to allow it (localhost and user-approved domains never ask).',
       parameters: {
@@ -130,6 +157,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_click',
       method: 'browser/click',
+      action: true,
       description: 'Click an element by its snapshot ref (e.g. "e3").',
       parameters: {
         type: 'object',
@@ -141,6 +169,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_type',
       method: 'browser/type',
+      action: true,
       description: 'Type text into an element by ref. Set submit:true to press Enter afterwards.',
       parameters: {
         type: 'object',
@@ -156,6 +185,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_press',
       method: 'browser/press',
+      action: true,
       description: 'Press a keyboard key (e.g. "Enter", "Escape", "Tab", "ArrowDown").',
       parameters: {
         type: 'object',
@@ -167,6 +197,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_scroll',
       method: 'browser/scroll',
+      action: true,
       description: 'Scroll the page (dx/dy pixels) or scroll an element into view by ref.',
       parameters: {
         type: 'object',
@@ -181,6 +212,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_wait',
       method: 'browser/wait',
+      action: true,
       description: 'Wait: a fixed delay (ms) or until a CSS selector appears (selector + timeoutMs).',
       parameters: {
         type: 'object',
@@ -195,6 +227,7 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
     {
       name: 'browser_eval',
       method: 'browser/eval',
+      action: true,
       description:
         'RESTRICTED: evaluate a stringified function in page context. Denied unless the browser was started with eval explicitly enabled.',
       parameters: {

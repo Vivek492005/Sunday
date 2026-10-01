@@ -176,9 +176,45 @@ blocked; first navigation to a new public origin needs approval; `eval`
 denied by default; `verify_ui` macro for UI checks. No access to the user's
 real browser profile.
 
+## Browser agent (`@sunday/browserd` + Agent Browser panel)
+
+browserd is a managed child process of sundayd (crash-isolated, lazy-spawned
+on first browser_* tool use, stopped with the daemon). Opt-in only:
+`sunday.browser.enabled` (default false) → `SUNDAY_BROWSER_ENABLED=1` at
+sidecar spawn; every browser_* tool returns a clear disabled error otherwise.
+
+- **Tools** (sundayd, risk class N): `browser_open/snapshot/click/type/press/
+  scroll/wait/eval/screenshot/console/network/close`, `browser_verify_ui`
+  (server-ready probe → checks → screenshot → structured report), and
+  `browser_walkthrough` (markdown + screenshots under
+  `.sunday/artifacts/<session>/`).
+- **Observation**: accessibility-tree snapshots with stable `data-sr` refs
+  (token-cheap primary observation); screenshots as image content parts.
+- **Screencast**: CDP `Page.startScreencast` (jpeg q60, ~2fps) streamed as
+  `browser/screencastFrame` notifications; the server caches the last frame
+  for `browser/frame/latest` polling (the panel polls at 2fps).
+- **Recording**: Playwright video + tracing per session, saved under
+  `<session>/media/`; the fake driver writes placeholders.
+- **Take over**: `browser/takeover` hands control to the user — the 7 agent
+  action tools fail fast with `BrowserTakeover` (-32006) while observation
+  (snapshot/console/network/screenshot) stays allowed; `browser/release`
+  hands control back.
+- **Agent Browser panel** (VS Code bottom panel, `sunday.browserView`):
+  live view, URL bar, reload/close, Take over / Resume agent, screenshot
+  button. Commands: `sunday.browser.open`, `sunday.browser.takeover`.
+- **Security**: domain allow-list enforced server-side in browserd
+  (`packages/browserd/src/policy.ts`); `browser_eval` gated by
+  `allowEval` (default off at server level); downloads disabled
+  (`acceptDownloads: false`); isolated profile dir under `~/.sunday`,
+  never the user's real Chrome profile.
+- playwright is an **optional peer** of `@sunday/browserd` (lazy dynamic
+  import); without it the real driver refuses and the fake driver carries
+  all tests. Real Chromium runs on GitHub Actions via
+  `npx playwright install chromium`.
+
 ## Eval (`@sunday/eval`)
 
-10 deterministic benchmark tasks over the real tool registry
+14 deterministic benchmark tasks over the real tool registry
 (`sunday-eval run`), reporting pass/fail and tool-call reliability as JSON +
 Markdown. `SUNDAY_EVAL_LIVE=1` replays the same tasks against a real model
 through sundayd.

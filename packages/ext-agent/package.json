@@ -86,6 +86,16 @@
         "category": "Sunday",
         "command": "sunday.orchestration.openManager",
         "title": "Open Orchestration Manager"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.browser.open",
+        "title": "Open Agent Browser"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.browser.takeover",
+        "title": "Take Over Browser Control"
       }
     ],
     "keybindings": [
@@ -127,6 +137,11 @@
           "default": false,
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",
           "type": "boolean"
+        },
+        "sunday.browser.enabled": {
+          "default": false,
+          "description": "Opt in to the agent browser (browserd). When off, browser_* tools return a disabled error.",
+          "type": "boolean"
         }
       },
       "title": "Sunday"
@@ -144,6 +159,12 @@
         {
           "id": "sunday.mcpView",
           "name": "Sunday MCP"
+        }
+      ],
+      "panel": [
+        {
+          "id": "sunday.browserView",
+          "name": "Agent Browser"
         }
       ]
     }

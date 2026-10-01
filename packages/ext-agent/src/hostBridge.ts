@@ -259,6 +259,48 @@ export class HostBridge {
     };
   }
 
+  // -- browser panel ------------------------------------------------------------
+
+  /** Ensure browserd is running for the Agent Browser panel (no-op if up). */
+  browserPanelEnsure(): Promise<MethodResult<'browser/panel/ensure'>> {
+    return this.call('browser/panel/ensure', {}, 15000);
+  }
+
+  /** Open a URL in the agent browser. */
+  browserPanelOpen(url: string): Promise<MethodResult<'browser/panel/open'>> {
+    return this.call('browser/panel/open', { url }, 30000);
+  }
+
+  /** Latest screencast frame (base64 JPEG) for the live panel image. */
+  browserPanelFrame(): Promise<MethodResult<'browser/panel/frame'>> {
+    return this.call('browser/panel/frame', {}, 10000);
+  }
+
+  /** Hand browser control to the user (agent action tools fail fast meanwhile). */
+  browserPanelTakeover(): Promise<MethodResult<'browser/panel/takeover'>> {
+    return this.call('browser/panel/takeover', {}, 15000);
+  }
+
+  /** Hand browser control back to the agent. */
+  browserPanelRelease(): Promise<MethodResult<'browser/panel/release'>> {
+    return this.call('browser/panel/release', {}, 15000);
+  }
+
+  /** Current browser control holder ('agent' | 'user'). */
+  browserPanelControl(): Promise<MethodResult<'browser/panel/control'>> {
+    return this.call('browser/panel/control', {}, 10000);
+  }
+
+  /** One-shot screenshot (base64 PNG) for display in the panel. */
+  browserPanelScreenshot(): Promise<MethodResult<'browser/panel/screenshot'>> {
+    return this.call('browser/panel/screenshot', {}, 30000);
+  }
+
+  /** Stop the screencast and close the browser session. */
+  browserPanelClose(): Promise<MethodResult<'browser/panel/close'>> {
+    return this.call('browser/panel/close', {}, 15000);
+  }
+
   dispose(): void {
     this.disposeChatEvent();
     this.chatListeners.clear();

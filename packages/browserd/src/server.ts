@@ -1,4 +1,8 @@
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 import {
   BROWSER_METHODS,
@@ -25,6 +29,16 @@ export interface BrowserdConfig extends BrowserPolicyOptions {
   headless?: boolean;
   /** How long verify_ui waits for the dev server to become ready. */
   readyTimeoutMs?: number;
+  /**
+   * Browser session id used for the recording media dir
+   * (<mediaBaseDir>/<sessionId>/media). Defaults to a random UUID.
+   */
+  sessionId?: string;
+  /**
+   * Base dir for recording media. Defaults to ~/.sunday/browser-sessions;
+   * tests override it to a temp dir.
+   */
+  mediaBaseDir?: string;
   /** Dependency injection (tests). Defaults to a real PlaywrightDriver. */
   createDriver?: () => Driver;
   /**
@@ -36,6 +50,23 @@ export interface BrowserdConfig extends BrowserPolicyOptions {
 
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
 const READY_POLL_MS = 500;
+/** Screencast frame notifications are throttled to ~2fps (§18.4). */
+const SCREENCAST_PUSH_MS = 500;
+
+/**
+ * Agent ACTION RPCs — blocked with ErrorCode.BrowserTakeover while the user
+ * has taken over the browser. Observation RPCs (snapshot/console/network/
+ * screenshot/verify_ui/frame) stay allowed so the agent can keep watching.
+ */
+const TAKEOVER_BLOCKED_METHODS: ReadonlySet<string> = new Set([
+  'browser/open',
+  'browser/click',
+  'browser/type',
+  'browser/press',
+  'browser/scroll',
+  'browser/wait',
+  'browser/eval',
+]);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -99,6 +130,15 @@ export class BrowserdServer {
   /** Origins the client approved this session (needsApproval → approve). */
   private readonly approvedOrigins = new Set<string>();
   private currentUrl: string | null = null;
+  private transport: BrowserTransport | undefined;
+  /** Who currently drives the browser: the agent, or the user (takeover). */
+  private control: 'agent' | 'user' = 'agent';
+  /** Latest screencast frame (base64 JPEG), served by browser/frame/latest. */
+  private lastFrame: string | null = null;
+  private lastFramePush = 0;
+  private readonly sessionId: string;
+  private readonly mediaBaseDir: string;
+  private recordingDir: string | undefined;
 
   constructor(config: BrowserdConfig = {}) {
     this.policy = new BrowserPolicy({ approvedDomains: config.approvedDomains });
@@ -107,6 +147,8 @@ export class BrowserdServer {
     this.workspaceRoot = config.workspaceRoot;
     this.headless = config.headless ?? true;
     this.onStdinClose = config.onStdinClose;
+    this.sessionId = config.sessionId ?? randomUUID();
+    this.mediaBaseDir = config.mediaBaseDir ?? join(homedir(), '.sunday', 'browser-sessions');
     this.createDriver =
       config.createDriver ??
       (() => new PlaywrightDriver({ workspaceRoot: this.workspaceRoot, headless: this.headless }, this.allowEval));
@@ -129,6 +171,8 @@ export class BrowserdServer {
     const transport = new BrowserTransport((method, params) => this.dispatch(method, params), input, output, {
       onStdinClose: this.onStdinClose ?? (() => void this.shutdown()),
     });
+    // Kept so the screencast can push browser/screencastFrame notifications.
+    this.transport = transport;
     transport.start();
   }
 
@@ -147,6 +191,12 @@ export class BrowserdServer {
       throw new BrowserRpcError(ErrorCode.MethodNotFound, `unknown method: ${method}`);
     }
     const name = method as BrowserMethodName;
+    if (this.control === 'user' && TAKEOVER_BLOCKED_METHODS.has(name)) {
+      throw new BrowserRpcError(
+        ErrorCode.BrowserTakeover,
+        'user has taken over the browser — agent actions are paused until they release control',
+      );
+    }
     switch (name) {
       case 'browser/ping': {
         parseBrowser(name, params);
@@ -219,11 +269,55 @@ export class BrowserdServer {
         await this.driver?.close().catch(() => undefined);
         this.driver = undefined; // next use relaunches fresh
         this.currentUrl = null;
+        this.lastFrame = null; // stale frames must not outlive the session
         return { ok: true as const };
       }
       case 'browser/verify_ui': {
         const p = parseBrowser(name, params);
         return this.verifyUi(p.url, p.checks, p.readyTimeoutMs, p.approve);
+      }
+      case 'browser/screencast/start': {
+        parseBrowser(name, params);
+        await this.startScreencast();
+        return { ok: true as const };
+      }
+      case 'browser/screencast/stop': {
+        parseBrowser(name, params);
+        await this.ensureDriver().stopScreencast();
+        return { ok: true as const };
+      }
+      case 'browser/frame/latest': {
+        parseBrowser(name, params);
+        return { data: this.lastFrame };
+      }
+      case 'browser/recording/start': {
+        const p = parseBrowser(name, params);
+        await this.startRecordingMedia(p.video ?? false, p.trace ?? false);
+        return { ok: true as const };
+      }
+      case 'browser/recording/stop': {
+        parseBrowser(name, params);
+        const r = await this.ensureDriver().stopRecording();
+        this.recordingDir = undefined;
+        return {
+          ok: true as const,
+          ...(r.videoPath ? { videoPath: r.videoPath } : {}),
+          ...(r.tracePath ? { tracePath: r.tracePath } : {}),
+        };
+      }
+      case 'browser/takeover': {
+        parseBrowser(name, params);
+        this.control = 'user';
+        return { ok: true as const, control: 'user' as const };
+      }
+      case 'browser/release': {
+        parseBrowser(name, params);
+        this.control = 'agent';
+        return { ok: true as const, control: 'agent' as const };
+      }
+      case 'browser/control': {
+        parseBrowser(name, params);
+        return { control: this.control };
       }
       default:
         throw new BrowserRpcError(ErrorCode.MethodNotFound, `unknown method: ${method}`);
@@ -234,6 +328,37 @@ export class BrowserdServer {
     const d = this.ensureDriver();
     if (!this.currentUrl) throw new DriverError('no page open — call browser/open first');
     return d;
+  }
+
+  /**
+   * Start the driver screencast. Every frame updates the browser/frame/latest
+   * cache; pushes to the client go out as browser/screencastFrame
+   * notifications throttled to ~2fps.
+   */
+  private async startScreencast(): Promise<void> {
+    const driver = this.ensureDriver();
+    const transport = this.transport;
+    await driver.startScreencast((jpeg) => {
+      const data = jpeg.toString('base64');
+      this.lastFrame = data;
+      const now = Date.now();
+      if (transport && now - this.lastFramePush >= SCREENCAST_PUSH_MS) {
+        this.lastFramePush = now;
+        transport.notify('browser/screencastFrame', { data, ts: now });
+      }
+    });
+  }
+
+  /**
+   * Start recording into the session media dir:
+   * <mediaBaseDir>/<sessionId>/media (video.webm / trace.zip).
+   */
+  private async startRecordingMedia(video: boolean, trace: boolean): Promise<string> {
+    const dir = join(this.mediaBaseDir, this.sessionId, 'media');
+    await mkdir(dir, { recursive: true });
+    await this.ensureDriver().startRecording({ video, trace, dir });
+    this.recordingDir = dir;
+    return dir;
   }
 
   /**

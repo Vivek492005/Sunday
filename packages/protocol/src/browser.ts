@@ -175,5 +175,57 @@ export const BROWSER_METHODS = {
       screenshotPng: z.string().optional(),
     }),
   },
+  /** Browser Agent UI phase: live JPEG screencast. Frames are pushed as
+   *  `browser/screencastFrame` notifications {data: base64jpeg, ts} (throttled
+   *  to ~2fps); the server also caches the latest frame for
+   *  browser/frame/latest polling. */
+  'browser/screencast/start': {
+    params: z.object({}),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'browser/screencast/stop': {
+    params: z.object({}),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  /** Poll the most recent cached screencast frame (base64 JPEG), or null when
+   *  no screencast has produced a frame yet. */
+  'browser/frame/latest': {
+    params: z.object({}),
+    result: z.object({ data: z.string().nullable() }),
+  },
+  /** Start recording into ~/.sunday/browser-sessions/<sessionId>/media. */
+  'browser/recording/start': {
+    params: z.object({
+      video: z.boolean().optional(),
+      trace: z.boolean().optional(),
+    }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  /** Stop recording; returns the artifact paths written under the media dir. */
+  'browser/recording/stop': {
+    params: z.object({}),
+    result: z.object({
+      ok: z.literal(true),
+      videoPath: z.string().optional(),
+      tracePath: z.string().optional(),
+    }),
+  },
+  /** The user takes over the browser: agent ACTION RPCs (open/click/type/
+   *  press/scroll/wait/eval) fail with ErrorCode.BrowserTakeover until
+   *  browser/release. Observation RPCs stay allowed. */
+  'browser/takeover': {
+    params: z.object({}),
+    result: z.object({ ok: z.literal(true), control: z.literal('user') }),
+  },
+  /** Hand control back to the agent. */
+  'browser/release': {
+    params: z.object({}),
+    result: z.object({ ok: z.literal(true), control: z.literal('agent') }),
+  },
+  /** Who currently drives the browser: 'agent' or 'user'. */
+  'browser/control': {
+    params: z.object({}),
+    result: z.object({ control: z.enum(['agent', 'user']) }),
+  },
 } as const;
 export type BrowserMethodName = keyof typeof BROWSER_METHODS;

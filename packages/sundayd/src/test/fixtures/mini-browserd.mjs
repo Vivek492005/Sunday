@@ -54,6 +54,29 @@ rl.on('line', (line) => {
     case 'browser/open':
       err(id, -32000, 'blocked: private network address "10.0.0.1" is not user-approved');
       break;
+    // Browser Agent UI phase (Worker 1) — session controls.
+    case 'browser/takeover':
+      ok(id, { ok: true, control: 'user' });
+      break;
+    case 'browser/release':
+      ok(id, { ok: true, control: 'agent' });
+      break;
+    case 'browser/control':
+      ok(id, { control: 'user' });
+      break;
+    case 'browser/screencast/start':
+    case 'browser/screencast/stop':
+      ok(id, { ok: true });
+      break;
+    case 'browser/frame/latest':
+      ok(id, { data: 'ZmFrZS1mcmFtZQ==' });
+      break;
+    case 'browser/recording/start':
+      ok(id, { ok: true });
+      break;
+    case 'browser/recording/stop':
+      ok(id, { ok: true, videoPath: '/tmp/media/video.webm', tracePath: '/tmp/media/trace.zip' });
+      break;
     default:
       ok(id, { ok: true, echo: method });
   }

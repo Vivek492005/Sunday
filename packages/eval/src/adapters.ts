@@ -7,8 +7,131 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { createDefaultRegistry } from '@sunday/tools';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createDefaultRegistry, type Tool, type ToolContext } from '@sunday/tools';
 import type { EvalTask, ExecutedCall, ModelAdapter, ScriptStep } from './types.js';
+
+/**
+ * Eval-local stub browser tools (browser eval exit criteria).
+ *
+ * The harness runs in CI and on this VM with no real Chromium, so scripted
+ * `browser_*` calls are replayed against these deterministic stubs instead of
+ * browserd. They return canned, well-formed results; each task's checker
+ * asserts the real workspace side effects (the fixed file, the written
+ * walkthrough doc). Registration is additive — it never changes the results
+ * of tasks whose scripts never call these tools.
+ */
+function browserStubTools(): Tool[] {
+  const browserOpen: Tool = {
+    definition: {
+      name: 'browser_open',
+      description: 'Open a URL in the agent browser (eval stub — no real navigation).',
+      parameters: {
+        type: 'object',
+        required: ['url'],
+        properties: { url: { type: 'string' }, approve: { type: 'boolean' } },
+      },
+    },
+    async execute(args) {
+      return { output: `opened ${String(args.url)} (eval stub — no real navigation)` };
+    },
+  };
+  const browserSnapshot: Tool = {
+    definition: {
+      name: 'browser_snapshot',
+      description: 'Accessibility snapshot of the current page (eval stub).',
+      parameters: { type: 'object', properties: {} },
+    },
+    async execute() {
+      return {
+        output: [
+          'snapshot (eval stub):',
+          '- heading "Welcom to Sunday" [e0]',
+          '- button "Buy now" [e1]',
+        ].join('\n'),
+      };
+    },
+  };
+  const browserConsole: Tool = {
+    definition: {
+      name: 'browser_console',
+      description: 'Console entries for the current page (eval stub).',
+      parameters: { type: 'object', properties: {} },
+    },
+    async execute() {
+      return { output: 'console (eval stub): no entries' };
+    },
+  };
+  const browserVerifyUi: Tool = {
+    definition: {
+      name: 'browser_verify_ui',
+      description: 'Run UI checks against the current page (eval stub — canned pass).',
+      parameters: {
+        type: 'object',
+        required: ['checks'],
+        properties: {
+          url: { type: 'string' },
+          checks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['kind'],
+              properties: { kind: { type: 'string' }, text: { type: 'string' }, ref: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    async execute(args) {
+      const checks = (args.checks as Array<{ kind?: string }>) ?? [];
+      const kinds = checks.map((c) => c.kind).join(', ');
+      return {
+        output: `verify_ui (eval stub): ${checks.length}/${checks.length} checks passed [${kinds}]`,
+        metadata: { ok: true },
+      };
+    },
+  };
+  const browserWalkthrough: Tool = {
+    definition: {
+      name: 'browser_walkthrough',
+      description:
+        'Record a narrated browser walkthrough (eval stub: writes .sunday/artifacts/walkthrough.md, no real screenshots).',
+      parameters: {
+        type: 'object',
+        required: ['steps'],
+        properties: {
+          title: { type: 'string' },
+          steps: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['narration'],
+              properties: { narration: { type: 'string' }, screenshot: { type: 'boolean' } },
+            },
+          },
+        },
+      },
+    },
+    async execute(args, ctx: ToolContext) {
+      const steps = (args.steps as Array<{ narration?: string; screenshot?: boolean }>) ?? [];
+      const dir = join(ctx.cwd, '.sunday', 'artifacts');
+      mkdirSync(dir, { recursive: true });
+      const lines = [`# ${String(args.title ?? 'Browser walkthrough')}`, ''];
+      steps.forEach((s, i) => {
+        lines.push(`## Step ${i + 1}`, '', String(s.narration ?? ''), '');
+        lines.push(`_(screenshot: ${s.screenshot ? 'captured' : 'skipped'} — eval stub)_`, '');
+      });
+      const rel = join('.sunday', 'artifacts', 'walkthrough.md');
+      writeFileSync(join(ctx.cwd, rel), lines.join('\n'));
+      return {
+        output: `walkthrough written to ${rel} (${steps.length} steps)`,
+        metadata: { path: rel },
+      };
+    },
+  };
+  return [browserOpen, browserSnapshot, browserConsole, browserVerifyUi, browserWalkthrough];
+}
 
 /** Execute scripted steps against the real tools; record every call. */
 export class FakeModelAdapter implements ModelAdapter {
@@ -16,6 +139,8 @@ export class FakeModelAdapter implements ModelAdapter {
 
   async runTask(task: EvalTask, workspaceRoot: string): Promise<ExecutedCall[]> {
     const registry = createDefaultRegistry();
+    // Browser tasks run against the deterministic stubs (no Chromium in CI).
+    for (const t of browserStubTools()) registry.register(t);
     const transcript: ExecutedCall[] = [];
     for (const step of task.script) {
       if (step.kind === 'answer') continue;

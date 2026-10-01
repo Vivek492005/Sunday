@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   DriverError,
@@ -7,6 +8,9 @@ import {
   type Driver,
   type NetworkEntry,
   type OpenResult,
+  type RecordingStartOptions,
+  type RecordingStopResult,
+  type ScreencastFrameHandler,
   type SnapshotResult,
   type AxNode,
 } from './driver.js';
@@ -114,6 +118,18 @@ export class PlaywrightDriver implements Driver {
   private readonly consoleBuf: ConsoleEntry[] = [];
   private readonly networkBuf: NetworkEntry[] = [];
   private readonly evalAllowed: boolean;
+  /** Active CDP screencast session, if any. */
+  private cdp: any | undefined;
+  /** Last URL navigated to — used to restore the page after a video relaunch. */
+  private lastUrl: string | null = null;
+  /**
+   * Video recording dir. recordVideo is a context-launch option, so a
+   * video request on an already-launched context relaunches it.
+   */
+  private videoDir: string | undefined;
+  private videoActive = false;
+  private tracingActive = false;
+  private recordingDir: string | undefined;
 
   constructor(private readonly opts: PlaywrightDriverOptions = {}, evalAllowed = false) {
     this.evalAllowed = evalAllowed;
@@ -128,12 +144,16 @@ export class PlaywrightDriver implements Driver {
     if (this.ctx) return;
     const { chromium } = await this.loadPlaywright();
     const userDataDir = profileDirFor(this.opts.workspaceRoot);
-    const baseOpts = {
+    const baseOpts: Record<string, unknown> = {
       headless: this.opts.headless ?? true,
       // §18.2: never touch the user's real profile; no passwords, no downloads.
       acceptDownloads: false,
       args: this.opts.args ?? [],
     };
+    if (this.videoDir) {
+      // Video recording is a context-launch option (no mid-session enable).
+      baseOpts.recordVideo = { dir: this.videoDir };
+    }
     // Prefer the user's installed Chrome/Chromium (keeps installs small);
     // fall back to playwright's bundled chromium.
     const attempts: Array<Record<string, unknown>> = [{ channel: 'chrome' }, { channel: 'chromium' }, {}];
@@ -152,8 +172,15 @@ export class PlaywrightDriver implements Driver {
         `playwright: could not launch any chromium: ${(lastErr as Error)?.message ?? lastErr}`,
       );
     }
+    this.videoActive = this.videoDir !== undefined;
     this.page = this.ctx.pages()[0] ?? (await this.ctx.newPage());
-    this.page.on('console', (msg: any) => {
+    this.attachPageListeners(this.page);
+  }
+
+  /** (Re)attach console/network capture to a page — also used after the
+   *  video-recording relaunch and the post-video fresh page. */
+  private attachPageListeners(page: any): void {
+    page.on('console', (msg: any) => {
       this.consoleBuf.push({
         type: msg.type() as ConsoleEntry['type'],
         text: String(msg.text()).slice(0, 2000),
@@ -162,7 +189,7 @@ export class PlaywrightDriver implements Driver {
       });
       if (this.consoleBuf.length > 200) this.consoleBuf.shift();
     });
-    this.page.on('response', (res: any) => {
+    page.on('response', (res: any) => {
       const req = res.request();
       this.networkBuf.push({
         url: req.url(),
@@ -172,6 +199,23 @@ export class PlaywrightDriver implements Driver {
       });
       if (this.networkBuf.length > 200) this.networkBuf.shift();
     });
+  }
+
+  /**
+   * Relaunch the persistent context with video recording enabled. The profile
+   * (cookies, storage) survives; the open page is restored from lastUrl.
+   */
+  private async relaunchWithVideo(): Promise<void> {
+    const url = this.lastUrl;
+    await this.stopScreencast().catch(() => undefined);
+    await this.ctx?.close().catch(() => undefined);
+    this.ctx = undefined;
+    this.page = undefined;
+    this.tracingActive = false; // tracing belonged to the old context
+    await this.ensureLaunched();
+    if (url) {
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => undefined);
+    }
   }
 
   private async ensurePage(): Promise<any> {
@@ -188,6 +232,7 @@ export class PlaywrightDriver implements Driver {
     const page = await this.ensurePage();
     const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     if (!res) throw new DriverError(`navigation produced no response: ${url}`);
+    this.lastUrl = page.url();
     return { url: page.url(), title: await page.title() };
   }
 
@@ -256,9 +301,107 @@ export class PlaywrightDriver implements Driver {
     return this.networkBuf.slice(-(limit ?? 100));
   }
 
+  async startScreencast(onFrame: ScreencastFrameHandler): Promise<void> {
+    const page = await this.ensurePage();
+    await this.stopScreencast(); // restarting replaces the previous screencast
+    const cdp = await page.context().newCDPSession(page);
+    this.cdp = cdp;
+    cdp.on('screencastFrame', (ev: { data: string; sessionId: string }) => {
+      try {
+        onFrame(Buffer.from(ev.data, 'base64'));
+      } catch {
+        /* a throwing listener must not break the CDP session */
+      }
+      // Ack every frame or Chromium stops sending them.
+      void cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => undefined);
+    });
+    await cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: 60,
+      everyNthFrame: 1,
+      maxWidth: 1280,
+      maxHeight: 800,
+    });
+  }
+
+  async stopScreencast(): Promise<void> {
+    const cdp = this.cdp;
+    this.cdp = undefined;
+    if (cdp) {
+      await cdp.send('Page.stopScreencast').catch(() => undefined);
+      await cdp.detach().catch(() => undefined);
+    }
+  }
+
+  async goBack(): Promise<void> {
+    const page = await this.ensurePage();
+    await page.goBack({ timeout: 10_000 });
+  }
+
+  async goForward(): Promise<void> {
+    const page = await this.ensurePage();
+    await page.goForward({ timeout: 10_000 });
+  }
+
+  async reload(): Promise<void> {
+    const page = await this.ensurePage();
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+  }
+
+  async startRecording(opts: RecordingStartOptions): Promise<void> {
+    const { dir, video = false, trace = false } = opts;
+    await mkdir(dir, { recursive: true });
+    this.recordingDir = dir;
+    if (video) {
+      this.videoDir = dir;
+      // recordVideo is a context-launch option: relaunch when the live
+      // context wasn't started with it.
+      await this.ensureLaunched();
+      if (!this.videoActive) await this.relaunchWithVideo();
+    }
+    if (trace && !this.tracingActive) {
+      await this.ensureLaunched();
+      await this.ctx.tracing.start({ screenshots: true, snapshots: true });
+      this.tracingActive = true;
+    }
+  }
+
+  async stopRecording(): Promise<RecordingStopResult> {
+    const out: RecordingStopResult = {};
+    const dir = this.recordingDir;
+    if (this.tracingActive && this.ctx && dir) {
+      const tracePath = join(dir, 'trace.zip');
+      await this.ctx.tracing.stop({ path: tracePath }).catch(() => undefined);
+      out.tracePath = tracePath;
+      this.tracingActive = false;
+    }
+    const page = this.page;
+    const video = page?.video?.() as { saveAs(p: string): Promise<void> } | undefined;
+    if (video && dir) {
+      // The video file finalizes on page close: close, save the artifact
+      // into the media dir, then keep the session alive with a fresh page.
+      const videoPath = join(dir, 'video.webm');
+      await page.close().catch(() => undefined);
+      await video.saveAs(videoPath).catch(() => undefined);
+      out.videoPath = videoPath;
+      if (this.ctx) {
+        this.page = await this.ctx.newPage().catch(() => undefined);
+        if (this.page) this.attachPageListeners(this.page);
+      }
+    }
+    this.recordingDir = undefined;
+    return out;
+  }
+
   async close(): Promise<void> {
+    await this.stopScreencast().catch(() => undefined);
     await this.ctx?.close().catch(() => undefined);
     this.ctx = undefined;
     this.page = undefined;
+    this.videoActive = false;
+    this.tracingActive = false;
+    this.recordingDir = undefined;
+    this.videoDir = undefined;
+    this.lastUrl = null;
   }
 }

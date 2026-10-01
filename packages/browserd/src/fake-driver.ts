@@ -1,9 +1,14 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   DriverError,
   type ConsoleEntry,
   type Driver,
   type NetworkEntry,
   type OpenResult,
+  type RecordingStartOptions,
+  type RecordingStopResult,
+  type ScreencastFrameHandler,
   type SnapshotResult,
   type AxNode,
 } from './driver.js';
@@ -11,6 +16,23 @@ import {
 /** A 1x1 transparent PNG — FakeDriver screenshots without a browser. */
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+/**
+ * A genuine 1x1 mid-gray baseline JPEG (330 bytes), emitted as screencast
+ * frames by FakeDriver. Generated once from hand-assembled segments and
+ * verified decodable (PIL + ffmpeg).
+ */
+const TINY_JPEG_BASE64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALChAYKDM9DAwOExo6PDcODRAYKDlFOA4RFh0zV1A+EhYlOERtZ00YIzdAUWhxXDFATldneXhlSFxfYnBkZ2P/wAALCAABAAEBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/ACv/2Q==';
+
+/** Screencast frame interval for the fake driver (~2fps). */
+const FAKE_SCREENCAST_MS = 500;
+
+/** Placeholder bytes for the fake driver's video.webm recording. */
+const FAKE_VIDEO_BYTES = Buffer.from('fake-webm');
+
+/** Placeholder bytes for the fake driver's trace.zip recording. */
+const FAKE_TRACE_BYTES = Buffer.from('fake-trace-zip');
 
 /** In-memory DOM node. `id` doubles as the stable ref (e.g. "e1"). */
 export interface FakeNode {
@@ -58,6 +80,11 @@ export class FakeDriver implements Driver {
   private lastKey: string | null = null;
   private lastScroll: { ref?: string; dx?: number; dy?: number } | null = null;
   private readonly evalAllowed: boolean;
+  /** Navigation history: urls visited via open(), with the current index. */
+  private readonly history: string[] = [];
+  private historyIndex = -1;
+  private screencastTimer: ReturnType<typeof setInterval> | undefined;
+  private recording: { video: boolean; trace: boolean; dir: string } | undefined;
 
   constructor(pages: FakePage[] = [], evalAllowed = false) {
     for (const p of pages) this.pages.set(p.url, p);
@@ -120,6 +147,10 @@ export class FakeDriver implements Driver {
     page.networkEntries ??= [];
     page.networkEntries.push({ url, method: 'GET', status: 200, ts: Date.now() });
     this.current = page;
+    // Push onto the history stack, dropping any "forward" entries.
+    this.history.length = this.historyIndex + 1;
+    this.history.push(page.url);
+    this.historyIndex = this.history.length - 1;
     return { url: page.url, title: page.title };
   }
 
@@ -198,7 +229,74 @@ export class FakeDriver implements Driver {
     return entries.slice(-(limit ?? 100));
   }
 
+  async startScreencast(onFrame: ScreencastFrameHandler): Promise<void> {
+    this.assertOpen();
+    await this.stopScreencast(); // restarting replaces the previous screencast
+    const frame = Buffer.from(TINY_JPEG_BASE64, 'base64');
+    this.screencastTimer = setInterval(() => {
+      try {
+        onFrame(frame);
+      } catch {
+        /* a throwing listener must not kill the screencast timer */
+      }
+    }, FAKE_SCREENCAST_MS);
+    this.screencastTimer.unref?.();
+  }
+
+  async stopScreencast(): Promise<void> {
+    if (this.screencastTimer !== undefined) {
+      clearInterval(this.screencastTimer);
+      this.screencastTimer = undefined;
+    }
+  }
+
+  /** Test hook: is a fake screencast currently running? */
+  get screencastActive(): boolean {
+    return this.screencastTimer !== undefined;
+  }
+
+  async goBack(): Promise<void> {
+    this.assertOpen();
+    if (this.historyIndex > 0) {
+      this.historyIndex -= 1;
+      this.current = this.pages.get(this.history[this.historyIndex]) ?? null;
+    }
+    // At the start of history: no-op, mirroring Playwright's null response.
+  }
+
+  async goForward(): Promise<void> {
+    this.assertOpen();
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex += 1;
+      this.current = this.pages.get(this.history[this.historyIndex]) ?? null;
+    }
+  }
+
+  async reload(): Promise<void> {
+    this.assertOpen();
+    // Fake pages are static: reload keeps the current page as-is.
+  }
+
+  async startRecording(opts: RecordingStartOptions): Promise<void> {
+    this.assertOpen();
+    await mkdir(opts.dir, { recursive: true });
+    if (opts.video) await writeFile(join(opts.dir, 'video.webm'), FAKE_VIDEO_BYTES);
+    if (opts.trace) await writeFile(join(opts.dir, 'trace.zip'), FAKE_TRACE_BYTES);
+    this.recording = { video: opts.video ?? false, trace: opts.trace ?? false, dir: opts.dir };
+  }
+
+  async stopRecording(): Promise<RecordingStopResult> {
+    const rec = this.recording;
+    this.recording = undefined;
+    if (!rec) return {};
+    const out: RecordingStopResult = {};
+    if (rec.video) out.videoPath = join(rec.dir, 'video.webm');
+    if (rec.trace) out.tracePath = join(rec.dir, 'trace.zip');
+    return out;
+  }
+
   async close(): Promise<void> {
+    await this.stopScreencast();
     this.closedFlag = true;
     this.current = null;
   }
