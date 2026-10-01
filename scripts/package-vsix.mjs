@@ -29,7 +29,8 @@ const version = JSON.parse(readFileSync(join(ROOT, 'packages/ext-agent/package.j
 
 function sh(cmd, argv, opts = {}) {
   console.log(`$ ${cmd} ${argv.join(' ')}`);
-  execFileSync(cmd, argv, { stdio: 'inherit', cwd: ROOT, ...opts });
+  // On Windows, .cmd shims (vsce) only resolve via PATHEXT under a shell.
+  execFileSync(cmd, argv, { stdio: 'inherit', cwd: ROOT, shell: process.platform === 'win32', ...opts });
 }
 
 function need(path, what) {
