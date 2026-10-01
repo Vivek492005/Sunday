@@ -116,6 +116,44 @@ export class HostBridge {
     return this.call('models/list', {}, 60000);
   }
 
+  // -- manager (Phase 4: checkpoints + worktrees) --------------------------------
+
+  checkpointCreate(
+    params: MethodParams<'checkpoint/create'>,
+  ): Promise<MethodResult<'checkpoint/create'>> {
+    return this.call('checkpoint/create', params);
+  }
+
+  checkpointList(
+    params: MethodParams<'checkpoint/list'>,
+  ): Promise<MethodResult<'checkpoint/list'>> {
+    return this.call('checkpoint/list', params);
+  }
+
+  checkpointRestore(
+    params: MethodParams<'checkpoint/restore'>,
+  ): Promise<MethodResult<'checkpoint/restore'>> {
+    return this.call('checkpoint/restore', params);
+  }
+
+  worktreeAdd(params: MethodParams<'worktree/add'>): Promise<MethodResult<'worktree/add'>> {
+    return this.call('worktree/add', params);
+  }
+
+  worktreeList(params: MethodParams<'worktree/list'>): Promise<MethodResult<'worktree/list'>> {
+    return this.call('worktree/list', params);
+  }
+
+  worktreeRemove(
+    params: MethodParams<'worktree/remove'>,
+  ): Promise<MethodResult<'worktree/remove'>> {
+    return this.call('worktree/remove', params);
+  }
+
+  worktreeMerge(params: MethodParams<'worktree/merge'>): Promise<MethodResult<'worktree/merge'>> {
+    return this.call('worktree/merge', params);
+  }
+
   dispose(): void {
     this.disposeChatEvent();
     this.chatListeners.clear();

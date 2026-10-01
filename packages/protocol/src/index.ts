@@ -12,6 +12,7 @@ export * from './chat.js';
 export * from './tools.js';
 export * from './models.js';
 export * from './context.js';
+export * from './manager.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';
@@ -19,6 +20,7 @@ import { CHAT_METHODS, CHAT_NOTIFICATIONS } from './chat.js';
 import { TOOLS_METHODS } from './tools.js';
 import { MODELS_METHODS } from './models.js';
 import { CONTEXT_METHODS } from './context.js';
+import { MANAGER_METHODS } from './manager.js';
 
 export const METHODS = {
   ...HANDSHAKE_METHODS,
@@ -27,6 +29,7 @@ export const METHODS = {
   ...TOOLS_METHODS,
   ...MODELS_METHODS,
   ...CONTEXT_METHODS,
+  ...MANAGER_METHODS,
 } as const;
 export type MethodName = keyof typeof METHODS;
 export type MethodParams<M extends MethodName> = z.infer<(typeof METHODS)[M]['params']>;

@@ -79,6 +79,9 @@ export class SundayDaemon {
   private readonly onShutdown: () => void;
   /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
   private readonly contextHandlers: DaemonContextHandlers | undefined;
+  /** Phase 4: dynamically registered method handlers (manager methods).
+   *  Wired via `registerManagerMethods(daemon)` in manager.ts. */
+  private readonly extraHandlers = new Map<string, (params: unknown) => Promise<unknown>>();
   /** Persists currently being written — drained before exit so a shutdown can
    *  never truncate a session file. */
   private readonly pendingPersists = new Set<Promise<void>>();
@@ -136,6 +139,16 @@ export class SundayDaemon {
     this.transport.start();
   }
 
+  /**
+   * Register a JSON-RPC method handler after construction (Phase 4: manager
+   * methods via `registerManagerMethods`). The method must exist in the
+   * protocol METHODS registry; dispatch consults this table before the
+   * built-in switch.
+   */
+  registerMethod(method: string, handler: (params: unknown) => Promise<unknown>): void {
+    this.extraHandlers.set(method, handler);
+  }
+
   /** Tracked persist: registers the in-flight write so gracefulExit can drain it. */
   private async persistSession(s: StoredSession): Promise<void> {
     const p = this.sessions.persist(s);
@@ -180,6 +193,12 @@ export class SundayDaemon {
     const method = req.method as MethodName;
     if (!(method in METHODS)) {
       throw new RpcError(ErrorCode.MethodNotFound, `unknown method: ${req.method}`);
+    }
+    // Phase 4: dynamically registered handlers (manager methods) win over
+    // the built-in switch.
+    const extra = this.extraHandlers.get(req.method);
+    if (extra) {
+      return extra(req.params);
     }
     switch (method) {
       case 'sunday/hello':

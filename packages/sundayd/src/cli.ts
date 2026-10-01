@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { SundayDaemon } from './daemon.js';
 import { createContextHandlers } from '@sunday/context';
+import { registerManagerMethods } from './manager.js';
 
 // sundayd entrypoint: JSON-RPC over stdio. Logs go to stderr so the NDJSON
 // frame stream on stdout stays clean.
@@ -36,6 +37,11 @@ const daemon = new SundayDaemon({
     'context/search': bindPerCall('context/search'),
   },
 });
+
+// Phase 4: checkpoints + worktrees. Registered first — the orchestration
+// primitives (`worktree/*`, `checkpoint/*`) are consumed verbatim by Phase 5.
+registerManagerMethods(daemon);
+
 daemon.start().catch((e) => {
   console.error(`sundayd failed to start: ${(e as Error).message}`);
   process.exit(1);

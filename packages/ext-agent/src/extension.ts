@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { SidecarManager, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
+import { ManagerViewProvider } from './managerView.js';
 
 const EXT_ID = 'sunday.sunday-agent';
 
@@ -26,6 +27,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   let bridge: HostBridge | undefined;
   let chatProvider: ChatViewProvider | undefined;
+  let managerProvider: ManagerViewProvider | undefined;
   const refreshBridge = () => {
     const rpc = manager.getRpc();
     if (rpc && !bridge) {
@@ -37,6 +39,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       log('HostBridge detached');
     }
     chatProvider?.notifyBridgeChanged();
+    managerProvider?.notifyBridgeChanged();
   };
 
   // -- status bar: sidecar health ------------------------------------------------
@@ -108,6 +111,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         bridge = new HostBridge(rpc);
         log('HostBridge attached to sundayd (chat)');
         chatProvider?.notifyBridgeChanged();
+        managerProvider?.notifyBridgeChanged();
+      }
+      return bridge;
+    },
+    getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    log,
+  });
+
+  // -- agent manager webview ------------------------------------------------------
+  managerProvider = new ManagerViewProvider({
+    extensionPath: context.extensionPath,
+    getBridge: () => bridge,
+    ensureBridge: async () => {
+      const rpc = await manager.ensureReady();
+      if (!bridge) {
+        bridge = new HostBridge(rpc);
+        log('HostBridge attached to sundayd (manager)');
+        chatProvider?.notifyBridgeChanged();
+        managerProvider?.notifyBridgeChanged();
       }
       return bridge;
     },
@@ -122,14 +144,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     manager,
     statusSub,
     chatProvider,
+    managerProvider,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.registerWebviewViewProvider(ManagerViewProvider.viewType, managerProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand('sunday.chat.focus', () => {
       void vscode.commands.executeCommand('sunday.chatView.focus');
     }),
     vscode.commands.registerCommand('sunday.manager.open', () => {
-      vscode.window.showInformationMessage('Agent Manager arrives in Phase 4.');
+      void vscode.commands.executeCommand('sunday.managerView.focus');
     }),
     vscode.commands.registerCommand('sunday.turn.stop', async () => {
       if (!bridge) {

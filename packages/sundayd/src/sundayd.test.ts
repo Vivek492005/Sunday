@@ -18,6 +18,7 @@ import {
 } from '@sunday/gateway';
 import { createDefaultRegistry as createDefaultTools } from '@sunday/tools';
 import { SundayDaemon, type DaemonOptions } from './daemon.js';
+import { registerManagerMethods } from './manager.js';
 import { SessionStore, type StoredSession } from './sessions.js';
 import { PolicyGate } from './policy.js';
 import { AgentLoop } from './loop.js';
@@ -72,6 +73,7 @@ interface Frame {
 interface Harness {
   dir: string;
   frames: Frame[];
+  daemon: SundayDaemon;
   call(method: string, params: unknown): number;
   raw(line: string): void;
   close(): void;
@@ -112,6 +114,7 @@ async function makeHarness(provider: ChatProvider, extra: Partial<DaemonOptions>
   return {
     dir,
     frames,
+    daemon,
     call(method: string, params: unknown): number {
       const id = nextId++;
       input.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
@@ -207,6 +210,15 @@ describe('handshake & protocol', () => {
   it('rejects invalid params', async () => {
     const h = await makeHarness(new MockProvider());
     const id = h.call('sunday/hello', { bogus: true });
+    await waitFor(() => !!response(h, id));
+    expect(response(h, id)!.error?.code).toBe(ErrorCode.InvalidParams);
+    h.close();
+  });
+
+  it('manager methods are registered (bad params -> -32602, not -32601)', async () => {
+    const h = await makeHarness(new MockProvider());
+    registerManagerMethods(h.daemon);
+    const id = h.call('checkpoint/list', { bogus: true });
     await waitFor(() => !!response(h, id));
     expect(response(h, id)!.error?.code).toBe(ErrorCode.InvalidParams);
     h.close();

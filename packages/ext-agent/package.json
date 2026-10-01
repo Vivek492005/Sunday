@@ -53,6 +53,10 @@
         {
           "id": "sunday.chatView",
           "name": "Sunday Chat"
+        },
+        {
+          "id": "sunday.managerView",
+          "name": "Sunday Manager"
         }
       ]
     }
