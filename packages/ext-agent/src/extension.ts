@@ -1,10 +1,11 @@
 // sunday-agent — built-in extension entry point.
 // Owns the sundayd sidecar lifecycle (SidecarManager), the typed HostBridge,
-// status-bar health, and command registration. Chat UI arrives in Phase 1f;
-// the Agent Manager in Phase 4.
+// status-bar health, command registration, and the Sunday Chat webview view.
+// The Agent Manager arrives in Phase 4.
 import * as vscode from 'vscode';
 import { SidecarManager, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
+import { ChatViewProvider } from './chatView.js';
 
 const EXT_ID = 'sunday.sunday-agent';
 
@@ -24,6 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   let bridge: HostBridge | undefined;
+  let chatProvider: ChatViewProvider | undefined;
   const refreshBridge = () => {
     const rpc = manager.getRpc();
     if (rpc && !bridge) {
@@ -34,6 +36,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       bridge = undefined;
       log('HostBridge detached');
     }
+    chatProvider?.notifyBridgeChanged();
   };
 
   // -- status bar: sidecar health ------------------------------------------------
@@ -95,14 +98,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.showInformationMessage('Sunday sidecar restarted.');
   };
 
+  // -- chat webview ---------------------------------------------------------------
+  chatProvider = new ChatViewProvider({
+    extensionPath: context.extensionPath,
+    getBridge: () => bridge,
+    ensureBridge: async () => {
+      const rpc = await manager.ensureReady();
+      if (!bridge) {
+        bridge = new HostBridge(rpc);
+        log('HostBridge attached to sundayd (chat)');
+        chatProvider?.notifyBridgeChanged();
+      }
+      return bridge;
+    },
+    getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    log,
+  });
+
   // -- commands ------------------------------------------------------------------
   context.subscriptions.push(
     output,
     statusBar,
     manager,
     statusSub,
+    chatProvider,
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand('sunday.chat.focus', () => {
-      vscode.window.showInformationMessage('Sunday chat panel arrives in Phase 1f — the sidecar is already running.');
+      void vscode.commands.executeCommand('sunday.chatView.focus');
     }),
     vscode.commands.registerCommand('sunday.manager.open', () => {
       vscode.window.showInformationMessage('Agent Manager arrives in Phase 4.');

@@ -47,6 +47,14 @@
         }
       },
       "title": "Sunday"
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "sunday.chatView",
+          "name": "Sunday Chat"
+        }
+      ]
     }
   },
   "dependencies": {

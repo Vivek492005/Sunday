@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "noEmit": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": false,
+    "types": [
+      "vite/client"
+    ]
+  },
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src"
+  ]
+}
