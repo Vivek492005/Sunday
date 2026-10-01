@@ -16,13 +16,13 @@
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const outFlag = args.indexOf('--out');
-const OUT = outFlag === -1 ? join(ROOT, 'dist-package') : args[outFlag + 1];
+const OUT = outFlag === -1 ? join(ROOT, 'dist-package') : resolve(args[outFlag + 1]);
 const STAGE = join(OUT, 'stage');
 
 const version = JSON.parse(readFileSync(join(ROOT, 'packages/ext-agent/package.json'), 'utf8')).version;
