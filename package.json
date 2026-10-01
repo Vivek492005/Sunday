@@ -1,0 +1,12 @@
+{
+  "name": "sunday",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Sunday — an agent-first coding IDE, forked from VS Code (Code-OSS). Product workspace (lives at sunday/ inside the fork).",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
