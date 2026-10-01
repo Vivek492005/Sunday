@@ -17,7 +17,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -47,7 +47,7 @@ need(join(ROOT, 'packages/ui-manager/dist/index.html'), 'ui-manager build');
 // 1. bundle the sidecars (via esbuild's JS API — cross-platform, no .bin
 //    shell-script resolution issues on Windows)
 const { buildSync } = await import(
-  join(ROOT, 'packages/ext-agent/node_modules/esbuild/lib/main.js')
+  pathToFileURL(join(ROOT, 'packages/ext-agent/node_modules/esbuild/lib/main.js')).href
 );
 function bundle(entry, outfile, extra = {}) {
   console.log(`$ esbuild ${entry} -> ${outfile}`);
