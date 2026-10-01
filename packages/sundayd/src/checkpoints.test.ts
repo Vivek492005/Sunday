@@ -21,6 +21,7 @@ function makeRepo(): string {
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@t.test');
   git(dir, 'config', 'user.name', 't');
+  git(dir, 'config', 'core.autocrlf', 'false'); // deterministic LF on Windows
   fs.writeFileSync(path.join(dir, 'a.txt'), 'v1\n');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'init');

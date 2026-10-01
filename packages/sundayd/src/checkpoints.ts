@@ -61,7 +61,9 @@ async function git(args: string[], cwd?: string): Promise<string> {
         // Checkpoint commits must not pick up the user's global git identity
         // or system config surprises; identity is pinned per-invocation.
         GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_GLOBAL: os.devNull,
+        // NOTE: os.devNull is '\\.\nul' on Windows, which Git for Windows
+        // (MSYS2) cannot open — use the plain DOS device name there.
+        GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : os.devNull,
       },
     });
     return stdout;
