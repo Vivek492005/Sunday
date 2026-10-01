@@ -189,6 +189,65 @@ describe('OpenRouter adapter', () => {
     ).rejects.toMatchObject({ name: 'ProviderHttpError', status: 429 });
   });
 
+  it('serializes image parts as image_url content blocks', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    const seen: Array<{ url: string; init: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      async (url: unknown, init: unknown) => {
+        seen.push({ url: String(url), init: init as RequestInit });
+        return new Response(sseStream(['data: [DONE]']), {
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      },
+    );
+    await drain(
+      new OpenRouterProvider().chat({
+        model: 'openrouter:meta-llama/llama-3.3-70b-instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'what is this?' },
+              { type: 'image', dataUrl: 'data:image/jpeg;base64,/9j/4AAQ' },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(seen).toHaveLength(1);
+    const body = JSON.parse(seen[0].init.body as string);
+    expect(body.messages[0]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'what is this?' },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,/9j/4AAQ' } },
+      ],
+    });
+  });
+
+  it('keeps all-text messages as a plain string (unchanged wire behavior)', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    const seen: Array<{ url: string; init: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      async (url: unknown, init: unknown) => {
+        seen.push({ url: String(url), init: init as RequestInit });
+        return new Response(sseStream(['data: [DONE]']), {
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      },
+    );
+    await drain(
+      new OpenRouterProvider().chat({
+        model: 'openrouter:meta-llama/llama-3.3-70b-instruct',
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      }),
+    );
+    const body = JSON.parse(seen[0].init.body as string);
+    expect(body.messages[0]).toEqual({ role: 'user', content: 'hi' });
+  });
+
   it('refuses to run without an API key', async () => {
     await expect(
       drain(new GroqProvider().chat({ model: 'groq:m', messages: [] })),

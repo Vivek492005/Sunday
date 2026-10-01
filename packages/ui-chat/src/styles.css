@@ -316,3 +316,113 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+/* @-mention autocomplete popup */
+.composer-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.composer-input-wrap textarea {
+  width: 100%;
+}
+
+.mention-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--vscode-quickInput-background, #252526);
+  border: 1px solid var(--vscode-quickInput-border, #454545);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.mention-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.mention-item.selected {
+  background: var(--vscode-list-activeSelectionBackground, #094771);
+  color: var(--vscode-list-activeSelectionForeground, #ffffff);
+}
+
+.mention-label {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mention-hint {
+  font-family: var(--vscode-editor-font-family, monospace);
+  opacity: 0.6;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mention-desc {
+  opacity: 0.75;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pasted image attachment chips */
+.attachment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 6px;
+  padding: 4px 4px 4px 6px;
+  font-size: 12px;
+  max-width: 220px;
+}
+
+.attachment-thumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.attachment-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.attachment-remove:hover {
+  opacity: 1;
+}

@@ -24,6 +24,7 @@ const DEFAULT_MODEL: ModelEntry = {
   label: 'Mock Model',
   contextWindow: 8192,
   supportsTools: true,
+  supportsFim: false,
 };
 
 export class MockChatProvider implements ChatProvider {

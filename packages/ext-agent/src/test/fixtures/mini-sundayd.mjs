@@ -118,6 +118,65 @@ rl.on('line', (line) => {
     case 'models/list':
       ok(id, { models: [] });
       break;
+    case 'completion/complete':
+      ok(id, {
+        completion: ' + 1;',
+        cached: false,
+        nativeFim: true,
+        cancelled: false,
+        latencyMs: 4,
+      });
+      break;
+    case 'completion/stats':
+      ok(id, {
+        count: 1,
+        cacheHits: 0,
+        cacheMisses: 1,
+        p50Ms: 4,
+        p95Ms: 4,
+        avgMs: 4,
+        inFlight: 0,
+      });
+      break;
+    case 'mcp/servers/list':
+      ok(id, {
+        servers: [
+          { name: 'fixture-srv', scope: 'user', transport: 'stdio', state: 'running', toolCount: 1 },
+        ],
+        workspaceConfigIgnored: false,
+        workspaceTrusted: true,
+      });
+      break;
+    case 'mcp/server/start':
+    case 'mcp/server/stop':
+    case 'mcp/server/restart':
+      ok(id, {
+        status: { name: params?.name ?? 'fixture-srv', scope: 'user', transport: 'stdio', state: 'running', toolCount: 1 },
+      });
+      break;
+    case 'mcp/tools/list':
+      ok(id, {
+        tools: [
+          {
+            namespaced: 'mcp__fixture_srv__echo',
+            name: 'echo',
+            server: 'fixture-srv',
+            description: 'echo back',
+            enabled: true,
+          },
+        ],
+      });
+      break;
+    case 'mcp/calls/history':
+      ok(id, { calls: [] });
+      break;
+    case 'policy/approve':
+    case 'policy/revoke':
+      ok(id, { ok: true });
+      break;
+    case 'policy/list':
+      ok(id, { dangerous: [], approved: [] });
+      break;
     default:
       send({ jsonrpc: '2.0', id, error: { code: -32601, message: `unknown method: ${method}` } });
   }

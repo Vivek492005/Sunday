@@ -83,6 +83,95 @@ export async function* streamChatCompletion(
   yield* parseSseStream(res.body);
 }
 
+/** Non-streaming FIM helpers for `FimProvider.complete` (Part B). Both throw
+ *  ProviderHttpError on non-2xx and propagate AbortError unchanged. */
+
+export interface FimHttpArgs {
+  model: string;
+  prefix: string;
+  suffix?: string;
+  maxTokens?: number;
+  stop?: string[];
+  signal?: AbortSignal;
+}
+
+function authHeaders(config: OpenAICompatibleConfig): Record<string, string> {
+  return {
+    'content-type': 'application/json',
+    authorization: `Bearer ${config.apiKey}`,
+    ...config.defaultHeaders,
+  };
+}
+
+/** Native fill-in-the-middle: POST /completions with `prompt` + `suffix`.
+ *  Only call this when the model is known to support it. */
+export async function requestNativeFim(
+  config: OpenAICompatibleConfig,
+  args: FimHttpArgs,
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${config.baseUrl}/completions`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        model: args.model,
+        prompt: args.prefix,
+        ...(args.suffix !== undefined ? { suffix: args.suffix } : {}),
+        max_tokens: args.maxTokens ?? 64,
+        temperature: 0,
+        ...(args.stop?.length ? { stop: args.stop } : {}),
+      }),
+      signal: args.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    throw new Error(`FIM request failed: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    throw new ProviderHttpError(res.status, await safeBodyText(res), res.headers);
+  }
+  const json = (await res.json()) as { choices?: Array<{ text?: unknown }> };
+  const text = json.choices?.[0]?.text;
+  return typeof text === 'string' ? text : '';
+}
+
+/** Fallback continuation: non-streaming POST /chat/completions with an
+ *  instruction-free prompt — the raw prefix as the user message, temperature
+ *  ~0, short maxTokens. The model continues the code; suffix is dropped. */
+export async function requestChatContinuation(
+  config: OpenAICompatibleConfig,
+  args: FimHttpArgs,
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        model: args.model,
+        messages: [{ role: 'user', content: args.prefix }],
+        temperature: 0,
+        max_tokens: args.maxTokens ?? 64,
+        ...(args.stop?.length ? { stop: args.stop } : {}),
+        stream: false,
+      }),
+      signal: args.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    throw new Error(`completion fallback request failed: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    throw new ProviderHttpError(res.status, await safeBodyText(res), res.headers);
+  }
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
+  const content = json.choices?.[0]?.message?.content;
+  return typeof content === 'string' ? content : '';
+}
+
 async function safeBodyText(res: Response): Promise<string> {
   try {
     return await res.text();
@@ -95,12 +184,32 @@ function partsToText(parts: ContentPart[]): string {
   return parts.map((p) => (p.type === 'text' ? p.text : '')).join('');
 }
 
+/**
+ * Map message parts to an OpenAI-compatible `content` value.
+ *
+ * All-text messages keep the legacy plain-string form (unchanged wire
+ * behavior). If any image part is present, the message becomes the
+ * array form: text parts → `{type:'text',text}` and image parts →
+ * `{type:'image_url',image_url:{url: dataUrl}}`, per the chat-completions
+ * vision format. Providers that reject mixed content will surface a
+ * normal 4xx, which the router already handles.
+ */
+export function contentPartsToOpenAI(parts: ContentPart[]): string | Array<Record<string, unknown>> {
+  if (!parts.some((p) => p.type === 'image')) return partsToText(parts);
+  const out: Array<Record<string, unknown>> = [];
+  for (const p of parts) {
+    if (p.type === 'text') out.push({ type: 'text', text: p.text });
+    else if (p.type === 'image') out.push({ type: 'image_url', image_url: { url: p.dataUrl } });
+  }
+  return out;
+}
+
 function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
   switch (m.role) {
     case 'system':
       return { role: 'system', content: m.content };
     case 'user':
-      return { role: 'user', content: partsToText(m.content) };
+      return { role: 'user', content: contentPartsToOpenAI(m.content) };
     case 'assistant': {
       const msg: Record<string, unknown> = {
         role: 'assistant',

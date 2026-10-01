@@ -12,3 +12,8 @@ export * from './daemon.js';
 // spawns lazily on first tool use.
 export * from './browserd.js';
 export * from './browser-tools.js';
+// Part A: Editor Intelligence — MCP hub + skills wiring.
+export * from './trust.js';
+export * from './system-prompt.js';
+export * from './agent-tools.js';
+export * from './mcp-methods.js';

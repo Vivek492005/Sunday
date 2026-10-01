@@ -116,6 +116,23 @@ export class HostBridge {
     return this.call('models/list', {}, 60000);
   }
 
+  // -- inline completion (Part B) ---------------------------------------------
+
+  /**
+   * Ghost-text completion for a cursor position. The daemon debounces and
+   * caches per document; a superseded keystroke resolves `cancelled: true`.
+   * Short timeout — this backs interactive typing, not agent turns.
+   */
+  completionComplete(
+    params: MethodParams<'completion/complete'>,
+  ): Promise<MethodResult<'completion/complete'>> {
+    return this.call('completion/complete', params, 15000);
+  }
+
+  completionStats(): Promise<MethodResult<'completion/stats'>> {
+    return this.call('completion/stats', {}, 10000);
+  }
+
   // -- manager (Phase 4: checkpoints + worktrees) --------------------------------
 
   checkpointCreate(
@@ -152,6 +169,46 @@ export class HostBridge {
 
   worktreeMerge(params: MethodParams<'worktree/merge'>): Promise<MethodResult<'worktree/merge'>> {
     return this.call('worktree/merge', params);
+  }
+
+  // -- MCP (Part A: servers, tools, call history) --------------------------------
+
+  mcpServersList(): Promise<MethodResult<'mcp/servers/list'>> {
+    return this.call('mcp/servers/list', {});
+  }
+
+  mcpServerStart(name: string): Promise<MethodResult<'mcp/server/start'>> {
+    return this.call('mcp/server/start', { name }, 60000);
+  }
+
+  mcpServerStop(name: string): Promise<MethodResult<'mcp/server/stop'>> {
+    return this.call('mcp/server/stop', { name }, 30000);
+  }
+
+  mcpServerRestart(name: string): Promise<MethodResult<'mcp/server/restart'>> {
+    return this.call('mcp/server/restart', { name }, 60000);
+  }
+
+  mcpToolsList(server?: string): Promise<MethodResult<'mcp/tools/list'>> {
+    return this.call('mcp/tools/list', server ? { server } : {});
+  }
+
+  mcpCallsHistory(limit?: number): Promise<MethodResult<'mcp/calls/history'>> {
+    return this.call('mcp/calls/history', limit === undefined ? {} : { limit });
+  }
+
+  // -- policy approvals (Part A: risk class M) -----------------------------------
+
+  policyApprove(tool: string): Promise<MethodResult<'policy/approve'>> {
+    return this.call('policy/approve', { tool });
+  }
+
+  policyRevoke(tool: string): Promise<MethodResult<'policy/revoke'>> {
+    return this.call('policy/revoke', { tool });
+  }
+
+  policyList(): Promise<MethodResult<'policy/list'>> {
+    return this.call('policy/list', {});
   }
 
   dispose(): void {

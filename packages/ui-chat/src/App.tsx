@@ -11,6 +11,7 @@ import {
   type ModelView,
   type ChatEventNotificationWire,
 } from './chatClient.js';
+import type { ImageWire } from './images.js';
 import { postToExtension } from './vscode.js';
 import { MessageList } from './MessageList.js';
 import { Composer } from './Composer.js';
@@ -65,9 +66,15 @@ export function App(): JSX.Element {
 
   const busy = state.activeTurnId !== undefined;
 
-  const send = (text: string): void => {
-    dispatch({ kind: 'send', text });
-    postToExtension({ type: 'sunday/chat/send', text, model: state.selectedModel });
+  const send = (text: string, images: ImageWire[]): void => {
+    const displayText =
+      images.length > 0
+        ? [text, ...images.map((i) => `🖼️ attached image: ${i.name ?? 'pasted image'}`)]
+            .filter(Boolean)
+            .join('\n')
+        : text;
+    dispatch({ kind: 'send', text: displayText });
+    postToExtension({ type: 'sunday/chat/send', text, model: state.selectedModel, images });
   };
 
   return (

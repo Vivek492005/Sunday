@@ -9,33 +9,42 @@ export * from './content.js';
 export * from './handshake.js';
 export * from './session.js';
 export * from './chat.js';
+export * from './completion.js';
 export * from './tools.js';
 export * from './models.js';
 export * from './context.js';
 export * from './manager.js';
 export * from './browser.js';
 export * from './orchestrate.js';
+export * from './mcp.js';
+export * from './policy.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';
 import { CHAT_METHODS, CHAT_NOTIFICATIONS } from './chat.js';
+import { COMPLETION_METHODS } from './completion.js';
 import { TOOLS_METHODS } from './tools.js';
 import { MODELS_METHODS } from './models.js';
 import { CONTEXT_METHODS } from './context.js';
 import { MANAGER_METHODS } from './manager.js';
 import { BROWSER_METHODS } from './browser.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
+import { MCP_METHODS } from './mcp.js';
+import { POLICY_METHODS } from './policy.js';
 
 export const METHODS = {
   ...HANDSHAKE_METHODS,
   ...SESSION_METHODS,
   ...CHAT_METHODS,
+  ...COMPLETION_METHODS,
   ...TOOLS_METHODS,
   ...MODELS_METHODS,
   ...CONTEXT_METHODS,
   ...MANAGER_METHODS,
   ...BROWSER_METHODS,
   ...ORCHESTRATE_METHODS,
+  ...MCP_METHODS,
+  ...POLICY_METHODS,
 } as const;
 export type MethodName = keyof typeof METHODS;
 export type MethodParams<M extends MethodName> = z.infer<(typeof METHODS)[M]['params']>;

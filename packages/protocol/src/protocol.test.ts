@@ -13,6 +13,9 @@ import {
   sessionSchema,
   toolDefinitionSchema,
   chatEventNotificationSchema,
+  contentPartSchema,
+  imagePartSchema,
+  textPartSchema,
 } from './index.js';
 
 describe('envelopes', () => {
@@ -83,7 +86,14 @@ describe('method params', () => {
       expect(typeof def.result.parse).toBe('function');
       // Phase 6: browser/verify_ui carries an underscore (composed macro
       // name); method names are otherwise kebab-case.
-      expect(name).toMatch(/^[a-z]+\/[a-z-_]+$/);
+      // Part A: the mcp/* family uses a second namespace segment
+      // (mcp/<resource>/<action>) because the MCP surface groups servers,
+      // tools, and call history.
+      if (name.startsWith('mcp/')) {
+        expect(name).toMatch(/^mcp\/[a-z]+\/[a-z]+$/);
+      } else {
+        expect(name).toMatch(/^[a-z]+\/[a-z-_]+$/);
+      }
     }
   });
 
@@ -154,5 +164,41 @@ describe('context methods', () => {
     });
     expect(result.hits).toHaveLength(1);
     expect(result.hits[0]!.score).toBe(2.5);
+  });
+});
+
+describe('content parts', () => {
+  it('accepts a text part', () => {
+    expect(textPartSchema.parse({ type: 'text', text: 'hi' })).toEqual({ type: 'text', text: 'hi' });
+  });
+
+  it('accepts an image part with a data: URL', () => {
+    const part = imagePartSchema.parse({
+      type: 'image',
+      dataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    });
+    expect(part.type).toBe('image');
+    expect(contentPartSchema.parse(part).type).toBe('image');
+  });
+
+  it('rejects an image part without a dataUrl', () => {
+    expect(() => imagePartSchema.parse({ type: 'image' })).toThrow();
+    expect(() => contentPartSchema.parse({ type: 'image', dataUrl: '' })).toThrow();
+  });
+
+  it('still rejects unknown part types', () => {
+    expect(() => contentPartSchema.parse({ type: 'video', url: 'x' })).toThrow();
+  });
+
+  it('chat/send accepts messages mixing text and image parts', () => {
+    expect(() =>
+      parseParams('chat/send', {
+        sessionId: 's1',
+        message: [
+          { type: 'text', text: 'what is this?' },
+          { type: 'image', dataUrl: 'data:image/png;base64,iVBORw0KGgo' },
+        ],
+      }),
+    ).not.toThrow();
   });
 });

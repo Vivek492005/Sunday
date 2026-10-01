@@ -131,6 +131,13 @@ export interface SidecarManagerOptions {
   crashWindowMs?: number;
   /** Give up auto-restart after this many rapid crashes. */
   maxRapidCrashes?: number;
+  /**
+   * Extra env vars for the sundayd child (merged over process.env). May be a
+   * function evaluated at each spawn — used for workspace trust
+   * (SUNDAY_WORKSPACE_TRUSTED) and pre-resolved MCP secrets
+   * (SUNDAY_MCP_SECRET_*), which can change between restarts.
+   */
+  extraEnv?: Record<string, string> | (() => Record<string, string>);
 }
 
 function waitForSpawn(proc: ChildProcess, source: string): Promise<void> {
@@ -274,10 +281,11 @@ export class SidecarManager {
     try {
       const cmd = resolveSidecarCommand(this.opts.extensionDir, this.opts.readConfig().sidecarPath || undefined);
       this.opts.log(`spawning sundayd (${cmd.source}): ${cmd.command} ${cmd.args.join(' ')}`);
+      const extraEnv = typeof this.opts.extraEnv === 'function' ? this.opts.extraEnv() : (this.opts.extraEnv ?? {});
       proc = spawn(cmd.command, cmd.args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true, // no console window flash on Windows
-        env: { ...process.env },
+        env: { ...process.env, ...extraEnv },
       });
       // Publish early so stop() can find and kill the child even mid-handshake.
       this.proc = proc;

@@ -46,6 +46,9 @@ export interface ModelEntry {
   label: string;
   contextWindow: number;
   supportsTools: boolean;
+  /** Advertises a native fill-in-the-middle endpoint (e.g. /completions with
+   *  `suffix`). Default false — providers without it use the chat fallback. */
+  supportsFim: boolean;
 }
 
 export interface ChatProvider {
@@ -53,4 +56,31 @@ export interface ChatProvider {
   readonly label: string;
   chat(request: ChatRequest): AsyncIterable<ChatChunk>;
   listModels(): Promise<ModelEntry[]>;
+}
+
+/** Fill-in-the-middle completion request (ghost text / autocomplete). */
+export interface FimRequest {
+  /** "provider:model" or bare model id — resolved like ChatRequest.model. */
+  model: string;
+  /** Code before the cursor. */
+  prefix: string;
+  /** Code after the cursor (dropped on providers without native FIM). */
+  suffix?: string;
+  maxTokens?: number;
+  stop?: string[];
+  signal?: AbortSignal;
+}
+
+export interface FimResult {
+  /** Raw completion text for the cursor position (no prompt echo). */
+  completion: string;
+  /** True when served by the provider's native FIM endpoint. */
+  nativeFim: boolean;
+}
+
+/** Optional capability on a ChatProvider: single-shot FIM completion.
+ *  Implementations must never throw for "no FIM support" — they fall back
+ *  to a prefix-only chat continuation instead. AbortError propagates. */
+export interface FimProvider {
+  complete(request: FimRequest): Promise<FimResult>;
 }

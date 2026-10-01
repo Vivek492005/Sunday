@@ -31,6 +31,54 @@
         "category": "Sunday",
         "command": "sunday.sidecar.status",
         "title": "Show Sidecar Status"
+      },
+      {
+        "command": "sunday.mcp.startServer",
+        "title": "Start Server…",
+        "category": "Sunday MCP"
+      },
+      {
+        "command": "sunday.mcp.stopServer",
+        "title": "Stop Server…",
+        "category": "Sunday MCP"
+      },
+      {
+        "command": "sunday.mcp.restartServer",
+        "title": "Restart Server…",
+        "category": "Sunday MCP"
+      },
+      {
+        "command": "sunday.mcp.storeSecret",
+        "title": "Store Secret…",
+        "category": "Sunday MCP"
+      },
+      {
+        "command": "sunday.workspace.trust",
+        "title": "Trust Workspace for MCP/Skills",
+        "category": "Sunday"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.inlineEdit",
+        "title": "Inline Edit…"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.git.commitMessage",
+        "title": "Generate Commit Message from Staged Changes"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.terminal.explainError",
+        "title": "Explain Last Terminal Error"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "sunday.inlineEdit",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
@@ -43,6 +91,21 @@
         "sunday.sidecar.path": {
           "default": "",
           "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
+          "type": "string"
+        },
+        "sunday.completion.debounceMs": {
+          "default": 75,
+          "description": "Per-document debounce (ms) before a keystroke burst triggers a completion request to the sidecar.",
+          "type": "number"
+        },
+        "sunday.completion.enabled": {
+          "default": true,
+          "description": "Enable Sunday ghost-text inline completions (Tab to accept) for all languages.",
+          "type": "boolean"
+        },
+        "sunday.completion.model": {
+          "default": "groq:llama-3.1-8b-instant",
+          "description": "Model ref (\"provider:model\") used for inline completions. Fast/cheap models recommended; providers without a native FIM endpoint fall back to a prefix-only chat continuation.",
           "type": "string"
         }
       },
@@ -57,11 +120,16 @@
         {
           "id": "sunday.managerView",
           "name": "Sunday Manager"
+        },
+        {
+          "id": "sunday.mcpView",
+          "name": "Sunday MCP"
         }
       ]
     }
   },
   "dependencies": {
+    "@sunday/mcp": "workspace:*",
     "@sunday/protocol": "workspace:*"
   },
   "description": "Built-in extension: agent chat UI glue + tool executors needing the VS Code API. Talks JSON-RPC to the sundayd sidecar.",

@@ -3,6 +3,7 @@
 // All message/event application logic lives here (no React, no DOM) so it is
 // unit-testable with plain vitest. The React layer (App.tsx) is a thin shell
 // over `createInitialState` + the `apply*` functions below.
+import type { ImageWire } from './images.js';
 
 // -- wire types (mirror the extension↔webview protocol; JSON only) ----------
 
@@ -56,7 +57,14 @@ export type InboundMessage =
 
 /** Webview → extension. */
 export type OutboundMessage =
-  | { type: 'sunday/chat/send'; text: string; model?: string }
+  | {
+      type: 'sunday/chat/send';
+      text: string;
+      model?: string;
+      /** Pasted image attachments (data: URLs), carried to `chat/send` as
+       *  image content parts. */
+      images?: ImageWire[];
+    }
   | { type: 'sunday/chat/cancel' }
   | { type: 'sunday/models/get' };
 

@@ -1,11 +1,19 @@
-import { streamChatCompletion } from './openai-compatible.js';
-import type { ChatChunk, ChatProvider, ChatRequest, ModelEntry } from './types.js';
+import { requestChatContinuation, requestNativeFim, streamChatCompletion } from './openai-compatible.js';
+import type {
+  ChatChunk,
+  ChatProvider,
+  ChatRequest,
+  FimProvider,
+  FimRequest,
+  FimResult,
+  ModelEntry,
+} from './types.js';
 
 /** OpenRouter + Groq adapters. Both are OpenAI-compatible; the shared core in
  *  openai-compatible.ts does the HTTP + SSE work. API keys come from the
  *  environment (OPENROUTER_API_KEY / GROQ_API_KEY) — never from the repo. */
 
-abstract class OpenAICompatibleProvider implements ChatProvider {
+abstract class OpenAICompatibleProvider implements ChatProvider, FimProvider {
   abstract readonly id: string;
   abstract readonly label: string;
 
@@ -15,6 +23,15 @@ abstract class OpenAICompatibleProvider implements ChatProvider {
     return {};
   }
   abstract listModels(): Promise<ModelEntry[]>;
+
+  /**
+   * Provider quirk: bare model ids known to serve a native FIM endpoint
+   * (POST /completions with `suffix`). Return null when the provider has no
+   * FIM endpoint at all (Groq) — every request falls back to chat.
+   */
+  protected nativeFimModels(): ReadonlySet<string> | null {
+    return null;
+  }
 
   protected requireApiKey(): string {
     const key = process.env[this.envVar()]?.trim();
@@ -42,6 +59,38 @@ abstract class OpenAICompatibleProvider implements ChatProvider {
       },
     );
   }
+
+  /** Single-shot FIM completion. Tries the native infill endpoint when the
+   *  model advertises FIM support; otherwise falls back to a prefix-only chat
+   *  continuation (suffix dropped). Never throws for "no FIM support" —
+   *  only for transport errors; AbortError propagates to the caller. */
+  async complete(request: FimRequest): Promise<FimResult> {
+    const apiKey = this.requireApiKey();
+    const model = this.resolveModel(request.model);
+    const config = { baseUrl: this.baseUrl(), apiKey, defaultHeaders: this.defaultHeaders() };
+    const args = {
+      model,
+      prefix: request.prefix,
+      suffix: request.suffix,
+      maxTokens: request.maxTokens,
+      stop: request.stop,
+      signal: request.signal,
+    };
+    const fimModels = this.nativeFimModels();
+    if (fimModels !== null && fimModels.has(model)) {
+      try {
+        const completion = await requestNativeFim(config, args);
+        return { completion, nativeFim: true };
+      } catch (err) {
+        // Abort is the caller's decision — never paper over it with a retry.
+        if ((err as Error).name === 'AbortError') throw err;
+        // Native endpoint failed (e.g. model lost FIM support): fall through
+        // to the chat continuation instead of failing the keystroke.
+      }
+    }
+    const completion = await requestChatContinuation(config, args);
+    return { completion, nativeFim: false };
+  }
 }
 
 // Defaults are a starting point; override via Sunday settings. Free-tier
@@ -53,12 +102,16 @@ const DEFAULT_OPENROUTER_MODELS: ModelEntry[] = [
     label: 'Llama 3.3 70B (OpenRouter)',
     contextWindow: 131072,
     supportsTools: true,
+    supportsFim: false,
   },
   {
     id: 'qwen/qwen-2.5-coder-32b-instruct',
     label: 'Qwen 2.5 Coder 32B (OpenRouter)',
     contextWindow: 32768,
     supportsTools: true,
+    // Qwen2.5-Coder is a FIM-trained coder; OpenRouter serves it on the
+    // legacy /completions endpoint with `suffix` support.
+    supportsFim: true,
   },
 ];
 
@@ -68,12 +121,14 @@ const DEFAULT_GROQ_MODELS: ModelEntry[] = [
     label: 'Llama 3.3 70B Versatile (Groq)',
     contextWindow: 131072,
     supportsTools: true,
+    supportsFim: false,
   },
   {
     id: 'llama-3.1-8b-instant',
     label: 'Llama 3.1 8B Instant (Groq)',
     contextWindow: 131072,
     supportsTools: true,
+    supportsFim: false,
   },
 ];
 
@@ -92,6 +147,13 @@ export class OpenRouterProvider extends OpenAICompatibleProvider {
       'HTTP-Referer': 'https://github.com/Vivek492005/Sunday_VS_CODE',
       'X-Title': 'Sunday',
     };
+  }
+  /** OpenRouter serves /completions for FIM-capable models; the set is
+   *  derived from the entries that advertise supportsFim. */
+  protected override nativeFimModels(): ReadonlySet<string> {
+    return new Set(
+      DEFAULT_OPENROUTER_MODELS.filter((m) => m.supportsFim).map((m) => m.id),
+    );
   }
   async listModels(): Promise<ModelEntry[]> {
     return DEFAULT_OPENROUTER_MODELS;

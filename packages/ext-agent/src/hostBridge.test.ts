@@ -114,4 +114,50 @@ describe('HostBridge', () => {
     expect(count).toBe(0);
     client.close();
   });
+
+  it('mcp/* round-trips: servers, lifecycle, tools, call history', async () => {
+    const { bridge, client } = await makeBridge();
+    const servers = await bridge.mcpServersList();
+    expect(servers.servers.map((s) => s.name)).toEqual(['fixture-srv']);
+    expect(servers.workspaceConfigIgnored).toBe(false);
+    expect(servers.workspaceTrusted).toBe(true);
+    expect((await bridge.mcpServerStart('fixture-srv')).status.state).toBe('running');
+    expect((await bridge.mcpServerStop('fixture-srv')).status.state).toBe('running');
+    expect((await bridge.mcpServerRestart('fixture-srv')).status.state).toBe('running');
+    const tools = await bridge.mcpToolsList();
+    expect(tools.tools.map((t) => t.namespaced)).toEqual(['mcp__fixture_srv__echo']);
+    expect(await bridge.mcpCallsHistory(10)).toEqual({ calls: [] });
+    bridge.dispose();
+    client.close();
+  });
+
+  it('policy/* round-trips: approve, revoke, list', async () => {
+    const { bridge, client } = await makeBridge();
+    expect(await bridge.policyApprove('mcp__fixture_srv__echo')).toEqual({ ok: true });
+    expect(await bridge.policyRevoke('mcp__fixture_srv__echo')).toEqual({ ok: true });
+    expect(await bridge.policyList()).toEqual({ dangerous: [], approved: [] });
+    bridge.dispose();
+    client.close();
+  });
+
+  it('completion/* round-trips: ghost text + latency stats', async () => {
+    const { bridge, client } = await makeBridge();
+    const res = await bridge.completionComplete({
+      uri: 'file:///a.ts',
+      position: { line: 0, character: 11 },
+      prefix: 'const x = 1',
+      suffix: '\n',
+      docVersion: 3,
+      model: 'groq:llama-3.1-8b-instant',
+    });
+    expect(res).toMatchObject({
+      completion: ' + 1;',
+      nativeFim: true,
+      cancelled: false,
+    });
+    const stats = await bridge.completionStats();
+    expect(stats).toMatchObject({ count: 1, cacheHits: 0, cacheMisses: 1 });
+    bridge.dispose();
+    client.close();
+  });
 });

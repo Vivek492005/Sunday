@@ -47,7 +47,7 @@ class MockProvider implements ChatProvider {
   }
 
   async listModels(): Promise<ModelEntry[]> {
-    return [{ id: 'mock-model', label: 'Mock Model', contextWindow: 8192, supportsTools: true }];
+    return [{ id: 'mock-model', label: 'Mock Model', contextWindow: 8192, supportsTools: true, supportsFim: false }];
   }
 }
 

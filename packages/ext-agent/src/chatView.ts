@@ -11,6 +11,7 @@ import * as crypto from 'node:crypto';
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
 import type { ChatEventNotification, ChatEventRelay } from '@sunday/protocol';
+import { composeChatMessage, type ImageAttachment } from './mentions.js';
 
 export const CHAT_VIEW_TYPE = 'sunday.chatView';
 
@@ -130,13 +131,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async onMessage(msg: unknown): Promise<void> {
-    const m = msg as { type?: unknown; text?: unknown; model?: unknown };
+    const m = msg as { type?: unknown; text?: unknown; model?: unknown; images?: unknown };
     if (!m || typeof m.type !== 'string') return;
     try {
       switch (m.type) {
         case 'sunday/chat/send':
           await this.handleSend(
             typeof m.text === 'string' ? m.text : '',
+            Array.isArray(m.images)
+              ? (m.images as ImageAttachment[]).filter(
+                  (i) => i && typeof i.dataUrl === 'string',
+                )
+              : [],
             typeof m.model === 'string' ? m.model : undefined,
           );
           break;
@@ -154,16 +160,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleSend(text: string, model?: string): Promise<void> {
+  private async handleSend(text: string, images: ImageAttachment[], model?: string): Promise<void> {
     const t = text.trim();
-    if (!t) return;
+    if (!t && images.length === 0) return;
     const bridge = await this.deps.ensureBridge();
     if (!this.sessionId) {
       const { session } = await bridge.sessionCreate({ cwd: this.deps.getCwd() });
       this.sessionId = session.id;
       this.deps.log(`chat view: created session ${session.id}`);
     }
-    const { turnId } = await bridge.chatSend({ sessionId: this.sessionId, message: t, model });
+    // Part B (worker 4): expand @-mentions into context parts and attach
+    // pasted images. `chat/send` already accepts a ContentPart[] message.
+    const message = await composeChatMessage(t, images, {
+      workspaceRoot: this.deps.getCwd(),
+    });
+    const { turnId } = await bridge.chatSend({ sessionId: this.sessionId, message, model });
     this.activeTurnId = turnId;
     this.post({ type: 'sunday/chat/state', activeTurn: turnId });
   }

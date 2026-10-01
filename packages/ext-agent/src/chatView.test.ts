@@ -127,7 +127,11 @@ describe('ChatViewProvider', () => {
     await flush();
     expect(bridge.sessionCreate).toHaveBeenCalledTimes(1);
     expect(bridge.sessionCreate).toHaveBeenCalledWith({ cwd: '/fake/cwd' });
-    expect(bridge.chatSend).toHaveBeenCalledWith({ sessionId: 'sess-1', message: 'hello', model: 'm1' });
+    expect(bridge.chatSend).toHaveBeenCalledWith({
+      sessionId: 'sess-1',
+      message: [{ type: 'text', text: 'hello' }],
+      model: 'm1',
+    });
     expect(webview.postMessage).toHaveBeenCalledWith({ type: 'sunday/chat/state', activeTurn: 'turn-1' });
     // Second message reuses the session.
     await handlers[0]({ type: 'sunday/chat/send', text: 'again' });

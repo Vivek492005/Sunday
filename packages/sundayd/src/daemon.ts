@@ -14,15 +14,24 @@ import {
   ProviderRegistry,
   Router,
   createDefaultRegistry as createDefaultProviders,
+  parseModelRef,
+  type FimProvider,
+  type FimRequest,
   type RouterPolicyConfig,
 } from '@sunday/gateway';
+import { homedir } from 'node:os';
 import { ToolRegistry, createDefaultRegistry as createDefaultTools } from '@sunday/tools';
 import { RpcError, StdioTransport } from './transport.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
-import { PolicyGate, type PolicyOptions } from './policy.js';
+import { PolicyGate, syncDangerousFlags, type PolicyOptions } from './policy.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
+import { buildSessionSystemPrompt } from './system-prompt.js';
+import { CompletionOrchestrator } from './completion.js';
+
+/** Part B: default inline-completion model (fast/cheap). */
+export const DEFAULT_COMPLETION_MODEL = 'groq:llama-3.1-8b-instant';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
@@ -84,7 +93,22 @@ export interface DaemonSubAgentOptions {
 export interface DaemonOptions {
   sessionsDir?: string;
   defaultModel?: string;
+  /**
+   * Part B: model ref used for ghost-text inline completions when the
+   * `completion/complete` RPC omits `model`. Default
+   * `groq:llama-3.1-8b-instant` (fast/cheap; Groq has no FIM endpoint so the
+   * gateway serves these via the prefix-only chat fallback).
+   */
+  completionModel?: string;
   policy?: PolicyOptions;
+  /**
+   * Part A: a pre-built PolicyGate (from `createSundaydTools()`), sharing
+   * the dangerous-tool markings with the tool registry. Takes precedence
+   * over `policy` when both are given.
+   */
+  policyGate?: PolicyGate;
+  /** Home dir for user skills/rules/memory in the system prompt. Defaults to os.homedir(). */
+  userDir?: string;
   maxIterations?: number;
   /** Dependency injection (tests / embedding). */
   tools?: ToolRegistry;
@@ -130,11 +154,17 @@ export class SundayDaemon {
   private readonly router: Router;
   /** Phase 5: default model ref, handed to the orchestrator host. */
   private readonly defaultModel: string;
+  /** Part B: model ref for inline completions (overridable per RPC). */
+  private readonly completionModel: string;
+  /** Part B: lazy completion orchestrator (debounce/cache/coalescing). */
+  private completionOrchestrator: CompletionOrchestrator | undefined;
   private readonly loop: AgentLoop;
   private readonly turns = new Map<string, AbortController>();
   private readonly onShutdown: () => void;
   /** Phase 6: managed browserd child (if the composition root opted in). */
   private readonly browserdManager: BrowserdManager | undefined;
+  /** Home dir for user skills/rules/memory (system prompt injection). */
+  private readonly userDir: string;
   /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
   private readonly contextHandlers: DaemonContextHandlers | undefined;
   /** Phase 4: dynamically registered method handlers (manager methods).
@@ -164,7 +194,9 @@ export class SundayDaemon {
     };
     this.router = new Router(this.providers, opts.defaultModel, routerPolicy);
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
-    const policy = new PolicyGate(opts.policy);
+    this.completionModel = opts.completionModel ?? DEFAULT_COMPLETION_MODEL;
+    const policy = opts.policyGate ?? new PolicyGate(opts.policy);
+    this.userDir = opts.userDir ?? homedir();
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
     this.contextHandlers = opts.contextHandlers;
     // Phase 6: opt-in browser tools. browserd stays a lazy child — it only
@@ -173,6 +205,9 @@ export class SundayDaemon {
     if (opts.browserd) {
       registerBrowserTools(this.tools, opts.browserd);
     }
+    // Part A: keep the gate's dangerous set in sync with every registered
+    // tool carrying `dangerous: true` (browser tools land here).
+    syncDangerousFlags(policy, this.tools);
     this.loop = new AgentLoop(
       { tools: this.tools, providers: this.providers },
       {
@@ -259,6 +294,26 @@ export class SundayDaemon {
     this.transport.notify('orchestrate/event', event);
   }
 
+  /**
+   * Part A: prepend the skills/rules/memory system prompt to a fresh
+   * session. Skipped entirely when there is nothing to inject, so sessions
+   * in skill-less workspaces behave exactly as before. Failures are logged,
+   * never fatal to session creation.
+   */
+  private async injectSystemPrompt(s: StoredSession): Promise<void> {
+    try {
+      const prompt = await buildSessionSystemPrompt({
+        workspaceDir: s.cwd ?? process.cwd(),
+        userDir: this.userDir,
+      });
+      if (prompt !== undefined) {
+        s.messages.push({ role: 'system', content: prompt });
+      }
+    } catch (e) {
+      console.error(`[sundayd] system prompt build failed: ${(e as Error).message}`);
+    }
+  }
+
   /** Tracked persist: registers the in-flight write so gracefulExit can drain it. */
   private async persistSession(s: StoredSession): Promise<void> {
     const p = this.sessions.persist(s);
@@ -323,6 +378,8 @@ export class SundayDaemon {
       case 'session/create': {
         const p = parseParams(method, req.params);
         const s = this.sessions.create(p);
+        // Part A: skills/rules/memory system prompt (no-op when empty).
+        await this.injectSystemPrompt(s);
         await this.persistSession(s);
         return { session: publicSession(s) };
       }
@@ -341,6 +398,10 @@ export class SundayDaemon {
         return { tools: this.tools.definitions() };
       case 'models/list':
         return this.modelsList();
+      case 'completion/complete':
+        return this.completionComplete(req);
+      case 'completion/stats':
+        return this.getCompletionOrchestrator().stats();
       case 'chat/send':
         return this.chatSend(req);
       case 'chat/cancel': {
@@ -370,6 +431,39 @@ export class SundayDaemon {
       // surface a per-turn error when a model is actually used.
       return { models: [] };
     }
+  }
+
+  /**
+   * Part B: lazy singleton. The FIM call resolves the provider per request
+   * so `completionModel` (or the RPC's `model`) picks the adapter; providers
+   * without `complete` fail this RPC loudly instead of hanging a keystroke.
+   */
+  private getCompletionOrchestrator(): CompletionOrchestrator {
+    if (!this.completionOrchestrator) {
+      this.completionOrchestrator = new CompletionOrchestrator({
+        complete: (req: FimRequest) => {
+          const ref = req.model || this.completionModel;
+          const { providerId } = parseModelRef(ref, this.completionModel);
+          const provider = this.providers.get(providerId) as Partial<FimProvider>;
+          if (typeof provider.complete !== 'function') {
+            throw new RpcError(
+              ErrorCode.InternalError,
+              `provider "${providerId}" does not support inline completions`,
+            );
+          }
+          return provider.complete({ ...req, model: ref });
+        },
+      });
+    }
+    return this.completionOrchestrator;
+  }
+
+  private async completionComplete(req: JsonRpcRequest): Promise<unknown> {
+    const p = parseParams('completion/complete', req.params);
+    return this.getCompletionOrchestrator().complete({
+      ...p,
+      model: p.model ?? this.completionModel,
+    });
   }
 
   private async chatSend(req: JsonRpcRequest): Promise<unknown> {
