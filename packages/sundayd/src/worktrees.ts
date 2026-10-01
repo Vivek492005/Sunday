@@ -83,7 +83,9 @@ function parseWorktreeList(out: string): WorktreeInfo[] {
   for (const line of out.split('\n')) {
     if (line.startsWith('worktree ')) {
       flush();
-      cur.path = line.slice('worktree '.length);
+      // Git prints forward slashes even on Windows; normalize to the
+      // platform form so path comparisons behave.
+      cur.path = path.normalize(line.slice('worktree '.length));
     } else if (line.startsWith('HEAD ')) {
       cur.head = line.slice('HEAD '.length);
     } else if (line.startsWith('branch ')) {
@@ -100,7 +102,13 @@ function parseWorktreeList(out: string): WorktreeInfo[] {
 }
 
 function samePath(a: string, b: string): boolean {
-  return path.resolve(a) === path.resolve(b);
+  const ra = path.resolve(a);
+  const rb = path.resolve(b);
+  // Windows paths are case-insensitive (and git may report a different
+  // drive-letter case than Node).
+  return process.platform === 'win32'
+    ? ra.toLowerCase() === rb.toLowerCase()
+    : ra === rb;
 }
 
 /**
