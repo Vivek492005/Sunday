@@ -1,22 +1,18 @@
 {
-  "bin": {
-    "sundayd": "./dist/cli.js"
-  },
   "dependencies": {
-    "@sunday/context": "workspace:*",
     "@sunday/gateway": "workspace:*",
-    "@sunday/orchestrator": "workspace:*",
     "@sunday/protocol": "workspace:*",
     "@sunday/tools": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@sunday/sundayd": "workspace:*",
     "@types/node": "^22.10.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   },
   "main": "dist/index.js",
-  "name": "@sunday/sundayd",
+  "name": "@sunday/orchestrator",
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",

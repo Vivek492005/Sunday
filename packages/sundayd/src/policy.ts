@@ -2,17 +2,12 @@
  *  Denied calls are NOT silent — the loop feeds the denial back to the model
  *  as a tool error so it can adapt, and the daemon surface exposes
  *  ErrorCode.PolicyDenied for client-initiated calls. */
+import { READ_ONLY_TOOLS, WRITE_TOOLS } from '@sunday/tools';
 
-export const READ_ONLY_TOOLS = new Set([
-  'read_file',
-  'list_dir',
-  'search',
-  'git_status',
-  'git_diff',
-  'git_log',
-]);
-
-export const WRITE_TOOLS = new Set(['write_file', 'edit_file', 'run_terminal']);
+// Re-exported here so `@sunday/sundayd` keeps its existing public surface;
+// the canonical definitions live in @sunday/tools (tool mutability is a
+// property of the catalogue, not the policy gate).
+export { READ_ONLY_TOOLS, WRITE_TOOLS };
 
 export type PolicyMode = 'allow-all' | 'read-only' | 'deny-all';
 

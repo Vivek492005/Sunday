@@ -2,6 +2,7 @@
 import { SundayDaemon } from './daemon.js';
 import { createContextHandlers } from '@sunday/context';
 import { registerManagerMethods } from './manager.js';
+import { registerOrchestrationMethods } from '@sunday/orchestrator';
 
 // sundayd entrypoint: JSON-RPC over stdio. Logs go to stderr so the NDJSON
 // frame stream on stdout stays clean.
@@ -41,6 +42,15 @@ const daemon = new SundayDaemon({
 // Phase 4: checkpoints + worktrees. Registered first — the orchestration
 // primitives (`worktree/*`, `checkpoint/*`) are consumed verbatim by Phase 5.
 registerManagerMethods(daemon);
+
+// Phase 5: hierarchical orchestration (Orchestrator → Feature Agents →
+// Verifier, sequential-only v1). The adapter keeps the package edge
+// one-directional: daemon.ts never imports @sunday/orchestrator (not even
+// its types); structural typing checks the host shape instead.
+registerOrchestrationMethods({
+  addMethod: (name, handler) => daemon.registerMethod(name, handler),
+  getOrchestratorHost: () => daemon.getOrchestratorHost(),
+});
 
 daemon.start().catch((e) => {
   console.error(`sundayd failed to start: ${(e as Error).message}`);

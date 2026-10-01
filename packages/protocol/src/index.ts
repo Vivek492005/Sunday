@@ -13,6 +13,7 @@ export * from './tools.js';
 export * from './models.js';
 export * from './context.js';
 export * from './manager.js';
+export * from './orchestrate.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';
@@ -21,6 +22,7 @@ import { TOOLS_METHODS } from './tools.js';
 import { MODELS_METHODS } from './models.js';
 import { CONTEXT_METHODS } from './context.js';
 import { MANAGER_METHODS } from './manager.js';
+import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
 
 export const METHODS = {
   ...HANDSHAKE_METHODS,
@@ -30,12 +32,13 @@ export const METHODS = {
   ...MODELS_METHODS,
   ...CONTEXT_METHODS,
   ...MANAGER_METHODS,
+  ...ORCHESTRATE_METHODS,
 } as const;
 export type MethodName = keyof typeof METHODS;
 export type MethodParams<M extends MethodName> = z.infer<(typeof METHODS)[M]['params']>;
 export type MethodResult<M extends MethodName> = z.infer<(typeof METHODS)[M]['result']>;
 
-export const NOTIFICATIONS = { ...CHAT_NOTIFICATIONS } as const;
+export const NOTIFICATIONS = { ...CHAT_NOTIFICATIONS, ...ORCHESTRATE_NOTIFICATIONS } as const;
 export type NotificationName = keyof typeof NOTIFICATIONS;
 
 /** Validate inbound params for a known method (throws ZodError on mismatch). */

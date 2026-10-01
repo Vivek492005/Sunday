@@ -19,6 +19,7 @@ import {
 import { createDefaultRegistry as createDefaultTools } from '@sunday/tools';
 import { SundayDaemon, type DaemonOptions } from './daemon.js';
 import { registerManagerMethods } from './manager.js';
+import { registerOrchestrationMethods } from '@sunday/orchestrator';
 import { SessionStore, type StoredSession } from './sessions.js';
 import { PolicyGate } from './policy.js';
 import { AgentLoop } from './loop.js';
@@ -211,6 +212,21 @@ describe('handshake & protocol', () => {
     const h = await makeHarness(new MockProvider());
     const id = h.call('sunday/hello', { bogus: true });
     await waitFor(() => !!response(h, id));
+    expect(response(h, id)!.error?.code).toBe(ErrorCode.InvalidParams);
+    h.close();
+  });
+
+  it('orchestrate/* methods are registered (bad params -> -32602, not -32601)', async () => {
+    const h = await makeHarness(new MockProvider());
+    // Same bridge cli.ts uses: structural, no import cycle.
+    registerOrchestrationMethods({
+      addMethod: (name, handler) => h.daemon.registerMethod(name, handler),
+      getOrchestratorHost: () => h.daemon.getOrchestratorHost(),
+    });
+    const id = h.call('orchestrate/plan', { bogus: true });
+    await waitFor(() => !!response(h, id));
+    // -32602 proves the method exists and validated params; -32601 would
+    // mean it was never registered.
     expect(response(h, id)!.error?.code).toBe(ErrorCode.InvalidParams);
     h.close();
   });

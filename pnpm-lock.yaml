@@ -70,6 +70,34 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.4)
 
+  packages/orchestrator:
+    dependencies:
+      '@sunday/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@sunday/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sunday/tools':
+        specifier: workspace:*
+        version: link:../tools
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@sunday/sundayd':
+        specifier: workspace:*
+        version: link:../sundayd
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.4)
+
   packages/protocol:
     dependencies:
       zod:
@@ -91,6 +119,9 @@ importers:
       '@sunday/gateway':
         specifier: workspace:*
         version: link:../gateway
+      '@sunday/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol

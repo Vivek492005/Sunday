@@ -9,3 +9,4 @@ export * from './search.js';
 export * from './terminal.js';
 export * from './git.js';
 export * from './registry.js';
+export * from './scopes.js';

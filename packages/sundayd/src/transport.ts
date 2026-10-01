@@ -98,5 +98,16 @@ function toErrorResponse(id: JsonRpcId, e: unknown): ReturnType<typeof errorResp
   if (e instanceof ZodError) {
     return errorResponse(id, ErrorCode.InvalidParams, `invalid params: ${e.issues.map((i) => i.message).join('; ')}`);
   }
+  // Phase 5: orchestration-layer errors. Matched structurally (by name, not by
+  // import) so sundayd keeps its one-directional package edge — the
+  // orchestrator's OrchestrationError carries a stable `code` for exactly
+  // this mapping. Input-shaped failures → InvalidParams; anything else stays
+  // an internal error.
+  if (e instanceof Error && e.name === 'OrchestrationError') {
+    const code = (e as { code?: string }).code;
+    if (code === 'invalid-params' || code === 'plan-invalid' || code === 'too-many-units' || code === 'plan-overlap') {
+      return errorResponse(id, ErrorCode.InvalidParams, e.message);
+    }
+  }
   return errorResponse(id, ErrorCode.InternalError, (e as Error)?.message ?? 'internal error');
 }

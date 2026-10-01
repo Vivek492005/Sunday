@@ -3,7 +3,9 @@ import {
   ErrorCode,
   METHODS,
   PROTOCOL_VERSION,
+  createRequest,
   parseParams,
+  type ChatEvent,
   type JsonRpcRequest,
   type MethodName,
   type Session,
@@ -18,7 +20,7 @@ import { ToolRegistry, createDefaultRegistry as createDefaultTools } from '@sund
 import { RpcError, StdioTransport } from './transport.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
 import { PolicyGate, type PolicyOptions } from './policy.js';
-import { AgentLoop, newTurnId } from './loop.js';
+import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
@@ -32,6 +34,49 @@ export interface DaemonContextHandlers {
   'context/map': (params: unknown) => Promise<unknown>;
   'context/index': (params: unknown) => Promise<unknown>;
   'context/search': (params: unknown) => Promise<unknown>;
+}
+
+/**
+ * Phase 5: everything the orchestrator needs from the daemon, declared
+ * structurally (see DaemonContextHandlers). Field-for-field compatible with
+ * the orchestrator's `OrchestratorHost` — the bridge in cli.ts relies on
+ * structural typing, never on importing the orchestrator package here.
+ *
+ * Note the inversion: the orchestrator never constructs an AgentLoop or a
+ * session itself. It asks the daemon to run one sub-agent turn via
+ * `runSubAgent`; the mechanics stay here. That keeps the package edge
+ * one-directional (orchestrator → sundayd would be a cycle, since the
+ * daemon's cli wires the orchestrator in).
+ */
+export interface DaemonOrchestratorHost {
+  /** Model router (with Relay failover); the planner calls it directly. */
+  router: Router;
+  /** Full tool catalogue — handed ONLY to Feature Agents (role=coder). */
+  tools: ToolRegistry;
+  /** Default model ref when the plan doesn't name one. */
+  defaultModel: string;
+  /** Dispatch into the daemon's own method table (worktree/*, checkpoint/*). */
+  dispatch(method: string, params: unknown): Promise<unknown>;
+  /** Emit `orchestrate/event` notifications to connected clients. */
+  notify(event: unknown): void;
+  /** Run one sub-agent turn — session lifecycle + AgentLoop live here. */
+  runSubAgent(opts: DaemonSubAgentOptions): Promise<void>;
+}
+
+/**
+ * Phase 5: one orchestrator sub-agent turn. Structural mirror of the
+ * orchestrator's `SubAgentRunOptions`.
+ */
+export interface DaemonSubAgentOptions {
+  title: string;
+  cwd: string;
+  model?: string;
+  systemPrompt: string;
+  prompt: string;
+  tools: ToolRegistry;
+  maxIterations: number;
+  signal?: AbortSignal;
+  onEvent: (event: ChatEvent) => void;
 }
 
 export interface DaemonOptions {
@@ -74,6 +119,11 @@ export class SundayDaemon {
   private readonly sessions: SessionStore;
   private readonly tools: ToolRegistry;
   private readonly providers: ProviderRegistry;
+  /** Phase 3: model router (kept as a field so Phase 5 orchestration can
+   *  hand it to sub-agent loops as ordinary clients). */
+  private readonly router: Router;
+  /** Phase 5: default model ref, handed to the orchestrator host. */
+  private readonly defaultModel: string;
   private readonly loop: AgentLoop;
   private readonly turns = new Map<string, AbortController>();
   private readonly onShutdown: () => void;
@@ -104,7 +154,8 @@ export class SundayDaemon {
       perProvider: {},
       failover: { enabled: true, on: ['rate-limit'] },
     };
-    const router = new Router(this.providers, opts.defaultModel, routerPolicy);
+    this.router = new Router(this.providers, opts.defaultModel, routerPolicy);
+    this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
     const policy = new PolicyGate(opts.policy);
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
     this.contextHandlers = opts.contextHandlers;
@@ -127,7 +178,7 @@ export class SundayDaemon {
               : { turnId, sessionId, event },
           ),
       },
-      { router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations },
+      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations },
     );
     this.transport = new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
@@ -147,6 +198,51 @@ export class SundayDaemon {
    */
   registerMethod(method: string, handler: (params: unknown) => Promise<unknown>): void {
     this.extraHandlers.set(method, handler);
+  }
+
+  /**
+   * Phase 5: orchestration host surface. Declared structurally (like
+   * DaemonContextHandlers above) so that @sunday/sundayd has no dependency
+   * on @sunday/orchestrator — not even at the type level. The orchestrator
+   * package drives sundayd's AgentLoop, so the edge must stay
+   * one-directional; cli.ts bridges the two via registerOrchestrationMethods.
+   */
+  getOrchestratorHost(): DaemonOrchestratorHost {
+    return {
+      router: this.router,
+      tools: this.tools,
+      defaultModel: this.defaultModel,
+      dispatch: (method, params) => this.dispatchLocal(method, params),
+      notify: (event) => this.notifyOrchestration(event),
+      runSubAgent: (opts) => this.runSubAgent(opts),
+    };
+  }
+
+  /**
+   * Phase 5: execute one orchestrator sub-agent turn. The orchestrator owns
+   * the coordination (plan → delegate → verify → merge); the mechanics —
+   * ephemeral session, AgentLoop, turn id — stay in the daemon.
+   */
+  private async runSubAgent(opts: DaemonSubAgentOptions): Promise<void> {
+    const session = this.sessions.create({ title: opts.title, cwd: opts.cwd, model: opts.model });
+    session.messages.push({ role: 'system', content: opts.systemPrompt });
+    const loop = new AgentLoop(
+      { tools: opts.tools, providers: this.providers },
+      { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
+      { router: this.router, maxIterations: opts.maxIterations },
+    );
+    await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal });
+  }
+
+  /** Phase 5: dispatch into the daemon's own method table (used by the
+   *  orchestrator for the `worktree/*` and `checkpoint/*` primitives). */
+  async dispatchLocal(method: string, params: unknown): Promise<unknown> {
+    return this.dispatch(createRequest(`local-${Date.now()}`, method, params));
+  }
+
+  /** Phase 5: emit an `orchestrate/event` notification to connected clients. */
+  notifyOrchestration(event: unknown): void {
+    this.transport.notify('orchestrate/event', event);
   }
 
   /** Tracked persist: registers the in-flight write so gracefulExit can drain it. */
