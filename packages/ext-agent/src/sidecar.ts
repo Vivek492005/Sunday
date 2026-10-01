@@ -59,6 +59,7 @@ export function resolveSidecarCommand(extensionDir: string, configuredPath?: str
     return toCommand(file, 'setting "sunday.sidecar.path"');
   }
   const candidates: Array<{ file: string; source: string }> = [
+    { file: path.join(extensionDir, 'sundayd', 'sundayd.mjs'), source: 'bundled extension (esbuild)' },
     { file: path.join(extensionDir, 'sundayd', 'dist', 'cli.js'), source: 'bundled extension' },
     { file: path.join(extensionDir, 'sundayd', 'cli.js'), source: 'bundled extension' },
     { file: path.join(extensionDir, '..', 'sundayd', 'dist', 'cli.js'), source: 'workspace (packages/sundayd)' },

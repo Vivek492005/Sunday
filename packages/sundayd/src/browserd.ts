@@ -66,9 +66,11 @@ export interface BrowserdCommand {
 /**
  * Resolve how to launch browserd. Order:
  *  1. explicit `browserdPath` (config override)
- *  2. sibling workspace package (`<sundayd>/../../browserd/dist/cli.js`,
+ *  2. next to a bundled sundayd (`<sundayd>/browserd.cjs` — esbuild bundle
+ *     shipped inside the extension)
+ *  3. sibling workspace package (`<sundayd>/../../browserd/dist/cli.js`,
  *     i.e. packages/browserd — same relative layout in src/ and dist/)
- *  3. `browserd` on PATH (installed bin)
+ *  4. `browserd` on PATH (installed bin)
  */
 export function resolveBrowserdCommand(
   sundaydModuleDir: string = path.dirname(fileURLToPath(import.meta.url)),
@@ -83,6 +85,8 @@ export function resolveBrowserdCommand(
     return toCommand(file, 'config "browserdPath"');
   }
   const sibling = path.join(sundaydModuleDir, '..', '..', 'browserd', 'dist', 'cli.js');
+  const bundled = path.join(sundaydModuleDir, 'browserd.mjs');
+  if (fs.existsSync(bundled)) return toCommand(bundled, 'bundled extension (esbuild)');
   if (fs.existsSync(sibling)) return toCommand(sibling, 'workspace (packages/browserd)');
   const onPath = findOnPath('browserd');
   if (onPath) return toCommand(onPath, 'PATH');

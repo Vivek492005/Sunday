@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+// Package the Sunday VS Code extension as a .vsix (Phase 7).
+//
+//   node scripts/package-vsix.mjs [--out <dir>]
+//
+// Prerequisites: `pnpm install` and `pnpm -r build` have run (tsc + vite +
+// esbuild outputs exist). vsce must be on PATH (`npm i -g @vscode/vsce`).
+//
+// Layout inside the vsix (matches the sidecar/webview discovery):
+//   package.json            extension manifest
+//   dist/extension.cjs      extension host bundle
+//   ui-chat/dist/           chat webview
+//   ui-manager/dist/        manager webview
+//   sundayd/sundayd.mjs      sidecar (esbuild ESM bundle, run with VS Code's node)
+//   sundayd/browserd.mjs     browser child (esbuild ESM bundle, spawned by sundayd)
+
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2);
+const outFlag = args.indexOf('--out');
+const OUT = outFlag === -1 ? join(ROOT, 'dist-package') : args[outFlag + 1];
+const STAGE = join(OUT, 'stage');
+
+const version = JSON.parse(readFileSync(join(ROOT, 'packages/ext-agent/package.json'), 'utf8')).version;
+
+function sh(cmd, argv, opts = {}) {
+  console.log(`$ ${cmd} ${argv.join(' ')}`);
+  execFileSync(cmd, argv, { stdio: 'inherit', cwd: ROOT, ...opts });
+}
+
+function need(path, what) {
+  if (!existsSync(path)) {
+    console.error(`missing ${what}: ${path}\nrun \`pnpm -r build\` first.`);
+    process.exit(1);
+  }
+}
+
+// 0. inputs exist
+need(join(ROOT, 'packages/ext-agent/dist/extension.cjs'), 'extension bundle');
+need(join(ROOT, 'packages/ui-chat/dist/index.html'), 'ui-chat build');
+need(join(ROOT, 'packages/ui-manager/dist/index.html'), 'ui-manager build');
+
+// 1. bundle the sidecars
+const esbuild = join(ROOT, 'packages/ext-agent/node_modules/.bin/esbuild');
+need(esbuild, 'esbuild');
+mkdirSync(join(STAGE, 'sundayd'), { recursive: true });
+sh(esbuild, [
+  'packages/sundayd/src/cli.ts', '--bundle', '--platform=node', '--format=esm',
+  '--outfile=' + join(STAGE, 'sundayd/sundayd.mjs'),
+  '--log-level=warning',
+]);
+sh(esbuild, [
+  'packages/browserd/src/cli.ts', '--bundle', '--platform=node', '--format=esm',
+  '--outfile=' + join(STAGE, 'sundayd/browserd.mjs'),
+  '--external:playwright', // lazy optional dep — resolved at runtime if installed
+  '--log-level=warning',
+]);
+
+// 2. stage the extension
+mkdirSync(join(STAGE, 'dist'), { recursive: true });
+{
+  // The vsix is fully bundled (esbuild) — strip dev-only and workspace deps
+  // so vsce/npm don't try to resolve them.
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'packages/ext-agent/package.json'), 'utf8'));
+  for (const [k, v] of Object.entries(manifest.dependencies ?? {})) {
+    if (String(v).startsWith('workspace:')) delete manifest.dependencies[k];
+  }
+  delete manifest.devDependencies;
+  writeFileSync(join(STAGE, 'package.json'), JSON.stringify(manifest, null, 2));
+}
+cpSync(join(ROOT, 'packages/ext-agent/dist/extension.cjs'), join(STAGE, 'dist/extension.cjs'));
+const readme = join(ROOT, 'packages/ext-agent/README.md');
+if (existsSync(readme)) cpSync(readme, join(STAGE, 'README.md'));
+cpSync(join(ROOT, 'packages/ui-chat/dist'), join(STAGE, 'ui-chat/dist'), { recursive: true });
+cpSync(join(ROOT, 'packages/ui-manager/dist'), join(STAGE, 'ui-manager/dist'), { recursive: true });
+
+// 3. vsce package
+const vsixName = `sunday-agent-${version}.vsix`;
+sh('vsce', ['package', '--out', join(OUT, vsixName)], { cwd: STAGE });
+
+console.log(`\nwrote ${join(OUT, vsixName)}`);

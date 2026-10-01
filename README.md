@@ -1,30 +1,59 @@
-# Sunday — product workspace
+# Sunday — agent-first coding IDE
 
-An agent-first coding IDE, forked from VS Code (Code-OSS), powered by an
-open-model router and a hierarchical multi-agent orchestration layer.
+Sunday is a VS Code-based, agent-first coding IDE. A built-in extension
+(`sunday-agent`) talks to a TypeScript sidecar (`sundayd`) over JSON-RPC;
+`sundayd` runs the agent loop against open models through a provider router
+with a visible Relay fallback, and scales to hierarchical multi-agent work
+(Orchestrator → Feature Agents → Verifier) with shadow-git checkpoints.
 
-This directory is the **product workspace**. In the final layout it lives at
-`sunday/` inside the fork of `microsoft/vscode` (see `docs/NAMING.md`).
-Full design: `../user/files/merged_step1.md` (product name there reads AURORA —
-see `docs/NAMING.md` for the rename mapping).
+**Status: 0.1.0 dev preview.** See [CHANGELOG.md](CHANGELOG.md).
+
+## Install (Windows)
+
+1. Download `Sunday-Agent-Setup-0.1.0.exe` from the
+   [releases page](https://github.com/Vivek492005/Sunday/releases).
+2. Run it — it installs the `sunday-agent` extension into VS Code.
+3. Open VS Code, set your provider keys (`OPENROUTER_API_KEY` /
+   `GROQ_API_KEY`), and open the Sunday Chat view.
+
+Or install the `.vsix` directly:
+`code --install-extension sunday-agent-0.1.0.vsix`
 
 ## Layout
 
 | Dir | What |
 |---|---|
-| `packages/protocol` | Shared types + JSON-RPC schemas (zod), versioned (§23) |
-| `packages/gateway` | Provider adapters, registry, router, relay, rate-limit scheduler (§10) |
-| `packages/sundayd` | Sidecar: sessions, agent loop, policy, checkpoints, artifacts (§9) |
-| `packages/tools` | Tool implementations: fs, search, edit, terminal-proxy, git, web, mcp (§12) |
-| `packages/context` | Repo map (tree-sitter), indexer, retrieval, compaction (§11) |
-| `packages/browserd` | Playwright/CDP controller (Phase 6, §18) |
-| `packages/ext-agent` | Built-in extension, prebuilt with esbuild (§6.3) |
-| `packages/ui-chat` | React app for the chat webview (§20.3) |
-| `packages/ui-manager` | React app for the Agent Manager (§20.4) |
-| `packages/eval` | Benchmark harness + fixtures (§24.2) |
-| `patches/` | PATCHES.md — register of every upstream edit (§26) |
-| `scripts/` | sync-builtin, packaging/release helpers |
+| `packages/protocol` | Shared types + JSON-RPC schemas (zod), versioned |
+| `packages/gateway` | Provider adapters (OpenRouter, Groq), registry, router, relay, rate-limit scheduler |
+| `packages/sundayd` | Sidecar: sessions, agent loop, policy, checkpoints, orchestration host, artifacts |
+| `packages/tools` | Tool implementations: fs, search, edit, terminal-proxy, git |
+| `packages/context` | Repo map, chunker, TF-IDF retrieval, `context/*` methods |
+| `packages/browserd` | Managed browser child (FakeDriver / lazy Playwright) + `browser_*` tools |
+| `packages/orchestrator` | Hierarchical orchestration: plan validation, budget, verifier |
+| `packages/ext-agent` | Built-in VS Code extension (esbuild bundle) |
+| `packages/ui-chat` | React chat webview |
+| `packages/ui-manager` | React Agent Manager webview |
+| `packages/eval` | Benchmark harness + fixtures (`sunday-eval run`) |
+| `patches/` | PATCHES.md — register of every upstream VS Code edit |
+| `packaging/` | Windows NSIS installer script |
+| `scripts/` | `package-vsix.mjs`, `sync-builtin.sh` |
+| `docs/` | Architecture, eval, packaging, naming |
 
-## Build
+## Develop
 
-Requires Node ≥ 22 and pnpm. `pnpm install && pnpm -r build`.
+Requires Node ≥ 22 and pnpm.
+
+```sh
+pnpm install
+pnpm -r --workspace-concurrency=1 build   # sequential: parallel tsc OOMs on small VMs
+pnpm -r --workspace-concurrency=1 test
+```
+
+Run the benchmark: `pnpm --filter @sunday/eval eval`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[SECURITY.md](SECURITY.md).
+
+## Naming
+
+The project was renamed AURORA → SUNDAY. Mapping: [docs/NAMING.md](docs/NAMING.md).

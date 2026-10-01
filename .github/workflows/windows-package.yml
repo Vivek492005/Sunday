@@ -1,0 +1,78 @@
+# Sunday — Windows packaging (Phase 7).
+#
+# Builds every package, runs the test suites, packages the sunday-agent
+# .vsix, builds the NSIS installer .exe, and — on a version tag push
+# (v0.1.0) — creates the GitHub release with both artifacts attached.
+#
+# Manual run: Actions tab → "windows-package" → Run workflow.
+
+name: windows-package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # needed to create the release + upload artifacts on tags
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build all packages (sequential — keeps TS memory low)
+        run: pnpm -r --workspace-concurrency=1 build
+
+      - name: Run test suites
+        run: pnpm -r --workspace-concurrency=1 test
+
+      - name: Install vsce
+        run: npm i -g @vscode/vsce
+
+      - name: Package .vsix
+        run: node scripts/package-vsix.mjs --out dist-package
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          $version = (node -p "require('./packages/ext-agent/package.json').version")
+          $vsix = "sunday-agent-$version.vsix"
+          makensis "/DVERSION=$version" "/DVSIX=dist-package\$vsix" packaging/windows/sunday.nsi
+          echo "SUNDAY_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunday-windows-${{ env.SUNDAY_VERSION }}
+          path: |
+            dist-package/*.vsix
+            Sunday-Agent-Setup-*.exe
+
+      - name: Create GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = $env:SUNDAY_VERSION
+          $tag = $env:GITHUB_REF_NAME
+          gh release create $tag `
+            --title "Sunday $version" `
+            --notes-file CHANGELOG.md `
+            "dist-package/sunday-agent-$version.vsix" `
+            "Sunday-Agent-Setup-$version.exe"
