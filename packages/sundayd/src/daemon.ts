@@ -23,6 +23,16 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
 export const SUNDAYD_VERSION: string = pkg.version ?? '0.0.1';
 
+// Phase 2: context — handler table shape returned by createContextHandlers()
+// in @sunday/context. Declared here structurally (not imported) so that
+// @sunday/sundayd has no dependency on @sunday/context; the host injects a
+// bound table via DaemonOptions.contextHandlers.
+export interface DaemonContextHandlers {
+  'context/map': (params: unknown) => Promise<unknown>;
+  'context/index': (params: unknown) => Promise<unknown>;
+  'context/search': (params: unknown) => Promise<unknown>;
+}
+
 export interface DaemonOptions {
   sessionsDir?: string;
   defaultModel?: string;
@@ -33,6 +43,11 @@ export interface DaemonOptions {
   providers?: ProviderRegistry;
   onShutdown?: () => void;
   onStdinClose?: () => void;
+  /** Phase 2: context — bound `context/*` handlers from @sunday/context
+   *  (e.g. `createContextHandlers(workspaceRoot)`), injected so sundayd
+   *  doesn't depend on @sunday/context. When absent, `context/*` calls fail
+   *  with MethodNotFound. */
+  contextHandlers?: DaemonContextHandlers;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -54,6 +69,8 @@ export class SundayDaemon {
   private readonly loop: AgentLoop;
   private readonly turns = new Map<string, AbortController>();
   private readonly onShutdown: () => void;
+  /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
+  private readonly contextHandlers: DaemonContextHandlers | undefined;
   /** Persists currently being written — drained before exit so a shutdown can
    *  never truncate a session file. */
   private readonly pendingPersists = new Set<Promise<void>>();
@@ -70,6 +87,7 @@ export class SundayDaemon {
     const router = new Router(this.providers);
     const policy = new PolicyGate(opts.policy);
     this.onShutdown = opts.onShutdown ?? (() => process.exit(0));
+    this.contextHandlers = opts.contextHandlers;
     this.loop = new AgentLoop(
       { tools: this.tools, providers: this.providers },
       {
@@ -112,6 +130,23 @@ export class SundayDaemon {
   }
 
   private async dispatch(req: JsonRpcRequest): Promise<unknown> {
+    // Phase 2: context — dispatched ahead of the switch. CONTEXT_METHODS is
+    // part of the central METHODS registry, but these calls are served by
+    // the injected @sunday/context handler table (each validates params
+    // against the CONTEXT_METHODS zod schemas itself), not by the switch
+    // below.
+    const maybeContext = req.method as 'context/map' | 'context/index' | 'context/search';
+    if (
+      maybeContext === 'context/map' ||
+      maybeContext === 'context/index' ||
+      maybeContext === 'context/search'
+    ) {
+      const handler = this.contextHandlers?.[maybeContext];
+      if (!handler) {
+        throw new RpcError(ErrorCode.MethodNotFound, `context not configured: ${req.method}`);
+      }
+      return handler(req.params);
+    }
     const method = req.method as MethodName;
     if (!(method in METHODS)) {
       throw new RpcError(ErrorCode.MethodNotFound, `unknown method: ${req.method}`);

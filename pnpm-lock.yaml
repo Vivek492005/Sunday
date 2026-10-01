@@ -16,9 +16,15 @@ importers:
 
   packages/context:
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.4
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.4)
 
   packages/eval:
     devDependencies:
@@ -79,6 +85,9 @@ importers:
 
   packages/sundayd:
     dependencies:
+      '@sunday/context':
+        specifier: workspace:*
+        version: link:../context
       '@sunday/gateway':
         specifier: workspace:*
         version: link:../gateway

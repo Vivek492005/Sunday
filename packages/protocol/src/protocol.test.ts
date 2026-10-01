@@ -95,3 +95,62 @@ describe('method params', () => {
     expect(sessionSchema.safeParse(s).success).toBe(true);
   });
 });
+
+// Phase 2: context — appended. (Import at the end is hoisted; kept here so the
+// append is purely additive.)
+import { CONTEXT_METHODS } from './index.js';
+
+describe('context methods', () => {
+  it('registers context/map, context/index and context/search with params+result schemas', () => {
+    expect(Object.keys(CONTEXT_METHODS).sort()).toEqual([
+      'context/index',
+      'context/map',
+      'context/search',
+    ]);
+    for (const [name, def] of Object.entries(CONTEXT_METHODS)) {
+      expect(name).toMatch(/^[a-z]+\/[a-z-]+$/);
+      expect(typeof def.params.parse).toBe('function');
+      expect(typeof def.result.parse).toBe('function');
+    }
+  });
+
+  it('validates context/map payloads', () => {
+    const params = CONTEXT_METHODS['context/map'].params.parse({ workspaceRoot: '/tmp/ws' });
+    expect(params.workspaceRoot).toBe('/tmp/ws');
+    expect(() => CONTEXT_METHODS['context/map'].params.parse({})).toThrow();
+    const result = CONTEXT_METHODS['context/map'].result.parse({
+      files: [{ path: 'src/a.ts', size: 12, lang: 'typescript' }],
+      totalFiles: 1,
+      totalBytes: 12,
+    });
+    expect(result.totalFiles).toBe(1);
+  });
+
+  it('validates context/index payloads', () => {
+    expect(
+      CONTEXT_METHODS['context/index'].params.parse({ workspaceRoot: '/tmp/ws', force: true }),
+    ).toEqual({ workspaceRoot: '/tmp/ws', force: true });
+    expect(
+      CONTEXT_METHODS['context/index'].result.parse({ files: 2, chunks: 5, skipped: 1 }),
+    ).toEqual({ files: 2, chunks: 5, skipped: 1 });
+    expect(() =>
+      CONTEXT_METHODS['context/index'].params.parse({ workspaceRoot: '/tmp/ws', force: 'x' }),
+    ).toThrow();
+  });
+
+  it('validates context/search payloads', () => {
+    expect(
+      CONTEXT_METHODS['context/search'].params.parse({ query: 'zephyr', k: 3, maxChars: 100 }),
+    ).toEqual({ query: 'zephyr', k: 3, maxChars: 100 });
+    expect(() => CONTEXT_METHODS['context/search'].params.parse({ query: '' })).toThrow();
+    expect(() => CONTEXT_METHODS['context/search'].params.parse({ query: 'x', k: 0 })).toThrow();
+    expect(() =>
+      CONTEXT_METHODS['context/search'].params.parse({ query: 'x', k: 51 }),
+    ).toThrow();
+    const result = CONTEXT_METHODS['context/search'].result.parse({
+      hits: [{ path: 'a.ts', startLine: 1, endLine: 5, score: 2.5, snippet: 'const x = 1;' }],
+    });
+    expect(result.hits).toHaveLength(1);
+    expect(result.hits[0]!.score).toBe(2.5);
+  });
+});

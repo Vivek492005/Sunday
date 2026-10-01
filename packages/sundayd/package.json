@@ -1,1 +1,29 @@
-{"bin":{"sundayd":"./dist/cli.js"},"dependencies":{"@sunday/gateway":"workspace:*","@sunday/protocol":"workspace:*","@sunday/tools":"workspace:*","zod":"^3.23.8"},"devDependencies":{"@types/node":"^22.10.0","typescript":"^5.6.0","vitest":"^3.0.0"},"main":"dist/index.js","name":"@sunday/sundayd","private":true,"scripts":{"build":"tsc -p tsconfig.json","lint":"eslint src --ext .ts","test":"vitest run","typecheck":"tsc --noEmit -p tsconfig.json"},"type":"module","types":"dist/index.d.ts","version":"0.0.1"}
+{
+  "bin": {
+    "sundayd": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@sunday/gateway": "workspace:*",
+    "@sunday/context": "workspace:*",
+    "@sunday/protocol": "workspace:*",
+    "@sunday/tools": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "main": "dist/index.js",
+  "name": "@sunday/sundayd",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "version": "0.0.1"
+}
