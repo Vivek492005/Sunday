@@ -15,7 +15,10 @@
 !endif
 
 Name "Sunday Agent ${VERSION}"
-OutFile "Sunday-Agent-Setup-${VERSION}.exe"
+!ifndef OUTFILE
+  !define OUTFILE "Sunday-Agent-Setup-${VERSION}.exe"
+!endif
+OutFile "${OUTFILE}"
 InstallDir "$LOCALAPPDATA\Programs\Sunday"
 RequestExecutionLevel user
 ShowInstDetails show
