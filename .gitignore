@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+# Staged at build time by scripts/sync-builtin.sh — never committed.
+vscode/extensions/sunday-agent/

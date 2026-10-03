@@ -1,0 +1,309 @@
+# Sunday — full branded IDE build (fork build).
+#
+# Builds the complete Sunday desktop IDE from the vendored VS Code tree
+# (vscode/, pinned in vscode/SUNDAY_UPSTREAM.md) on GitHub Actions runners.
+# Standard runners have 16GB RAM, which is enough for the full Code-OSS
+# build — this is the same approach VSCodium uses.
+#
+# Triggers:
+#   - Manual: Actions tab → "Sunday IDE" → Run workflow.
+#   - Release: push a tag like `ide-v0.2.0`. The `v*` tag line is owned by
+#     windows-package.yml (extension-only release); `ide-v*` keeps the two
+#     release lines distinct. On `ide-v*` the built installers are attached
+#     to the GitHub release for that tag.
+#
+# Pipeline per OS leg (windows x64 / linux x64 / macOS arm64):
+#   1. pnpm install + sequential product build + tests (root workspace)
+#   2. node scripts/package-vsix.mjs → sunday-agent VSIX + sidecar bundles
+#   3. npm ci inside vscode/  (upstream uses npm, NOT pnpm, for the fork)
+#   4. bash scripts/sync-builtin.sh → copies the built sunday-agent
+#      extension into vscode/extensions/ as a built-in extension
+#      (branding via product.json/resources is already in-tree: P-001/P-002)
+#   5. npm run gulp core-ci                      → typecheck + esbuild bundles
+#   6. npm run gulp vscode-<platform>-<arch>-min-ci → packaged client dir
+#   7. OS installer: Inno Setup .exe (win) / tar.gz (linux) / .dmg (macOS)
+#
+# Gulp targets chosen (vscode/build/gulpfile.vscode*.ts + upstream
+# azure-pipelines product-build-*-compile.yml):
+#   - core-ci: tsgo typecheck, transpile to out-build, esbuild min bundles
+#     (out-vscode-min, out-vscode-reh-min, out-vscode-reh-web-min). This is
+#     what upstream's own CI runs before packaging.
+#   - vscode-<platform>-<arch>-min-ci: the full "-min" task does
+#     copyCodicons + extension compile + esbuildBundle + package; the "-ci"
+#     suffix skips the bundle step because core-ci already produced it.
+#     We build ONLY the desktop client here (no -reh server / -reh-web):
+#     the IDE release is the desktop app. Server builds can be added later
+#     via vscode-reh-<platform>-<arch>-min-ci if remote dev is needed.
+#   - win32 only: vscode-win32-x64-inno-updater (auto-update helper),
+#     then vscode-win32-x64-system-setup / vscode-win32-x64-user-setup
+#     (Inno Setup installers via the `innosetup` npm package — no choco
+#     needed, unlike windows-package.yml's standalone NSIS step).
+#   - darwin only: build/darwin/create-dmg.ts (clones dmgbuild, needs
+#     network + python3, both present on macos runners).
+#   - linux only: plain tar.gz of the client dir (upstream does the same
+#     before deb/rpm; deb/rpm/snap packaging is future work).
+#
+# Hard-won fixes carried over from windows-package.yml:
+#   - pnpm install --frozen-lockfile (never plain `pnpm install`)
+#   - pnpm -r --workspace-concurrency=1 build/test (sequential; parallel
+#     tsc OOMs on small machines and is pointless on the big steps anyway)
+#   - node 24.18.0 from vscode/.nvmrc for the whole job (vscode's preinstall
+#     script enforces the .nvmrc version; product packages build fine on 24)
+#   - esbuild .bin / .cmd shim issue: never invoke esbuild/vsce CLIs via
+#     shell shims — scripts/package-vsix.mjs already uses the esbuild JS API
+#     and spawns vsce with shell:true on Windows
+#   - CRLF: vscode/.gitattributes pins *.sh to LF; root scripts are invoked
+#     explicitly via `bash` (Git Bash on Windows)
+#   - absolute paths for installer outputs (no relative-path surprises)
+#
+# TODO(signing): no certificates are available in this repo, so all
+# installers ship UNSIGNED. Hook signing in at the marked spots when certs
+# exist:
+#   - win32: pass `--sign` to the gulp setup tasks + wire ESRP/signer
+#   - darwin: codesign the .app + `xcrun notarytool` before/after DMG —
+#     unsigned DMGs trigger Gatekeeper warnings on first launch
+#   - linux: tarball needs no signing; sign .deb/.rpm if those are added
+
+name: Sunday IDE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ide-v*'
+
+permissions:
+  contents: write # create releases + upload artifacts on tags
+
+# Never cancel a 30-60+ min IDE build because a newer commit landed.
+concurrency:
+  group: sunday-ide-${{ github.ref }}
+  cancel-in-progress: false
+
+# Git Bash everywhere: uniform tee/pipefail/glob behavior on all three OSes.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Hardening: fail the workflow if anything looking like a real credential
+  # was committed to the product tree. Same exclusions as windows-package.yml.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for leaked secrets
+        shell: pwsh
+        run: |
+          $pattern = 'github_pat_[A-Za-z0-9_]{8,}|ghp_[A-Za-z0-9]{8,}|gho_[A-Za-z0-9]{8,}|sk-[A-Za-z0-9]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'
+          $hits = git grep -n -E $pattern -- packages scripts docs packaging branding .github `
+            ':!packages/skills/src/memory.ts' `
+            ':!packages/skills/src/memory.test.ts' `
+            ':!packages/sundayd/src/agent-tools.test.ts'
+          if ($hits) {
+            Write-Error "Secret scan failed — possible leaked credentials:`n$hits"
+            exit 1
+          }
+          Write-Host 'Secret scan clean.'
+
+  # Creates the GitHub release for `ide-v*` tags BEFORE the matrix starts, so
+  # the three OS jobs can upload concurrently without racing `release create`.
+  # No-op on workflow_dispatch runs (the job itself never skips, so `needs`
+  # stays satisfied).
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/ide-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="${tag#ide-v}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists."
+          else
+            gh release create "$tag" \
+              --title "Sunday IDE $version" \
+              --notes "Sunday IDE $version — full branded desktop build (Windows x64, Linux x64, macOS arm64) with the sunday-agent extension built in. Installers are unsigned (see TODO(signing) in sunday-ide.yml)."
+          fi
+
+  build-ide:
+    needs: [secret-scan, prepare-release]
+    timeout-minutes: 180 # the full Code-OSS build takes 30-60+ min
+    strategy:
+      fail-fast: false # let all three OSes report independently
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            gulp_client: vscode-win32-x64-min-ci
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            gulp_client: vscode-linux-x64-min-ci
+          - os: macos-latest # arm64 runner
+            platform: darwin
+            arch: arm64
+            gulp_client: vscode-darwin-arm64-min-ci
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9 # matches pnpm-lock.yaml lockfileVersion 9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: 'vscode/.nvmrc' # 24.18.0; vscode preinstall enforces it
+          cache: pnpm
+
+      # Straightforward cache for the fork's npm tree (upstream uses npm,
+      # NOT pnpm, inside vscode/). Keyed on the lockfile hash.
+      - name: Cache vscode npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: sunday-ide-npm-${{ runner.os }}-${{ hashFiles('vscode/package-lock.json') }}
+          restore-keys: |
+            sunday-ide-npm-${{ runner.os }}-
+
+      - name: Install product dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all product packages (sequential — keeps TS memory low)
+        run: pnpm -r --workspace-concurrency=1 build
+
+      - name: Run product test suites
+        run: pnpm -r --workspace-concurrency=1 test
+
+      - name: Install vsce
+        run: npm i -g @vscode/vsce
+
+      - name: Package sunday-agent VSIX + sidecar bundles
+        run: node scripts/package-vsix.mjs --out dist-package
+
+      - name: Read Sunday version
+        run: |
+          version="$(node -p "require('./packages/ext-agent/package.json').version")"
+          echo "SUNDAY_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Building Sunday $version"
+
+      # Upstream installs the fork with npm ci (npm, not pnpm). Skip the
+      # electron/playwright binary downloads here — the gulp packaging step
+      # fetches Electron itself via build/lib/electron.ts.
+      - name: Install vscode dependencies (npm ci)
+        working-directory: vscode
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+        run: npm ci
+
+      # Copies the built sunday-agent extension (dist + webviews + sidecars)
+      # into vscode/extensions/ as a built-in extension. Depends on Worker 2's
+      # rewritten scripts/sync-builtin.sh; must run BEFORE `gulp core-ci`
+      # because the extension compile step picks up vscode/extensions/*/.
+      - name: Sync built-in sunday-agent extension into the fork
+        run: bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode"
+
+      # Upstream's own compile step: tsgo typecheck + transpile to out-build
+      # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
+      # per-OS build log; pipefail keeps gulp failures fatal through tee.
+      - name: Compile client (gulp core-ci)
+        working-directory: vscode
+        run: |
+          set -o pipefail
+          npm run gulp core-ci 2>&1 | tee -a "$GITHUB_WORKSPACE/build-${{ matrix.platform }}-${{ matrix.arch }}.log"
+
+      # Packages ../VSCode-<platform>-<arch> (sibling of vscode/, i.e. at the
+      # repo root of the checkout). The -min-ci variant reuses the bundles
+      # from core-ci instead of rebuilding them.
+      - name: Package desktop client
+        working-directory: vscode
+        run: |
+          set -o pipefail
+          npm run gulp ${{ matrix.gulp_client }} 2>&1 | tee -a "$GITHUB_WORKSPACE/build-${{ matrix.platform }}-${{ matrix.arch }}.log"
+
+      # Sanity gate before spending time on installers: the client dir must
+      # exist with a branded product.json.
+      - name: Verify packaged client
+        run: |
+          client_dir="$GITHUB_WORKSPACE/VSCode-${{ matrix.platform }}-${{ matrix.arch }}"
+          test -f "$client_dir/resources/app/product.json"
+          app_name="$(node -p "require(process.argv[1]).applicationName" "$client_dir/resources/app/product.json")"
+          echo "packaged client OK: $client_dir (applicationName=$app_name)"
+
+      # ---- Windows: Inno Setup installers (system + user) ----
+      # inno ISCC.exe comes from the `innosetup` npm package (installed via
+      # npm ci) — no choco install needed. Output .exe names are renamed to
+      # Sunday branding here (code.iss still emits VSCodeSetup.exe).
+      # TODO(signing): pass --sign to these gulp tasks and wire the ESRP /
+      # self-hosted signer when certificates exist; ship unsigned until then.
+      - name: Build Windows installers (Inno Setup)
+        if: matrix.platform == 'win32'
+        working-directory: vscode
+        run: |
+          set -o pipefail
+          npm run gulp vscode-win32-x64-inno-updater 2>&1 | tee -a "$GITHUB_WORKSPACE/build-win32-x64.log"
+          npm run gulp vscode-win32-x64-system-setup 2>&1 | tee -a "$GITHUB_WORKSPACE/build-win32-x64.log"
+          npm run gulp vscode-win32-x64-user-setup 2>&1 | tee -a "$GITHUB_WORKSPACE/build-win32-x64.log"
+          sys_exe=(.build/win32-x64/system-setup/*.exe)
+          usr_exe=(.build/win32-x64/user-setup/*.exe)
+          mv "${sys_exe[0]}" "$GITHUB_WORKSPACE/SundaySetup-x64-$SUNDAY_VERSION.exe"
+          mv "${usr_exe[0]}" "$GITHUB_WORKSPACE/SundayUserSetup-x64-$SUNDAY_VERSION.exe"
+          ls -la "$GITHUB_WORKSPACE"/Sunday*.exe
+
+      # ---- Linux: portable tarball of the client dir ----
+      - name: Archive Linux client (tar.gz)
+        if: matrix.platform == 'linux'
+        run: |
+          tar -czf "$GITHUB_WORKSPACE/sunday-linux-x64-$SUNDAY_VERSION.tar.gz" \
+            -C "$GITHUB_WORKSPACE" VSCode-linux-x64
+          ls -la "$GITHUB_WORKSPACE"/sunday-linux-*.tar.gz
+
+      # ---- macOS: DMG via build/darwin/create-dmg.ts ----
+      # Clones dmgbuild from GitHub into a venv; needs network + python3
+      # (both present on macos runners). Emits VSCode-darwin-arm64.dmg;
+      # renamed to Sunday branding here.
+      # TODO(signing): codesign the .app bundle + notarize with
+      # `xcrun notarytool` before creating the DMG when an Apple Developer
+      # certificate exists — unsigned DMGs trigger Gatekeeper warnings.
+      - name: Build macOS DMG
+        if: matrix.platform == 'darwin'
+        working-directory: vscode
+        run: |
+          set -o pipefail
+          node build/darwin/create-dmg.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/dmg-out" 2>&1 | tee -a "$GITHUB_WORKSPACE/build-darwin-arm64.log"
+          mv "$GITHUB_WORKSPACE/dmg-out/VSCode-darwin-arm64.dmg" \
+             "$GITHUB_WORKSPACE/Sunday-darwin-arm64-$SUNDAY_VERSION.dmg"
+          ls -la "$GITHUB_WORKSPACE"/Sunday-darwin-*.dmg
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunday-ide-${{ matrix.platform }}-${{ matrix.arch }}-${{ env.SUNDAY_VERSION }}
+          path: |
+            SundaySetup-*.exe
+            SundayUserSetup-*.exe
+            sunday-linux-*.tar.gz
+            Sunday-darwin-*.dmg
+            dist-package/*.vsix
+            build-${{ matrix.platform }}-${{ matrix.arch }}.log
+          if-no-files-found: error
+
+      - name: Attach artifacts to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/ide-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # nullglob: only the patterns matching this OS leg's files expand.
+          # The vsix is identical on all legs; --clobber makes re-uploads safe.
+          shopt -s nullglob
+          files=(SundaySetup-*.exe SundayUserSetup-*.exe sunday-linux-*.tar.gz Sunday-darwin-*.dmg dist-package/sunday-agent-*.vsix)
+          gh release upload "$GITHUB_REF_NAME" --clobber "${files[@]}"

@@ -59,6 +59,15 @@ function bundle(entry, outfile, extra = {}) {
     format: 'esm',
     outfile, // already absolute (under STAGE)
     logLevel: 'warning',
+    // Load-bearing: esbuild leaves require() calls inside bundled CommonJS
+    // deps (e.g. cross-spawn's require('child_process'), pulled in via
+    // @sunday/mcp) as runtime __require() calls, which throw
+    // 'Dynamic require … is not supported' in pure ESM output. Defining
+    // require via createRequire routes those calls to the real CJS loader.
+    // (Aliased import: sundayd's own sources already import createRequire.)
+    banner: {
+      js: "import { createRequire as __sundayCreateRequire } from 'node:module'; const require = __sundayCreateRequire(import.meta.url);",
+    },
     ...extra,
   });
 }

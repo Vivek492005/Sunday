@@ -19,7 +19,9 @@ taken from the `sunday/main` branch of the `Vivek492005/Sunday_VS_CODE` fork.
 ## How Sunday integrates with this tree
 
 Sunday product code lives at the repo root (`packages/`, `patches/`,
-`scripts/`, `branding/`). At packaging time (Phase 7), the Windows build
-checks out this tree and overlays the product via `scripts/sync-builtin.sh`
-— see `patches/PATCHES.md` for the minimal-patch policy. Do not edit
-upstream files here directly; record every divergence in `patches/PATCHES.md`.
+`scripts/`, `branding/`). At IDE build time, the `sunday-ide` GitHub
+workflow compiles this tree and overlays the product via
+`scripts/sync-builtin.sh` — see `patches/PATCHES.md` for the minimal-patch
+policy. Edits to upstream files are allowed only as registered patches
+(P-001 product identity, P-002 icons/resources — implemented 2026-10-03);
+record every divergence in `patches/PATCHES.md`.
