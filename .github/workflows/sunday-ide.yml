@@ -226,6 +226,10 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+          # @vscode/ripgrep postinstall downloads its binary via api.github.com;
+          # unauthenticated CI IPs get 403 rate limits. The automatic token
+          # (1000 req/hr) avoids it — the script reads process.env.GITHUB_TOKEN.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm ci
 
       # Copies the built sunday-agent extension (dist + webviews + sidecars)
@@ -234,6 +238,16 @@ jobs:
       # because the extension compile step picks up vscode/extensions/*/.
       - name: Sync built-in sunday-agent extension into the fork
         run: bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode"
+
+      - name: Install copilot extension dependencies
+        # The built-in copilot extension has its own lockfile; its
+        # @github/copilot SDK must be present for the packaging shim
+        # (prepareBuiltInCopilotRipgrepShim). Upstream installs it via
+        # `npm run copilot:setup`; plain npm ci suffices for the shim.
+        working-directory: vscode/extensions/copilot
+        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the

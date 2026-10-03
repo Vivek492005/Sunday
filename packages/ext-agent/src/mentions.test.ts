@@ -1,5 +1,6 @@
 // Tests for @-mention parsing and expansion. `vscode` and `node:child_process`
 // are mocked; no DOM, no network, no real VS Code.
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('vscode', () => ({
@@ -131,7 +132,7 @@ describe('expandMentions', () => {
     const [b] = await expandMentions(parseMentions('see @file src/a.ts'));
     expect(b!.label).toBe('@file src/a.ts');
     expect(b!.content).toBe('1| const a = 1;\n2| const b = 2;');
-    expect(mockFs.readFile.mock.calls[0][0].fsPath).toBe('/ws/src/a.ts');
+    expect(mockFs.readFile.mock.calls[0][0].fsPath).toBe(path.join('/ws', 'src', 'a.ts'));
   });
 
   it('reports a missing file as a block instead of throwing', async () => {
@@ -233,7 +234,9 @@ describe('expandMentions', () => {
     const [b] = await expandMentions(parseMentions('@docs foo'));
     expect(b!.content).toContain('foo — Does foo things.');
     expect(b!.content).toContain('Body here.');
-    expect(mockFs.readFile.mock.calls[0][0].fsPath).toBe('/ws/.sunday/skills/foo/SKILL.md');
+    expect(mockFs.readFile.mock.calls[0][0].fsPath).toBe(
+      path.join('/ws', '.sunday', 'skills', 'foo', 'SKILL.md'),
+    );
   });
 
   it('reports a missing skill instead of throwing', async () => {
