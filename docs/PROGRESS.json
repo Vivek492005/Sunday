@@ -37,9 +37,9 @@
       "status": "active"
     },
     {
-      "detail": "P-030 done; daemon done; next-edit done; background agents done; voice done; 2 items remain",
+      "detail": "P-030 done; daemon done; next-edit done; background agents done; voice done; CLI done; 1 item remains",
       "name": "Phase 8 (Backlog)",
-      "percent": 70,
+      "percent": 80,
       "status": "active"
     }
   ],
@@ -49,5 +49,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-04T00:29:28+00:00"
+  "updated": "2026-10-04T00:34:38+00:00"
 }
