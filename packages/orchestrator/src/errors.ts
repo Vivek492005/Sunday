@@ -21,3 +21,21 @@ export class OrchestrationError extends Error {
     this.code = code;
   }
 }
+
+export type BackgroundAgentErrorCode =
+  | 'invalid-params'
+  | 'invalid-run-id'
+  | 'unknown-run'
+  | 'git-failed'
+  | 'pr-failed';
+
+/** Background-agent errors. Same stable-`code` convention as OrchestrationError. */
+export class BackgroundAgentError extends Error {
+  readonly code: BackgroundAgentErrorCode;
+
+  constructor(code: BackgroundAgentErrorCode, message: string) {
+    super(message);
+    this.name = 'BackgroundAgentError';
+    this.code = code;
+  }
+}

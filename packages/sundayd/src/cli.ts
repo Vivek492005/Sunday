@@ -14,6 +14,7 @@ import {
 import { createContextHandlers } from '@sunday/context';
 import { registerManagerMethods } from './manager.js';
 import { registerOrchestrationMethods } from '@sunday/orchestrator';
+import { registerBackgroundMethods } from '@sunday/orchestrator';
 import {
   setupOrchestrationPersistence,
   type OrchestrationPersistenceModule,
@@ -196,6 +197,15 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
   registerOrchestrationMethods({
     addMethod: (name, handler) => daemon.registerMethod(name, handler),
     getOrchestratorHost: () => daemon.getOrchestratorHost(),
+  });
+
+  // Phase 8: background agents with PR creation. The host is the same
+  // orchestrator host plus a `background/event` notify channel (declared on
+  // DaemonOrchestratorHost); the package edge stays one-directional via
+  // structural typing.
+  registerBackgroundMethods({
+    addMethod: (name, handler) => daemon.registerMethod(name, handler),
+    getBackgroundHost: () => daemon.getOrchestratorHost(),
   });
 
   // Parallel Agents phase: durable run registry. The store +

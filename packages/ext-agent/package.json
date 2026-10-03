@@ -153,6 +153,11 @@
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",
           "type": "boolean"
         },
+        "sunday.backgroundAgents.enabled": {
+          "default": false,
+          "description": "Experimental: background agents that run detached in the per-user daemon and open GitHub PRs on completion. Default off.",
+          "type": "boolean"
+        },
         "sunday.browser.enabled": {
           "default": false,
           "description": "Opt in to the agent browser (browserd). When off, browser_* tools return a disabled error.",

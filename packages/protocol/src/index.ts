@@ -17,6 +17,7 @@ export * from './manager.js';
 export * from './browser.js';
 export * from './browser-panel.js';
 export * from './orchestrate.js';
+export * from './background.js';
 export * from './mcp.js';
 export * from './policy.js';
 export * from './daemon-paths.js';
@@ -33,6 +34,7 @@ import { MANAGER_METHODS } from './manager.js';
 import { BROWSER_METHODS } from './browser.js';
 import { BROWSER_PANEL_METHODS } from './browser-panel.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
+import { BACKGROUND_METHODS, BACKGROUND_NOTIFICATIONS } from './background.js';
 import { MCP_METHODS } from './mcp.js';
 import { POLICY_METHODS } from './policy.js';
 import { DAEMON_METHODS } from './daemon.js';
@@ -49,6 +51,7 @@ export const METHODS = {
   ...BROWSER_METHODS,
   ...BROWSER_PANEL_METHODS,
   ...ORCHESTRATE_METHODS,
+  ...BACKGROUND_METHODS,
   ...MCP_METHODS,
   ...POLICY_METHODS,
   ...DAEMON_METHODS,
@@ -57,7 +60,11 @@ export type MethodName = keyof typeof METHODS;
 export type MethodParams<M extends MethodName> = z.infer<(typeof METHODS)[M]['params']>;
 export type MethodResult<M extends MethodName> = z.infer<(typeof METHODS)[M]['result']>;
 
-export const NOTIFICATIONS = { ...CHAT_NOTIFICATIONS, ...ORCHESTRATE_NOTIFICATIONS } as const;
+export const NOTIFICATIONS = {
+  ...CHAT_NOTIFICATIONS,
+  ...ORCHESTRATE_NOTIFICATIONS,
+  ...BACKGROUND_NOTIFICATIONS,
+} as const;
 export type NotificationName = keyof typeof NOTIFICATIONS;
 
 /** Validate inbound params for a known method (throws ZodError on mismatch). */

@@ -10,3 +10,4 @@ export * from './runner.js';
 export * from './handlers.js';
 export * from './state.js';
 export * from './merge.js';
+export * from './background.js';

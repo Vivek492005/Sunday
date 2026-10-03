@@ -78,6 +78,8 @@ export interface DaemonOrchestratorHost {
   dispatch(method: string, params: unknown): Promise<unknown>;
   /** Emit `orchestrate/event` notifications to connected clients. */
   notify(event: unknown): void;
+  /** Emit `background/event` notifications to connected clients (Phase 8). */
+  notifyBackground(event: unknown): void;
   /** Run one sub-agent turn — session lifecycle + AgentLoop live here. */
   runSubAgent(opts: DaemonSubAgentOptions): Promise<void>;
 }
@@ -304,6 +306,7 @@ export class SundayDaemon {
       defaultModel: this.defaultModel,
       dispatch: (method, params) => this.dispatchLocal(method, params),
       notify: (event) => this.notifyOrchestration(event),
+      notifyBackground: (event) => this.notifyBackground(event),
       runSubAgent: (opts) => this.runSubAgent(opts),
     };
   }
@@ -348,6 +351,11 @@ export class SundayDaemon {
   /** Phase 5: emit an `orchestrate/event` notification to connected clients. */
   notifyOrchestration(event: unknown): void {
     this.transport.notify('orchestrate/event', event);
+  }
+
+  /** Phase 8: emit a `background/event` notification to connected clients. */
+  notifyBackground(event: unknown): void {
+    this.transport.notify('background/event', event);
   }
 
   /**
