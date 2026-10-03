@@ -34,15 +34,22 @@ jobs:
         shell: pwsh
         run: |
           $pattern = 'github_pat_[A-Za-z0-9_]{8,}|ghp_[A-Za-z0-9]{8,}|gho_[A-Za-z0-9]{8,}|sk-[A-Za-z0-9]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'
+          # git grep exits 1 when nothing matches — that is the CLEAN case.
+          # Capture output first, then judge by content, not by exit code.
           $hits = git grep -n -E $pattern -- packages scripts docs packaging branding .github `
             ':!packages/skills/src/memory.ts' `
             ':!packages/skills/src/memory.test.ts' `
-            ':!packages/sundayd/src/agent-tools.test.ts'
+            ':!packages/sundayd/src/agent-tools.test.ts' 2>$null
+          if ($LASTEXITCODE -gt 1) {
+            Write-Error "git grep errored (exit $LASTEXITCODE)"
+            exit 1
+          }
           if ($hits) {
             Write-Error "Secret scan failed — possible leaked credentials:`n$hits"
             exit 1
           }
           Write-Host 'Secret scan clean.'
+          exit 0
 
   package-windows:
     runs-on: windows-latest
