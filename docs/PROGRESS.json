@@ -1,0 +1,53 @@
+{
+  "phases": [
+    {
+      "detail": "VSIX + Windows installer shipped, release live",
+      "name": "v0.1.0 Extension Release",
+      "percent": 100,
+      "status": "done"
+    },
+    {
+      "detail": "569/569 tests, MCP + autocomplete + mentions",
+      "name": "Editor Intelligence",
+      "percent": 100,
+      "status": "done"
+    },
+    {
+      "detail": "668/668 tests, orchestration + merge",
+      "name": "Parallel Agents",
+      "percent": 100,
+      "status": "done"
+    },
+    {
+      "detail": "742/742 tests, browserd + panel",
+      "name": "Browser Agent UI",
+      "percent": 100,
+      "status": "done"
+    },
+    {
+      "detail": "805/805 tests, security + docs + Apache-2.0",
+      "name": "Hardening",
+      "percent": 100,
+      "status": "done"
+    },
+    {
+      "detail": "CI: macOS/Ubuntu at packaging stage, Windows tests pending",
+      "name": "Fork Build (Full IDE)",
+      "percent": 85,
+      "status": "active"
+    },
+    {
+      "detail": "P-030 done; daemon Stage 1 (socket) done; 4 items remain",
+      "name": "Phase 8 (Backlog)",
+      "percent": 35,
+      "status": "active"
+    }
+  ],
+  "project": "Sunday IDE",
+  "release_gates": {
+    "detail": "Docs green; Build/Tests/Security/Privacy/Perf/A11y partial; Legal done (Apache-2.0)",
+    "green": 1,
+    "total": 11
+  },
+  "updated": "2026-10-03T23:59:51+00:00"
+}
