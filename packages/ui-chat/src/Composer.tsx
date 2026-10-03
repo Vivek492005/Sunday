@@ -6,7 +6,7 @@ import {
   moveSelection,
   type MentionItem,
   type PopupState,
-} from './mentionPopup.js';
+} from './mentionQuery.js';
 import {
   fileToDataUrl,
   makeAttachment,

@@ -1,6 +1,6 @@
-import type { MentionItem } from './mentionPopup.js';
+import type { MentionItem } from './mentionQuery.js';
 
-/** Presentational @-mention popup list. All logic lives in mentionPopup.ts;
+/** Presentational @-mention popup list. All logic lives in mentionQuery.ts;
  *  this component only renders the items and the current highlight. */
 export function MentionPopup({
   items,

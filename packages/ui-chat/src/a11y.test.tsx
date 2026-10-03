@@ -4,7 +4,7 @@
 // render components with react-dom/server and assert on the static markup:
 // ARIA roles, labels, and state attributes must be present in the HTML the
 // webview actually serves. Keyboard behavior of the mention popup lives in
-// mentionPopup.ts and is covered by mentionPopup.test.ts.
+// mentionQuery.ts and is covered by mentionQuery.test.ts.
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MessageList } from './MessageList.js';
@@ -13,7 +13,7 @@ import { MentionPopup } from './MentionPopup.js';
 import { ModelPill } from './ModelPill.js';
 import { StopButton } from './StopButton.js';
 import type { ChatMessageView } from './chatClient.js';
-import type { MentionItem } from './mentionPopup.js';
+import type { MentionItem } from './mentionQuery.js';
 
 const assistantMsg = (over: Partial<ChatMessageView> = {}): ChatMessageView => ({
   id: 'm1',

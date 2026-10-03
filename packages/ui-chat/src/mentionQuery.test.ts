@@ -7,7 +7,7 @@ import {
   mentionQueryAtCaret,
   moveSelection,
   type PopupState,
-} from './mentionPopup.js';
+} from './mentionQuery.js';
 
 describe('mentionQueryAtCaret', () => {
   it('detects a query right after @', () => {
