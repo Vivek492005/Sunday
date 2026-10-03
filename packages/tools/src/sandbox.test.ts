@@ -157,6 +157,9 @@ describe('runSandboxed', () => {
       timeoutMs: 1000,
       maxOut: 1000,
       probe: () => true,
+      // bubblewrap is Linux-only; pin the platform so this test is
+      // meaningful on macOS/Windows CI runners too.
+      platform: 'linux',
       runner: fakeRunner(calls),
     });
     expect(calls).toHaveLength(1);

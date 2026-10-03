@@ -212,6 +212,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3 libkrb5-dev libsecret-1-dev libx11-dev libxkbfile-dev
+      # vscode/build/npm/postinstall.ts symlinks .claude/CLAUDE.md ->
+      # .github/copilot-instructions.md (and .claude/skills -> .agents/skills).
+      # .github/ was deliberately excluded from the vendor copy (see
+      # vscode/SUNDAY_UPSTREAM.md), so stub the files postinstall stats.
+      # This is CI scaffolding only — no upstream files are modified.
+      - name: Stub upstream files excluded from vendor copy
+        run: |
+          mkdir -p vscode/.github vscode/.agents/skills
+          touch vscode/.github/copilot-instructions.md
       - name: Install vscode dependencies (npm ci)
         working-directory: vscode
         env:

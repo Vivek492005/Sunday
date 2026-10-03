@@ -295,6 +295,8 @@ export interface RunSandboxedOptions {
   /** Test seams (not set by production callers). */
   probe?: SandboxProbe;
   runner?: typeof runCommand;
+  /** Override process.platform for the availability check (tests). */
+  platform?: NodeJS.Platform;
 }
 
 /** Best-effort `docker kill` so a timed-out/aborted `docker run --rm` does
@@ -316,7 +318,7 @@ export async function runSandboxed(opts: RunSandboxedOptions): Promise<ToolResul
   if (mode === 'off') {
     return err('internal error: runSandboxed called with sandbox mode "off"');
   }
-  const avail = checkSandboxAvailable(mode, { probe: opts.probe });
+  const avail = checkSandboxAvailable(mode, { probe: opts.probe, platform: opts.platform });
   if (!avail.ok) return err(avail.reason ?? `sandbox mode "${mode}" is not available`);
   if (mode === 'docker' && !opts.sandbox.dockerImage.trim()) {
     return err(

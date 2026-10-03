@@ -19,7 +19,11 @@ function shellForPlatform(): { cmd: string; argv: (command: string) => string[] 
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; ${command}`,
+        // $OutputEncoding (not [Console]::OutputEncoding): sets the encoding
+        // for PIPED output. [Console]::OutputEncoding touches the interactive
+        // console, which doesn't exist under CI pipes and can hang the shell
+        // on exit in Windows PowerShell 5.1.
+        `$OutputEncoding=[System.Text.Encoding]::UTF8; ${command}`,
       ],
     };
   }

@@ -15,7 +15,9 @@ let tmp: string;
 let ctx: ToolContext;
 
 beforeEach(async () => {
-  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'sunday-tools-'));
+  // realpath: os.tmpdir() can be a symlink (macOS: /var -> /private/var);
+  // resolveWithinRoot realpaths internally, so compare against the real path.
+  tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'sunday-tools-')));
   ctx = { cwd: tmp };
 });
 
