@@ -115,7 +115,7 @@
         },
         "sunday.sidecar.path": {
           "default": "",
-          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
+          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled → workspace → PATH).",
           "type": "string"
         },
         "sunday.completion.debounceMs": {
@@ -146,7 +146,11 @@
         "sunday.sandbox.mode": {
           "default": "off",
           "description": "Sandbox for agent-run shell commands. off = run on the host (current behavior); docker = disposable container with networking disabled; bubblewrap = Linux bwrap with an unshared network namespace. Applies on the next sidecar restart.",
-          "enum": ["off", "docker", "bubblewrap"],
+          "enum": [
+            "off",
+            "docker",
+            "bubblewrap"
+          ],
           "type": "string"
         },
         "sunday.sandbox.dockerImage": {
@@ -207,5 +211,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "license": "Apache-2.0"
 }

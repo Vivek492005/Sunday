@@ -1,6 +1,7 @@
 {
   "name": "sunday",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "private": true,
   "description": "Sunday — an agent-first coding IDE, forked from VS Code (Code-OSS). Product workspace (lives at sunday/ inside the fork).",
   "scripts": {
