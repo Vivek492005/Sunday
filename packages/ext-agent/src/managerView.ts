@@ -707,4 +707,15 @@ export class ManagerPanelManager extends ManagerWebviewController {
     this.panel = undefined;
     this.detachWebview();
   }
+
+  /**
+   * P-030 Stage 2: reveal the panel, then move it to a dedicated window.
+   * `reveal()` focuses the panel (making it the active editor), so
+   * `workbench.action.moveEditorToNewWindow` moves exactly this panel.
+   * The panel object stays valid across windows — `this.panel` keeps working.
+   */
+  async revealInNewWindow(): Promise<void> {
+    this.reveal();
+    await vscode.commands.executeCommand('workbench.action.moveEditorToNewWindow');
+  }
 }

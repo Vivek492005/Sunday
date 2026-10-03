@@ -19,6 +19,11 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.manager.openWindow",
+        "title": "Sunday Manager: Open in New Window"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.turn.stop",
         "title": "Stop Agent"
       },

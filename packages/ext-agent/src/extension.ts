@@ -374,6 +374,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // The sidebar WebviewView stays registered for now (backward compat).
       managerPanel?.reveal();
     }),
+    vscode.commands.registerCommand('sunday.manager.openWindow', () => {
+      // P-030 Stage 2: reveal the panel, then move it to a dedicated window.
+      void managerPanel?.revealInNewWindow();
+    }),
     vscode.commands.registerCommand('sunday.turn.stop', async () => {
       if (!bridge) {
         vscode.window.showInformationMessage('Sunday sidecar is not running.');

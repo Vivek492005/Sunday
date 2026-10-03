@@ -35,6 +35,7 @@ import {
   MANAGER_PANEL_TYPE,
   resolveManagerDistDir,
 } from './managerView.js';
+import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
 
 type MockBridge = ReturnType<typeof makeBridge>;
@@ -449,5 +450,33 @@ describe('ManagerPanelManager', () => {
     expect(replacement.listeners.size).toBe(1);
     manager.dispose();
     expect(replacement.listeners.size).toBe(0);
+  });
+
+  it('revealInNewWindow() reveals the panel then moves it to a new window', async () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    const execCommand = vi.mocked(vscode.commands.executeCommand);
+    execCommand.mockClear();
+    await manager.revealInNewWindow();
+    // Panel was created (create-or-reveal) …
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(1);
+    // … then the active editor (the just-revealed panel) is moved out.
+    expect(execCommand).toHaveBeenCalledTimes(1);
+    expect(execCommand).toHaveBeenCalledWith('workbench.action.moveEditorToNewWindow');
+    manager.dispose();
+  });
+
+  it('revealInNewWindow() reuses the existing panel instead of creating one', async () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    const execCommand = vi.mocked(vscode.commands.executeCommand);
+    execCommand.mockClear();
+    manager.reveal(); // first reveal creates the panel
+    await manager.revealInNewWindow(); // second call reuses it
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(1);
+    expect(execCommand).toHaveBeenCalledWith('workbench.action.moveEditorToNewWindow');
+    manager.dispose();
   });
 });
