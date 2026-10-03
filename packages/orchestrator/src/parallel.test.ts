@@ -259,9 +259,9 @@ describe('parallel execution', () => {
 
   it("one unit's failure never kills the others", async () => {
     const m = createMockHost({
-      u1: {},
-      u2: { verdicts: ['fail', 'fail', 'fail'] },
-      u3: {},
+      u1: { featureDelayMs: 10 },
+      u2: { verdicts: ['fail', 'fail', 'fail'], featureDelayMs: 10 },
+      u3: { featureDelayMs: 10 },
     });
     const plan = {
       units: [unit('u1', ['src/a/**']), unit('u2', ['src/b/**']), unit('u3', ['src/c/**'])],
@@ -377,7 +377,10 @@ new file mode 100644
   });
 
   it('conflicted run: status, event, no merges, worktrees kept', async () => {
-    const m = createMockHost({ u1: { diff: diffA }, u2: { diff: diffB } });
+    const m = createMockHost({
+      u1: { diff: diffA, featureDelayMs: 10 },
+      u2: { diff: diffB, featureDelayMs: 10 },
+    });
     const plan = { units: [unit('u1', ['src/a/**']), unit('u2', ['src/b/**'])] };
     const result = await runOrchestration(m.host, {
       goal: GOAL,
