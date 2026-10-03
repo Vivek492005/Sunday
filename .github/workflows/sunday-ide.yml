@@ -255,11 +255,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Ensure copilot SDK dir for packaging shim
+        # prepareBuiltInCopilotRipgrepShim (run during `gulp vscode-*-min-ci`)
+        # requires extensions/copilot/node_modules/@github/copilot/sdk/ to
+        # exist in the PACKAGED app. Two gaps: (1) the @github/copilot npm
+        # package does not ship a sdk/ dir (it's populated by the shim), and
+        # (2) vscode/build/.moduleignore excludes `@github/copilot/**` from
+        # the packaged extension. Fix both at workflow time (no vscode/
+        # core changes committed): create the dir, and re-include it via a
+        # `!` negation in .moduleignore (cleanNodeModules treats `!`-lines
+        # as re-includes).
+        run: |
+          sdk_dir="vscode/extensions/copilot/node_modules/@github/copilot/sdk"
+          mkdir -p "$sdk_dir"
+          # Minimal package.json so the dir is a valid package root if probed.
+          if [ ! -f "vscode/extensions/copilot/node_modules/@github/copilot/package.json" ]; then
+            echo '{"name":"@github/copilot","version":"0.0.0-stub"}' > "vscode/extensions/copilot/node_modules/@github/copilot/package.json"
+          fi
+          grep -q '^!@github/copilot/sdk/' vscode/build/.moduleignore || \
+            echo '!@github/copilot/sdk/**' >> vscode/build/.moduleignore
+          echo "copilot sdk dir ready: $sdk_dir"
+
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
       # per-OS build log; pipefail keeps gulp failures fatal through tee.
+      # GITHUB_TOKEN: the build fetches vscode-js-debug via api.github.com;
+      # unauthenticated CI IPs get 403 rate limits (run 37137724324, macOS).
       - name: Compile client (gulp core-ci)
         working-directory: vscode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
           npm run gulp core-ci 2>&1 | tee -a "$GITHUB_WORKSPACE/build-${{ matrix.platform }}-${{ matrix.arch }}.log"
@@ -269,6 +294,8 @@ jobs:
       # from core-ci instead of rebuilding them.
       - name: Package desktop client
         working-directory: vscode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -o pipefail
           npm run gulp ${{ matrix.gulp_client }} 2>&1 | tee -a "$GITHUB_WORKSPACE/build-${{ matrix.platform }}-${{ matrix.arch }}.log"

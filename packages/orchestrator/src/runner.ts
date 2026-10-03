@@ -639,7 +639,9 @@ async function runOrchestrationParallel(
     try {
       if (runController.signal.aborted) throw new UnitCancelledError(unit.id);
       ustate.status = 'running';
-      await persist();
+      // Persist is best-effort (crash recovery only): a disk I/O failure must
+      // never throw into the catch below and clobber the unit's outcome.
+      await persist().catch(() => undefined);
       const ctx: UnitContext = {
         runId,
         workspaceRoot,
@@ -657,14 +659,14 @@ async function runOrchestrationParallel(
       );
       ustate.worktreePath = added.path;
       worktreeByUnit.set(unit.id, added.path);
-      await persist();
+      await persist().catch(() => undefined);
       ctx.notify(unit.id, 'started', `worktree ${added.path} · branch ${added.branch}`);
 
       const outcome = await runUnitAttempts(host, ctx, added.path);
       if (outcome.outcome === 'done') {
         ustate.status = 'done';
         workOutcome.set(unit.id, 'done');
-        await persist();
+        await persist().catch(() => undefined);
         return;
       }
       // Failed: clean up the worktree, record, CONTINUE (others unaffected).
@@ -677,7 +679,7 @@ async function runOrchestrationParallel(
         // best-effort
       }
       ctx.notify(unit.id, 'failed', failureDetail(outcome.evidence));
-      await persist();
+      await persist().catch(() => undefined);
     } catch (e) {
       const cancelled =
         e instanceof UnitCancelledError || uc.signal.aborted || runController.signal.aborted;
