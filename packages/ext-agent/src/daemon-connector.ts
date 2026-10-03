@@ -2,11 +2,13 @@
  * Phase 8 Stage 1 — DaemonConnector: connect the extension to sundayd over a
  * socket, spawning `sundayd --socket <path>` when nothing is listening.
  *
- * Same topology as today (one daemon per window); the single-flight per-user
- * daemon arrives in Stage 2. The connector owns the child it spawns and
- * shuts it down on dispose, mirroring SidecarManager semantics
- * (`sunday/shutdown` → SIGTERM → SIGKILL fallback). When it attaches to an
- * already-listening daemon it owns nothing and only closes its own socket.
+ * Phase 8 Stage 2 — single-flight per-user daemon: when `singleFlight` is
+ * set, the connector first tries the well-known per-user socket
+ * (`sharedDaemonSocketPath()`); on failure it arbitrates via the lockfile
+ * mutex (`sharedDaemonLockPath()`): the winner spawns one *shared* daemon
+ * (never killed on dispose), losers poll for the winner's socket, and stale
+ * locks (dead PID) are stolen. Without `singleFlight` the connector keeps
+ * Stage 1 semantics: one daemon per window, owned and shut down on dispose.
  *
  * Wiring into `extension.ts` (replacing SidecarManager) is Stage 2 work;
  * this module is deliberately decoupled from command resolution — the
@@ -17,8 +19,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import type { ChildProcess } from 'node:child_process';
-import { PROTOCOL_VERSION, helloResultSchema, type HelloResult } from '@sunday/protocol';
+import {
+  PROTOCOL_VERSION,
+  helloResultSchema,
+  type HelloResult,
+  acquireDaemonLock,
+  isPidAlive,
+  readDaemonLock,
+  releaseDaemonLockIfOurs,
+} from '@sunday/protocol';
 import { RpcClient } from './rpc.js';
+// Re-exported for callers/tests so the well-known paths have one import surface.
+export { sharedDaemonSocketPath, sharedDaemonLockPath, isSharedDaemonSocket } from '@sunday/protocol';
 
 export class DaemonConnectorError extends Error {
   constructor(message: string) {
@@ -43,6 +55,31 @@ export class ProtocolMismatchError extends DaemonConnectorError {
   }
 }
 
+/**
+ * Phase 8 Stage 2 — single-flight options. When set, `connect()` arbitrates
+ * one shared daemon per OS user via the lockfile mutex instead of spawning
+ * a private per-window daemon:
+ *
+ * 1. Try the socket — a live daemon may already own it → attach.
+ * 2. `wx`-create the lockfile → we won → spawn the shared daemon, connect.
+ * 3. Lock held by a live PID → poll for the winner's socket until
+ *    `acquireTimeoutMs` (another window is spawning).
+ * 4. Lock held by a dead PID → steal it (unlink) and retry from 2.
+ *
+ * In single-flight mode `dispose()` never shuts the daemon down and never
+ * kills the child: the daemon outlives windows by design. Callers should
+ * inject a *detached* `spawnDaemon` (`detached: true, stdio: 'ignore'`) so
+ * the daemon survives the spawning window too.
+ */
+export interface SingleFlightOptions {
+  /** Lockfile path for the spawn mutex (see `sharedDaemonLockPath()`). */
+  lockPath: string;
+  /** How long a loser waits for the winner's socket. Default 15000ms. */
+  acquireTimeoutMs?: number;
+  /** Poll interval while waiting for the winner's socket. Default 100ms. */
+  pollIntervalMs?: number;
+}
+
 export interface DaemonConnectorOptions {
   /**
    * Socket path (unix domain socket) or named pipe (`\\\\.\\pipe\\…` on
@@ -60,6 +97,12 @@ export interface DaemonConnectorOptions {
   handshakeTimeoutMs?: number;
   /** How long to wait for the socket after spawning. Default 15000ms. */
   spawnTimeoutMs?: number;
+  /**
+   * Enable single-flight per-user daemon startup (Stage 2). When unset,
+   * Stage 1 semantics apply: `socketPath` is private to this window and
+   * the spawned daemon is owned (shut down + killed on dispose).
+   */
+  singleFlight?: SingleFlightOptions;
   log?: (msg: string) => void;
 }
 
@@ -116,9 +159,12 @@ export class DaemonConnector {
   /**
    * Connect to the daemon: try the socket first (a live daemon may already
    * own it); otherwise spawn `sundayd --socket <path>` and connect to that.
+   * With `singleFlight` set, the spawn goes through the per-user lockfile
+   * mutex so two windows never start two daemons.
    */
   async connect(): Promise<RpcClient> {
     if (this.rpc && !this.rpc.isClosed) return this.rpc;
+    if (this.opts.singleFlight) return this.connectSingleFlight();
     try {
       return await this.connectSocket();
     } catch (e) {
@@ -158,6 +204,148 @@ export class DaemonConnector {
     return this.rpc;
   }
 
+  /**
+   * Phase 8 Stage 2 — single-flight connect. Exactly one daemon per OS user:
+   * attach when live, win the lockfile mutex and spawn when free, wait for
+   * the winner when contended, steal when stale.
+   */
+  private async connectSingleFlight(): Promise<RpcClient> {
+    const sf = this.opts.singleFlight as SingleFlightOptions;
+    const lockPath = sf.lockPath;
+    const acquireTimeoutMs = sf.acquireTimeoutMs ?? 15000;
+    const pollIntervalMs = sf.pollIntervalMs ?? 100;
+
+    // Fast path: a live daemon may already own the socket.
+    try {
+      return await this.connectSocket();
+    } catch (e) {
+      this.opts.log?.(
+        `no live sundayd on ${this.opts.socketPath} (${(e as Error).message}); single-flight startup`,
+      );
+    }
+
+    // Parent dirs for the lockfile and (POSIX) socket, so both the `wx`
+    // create and the daemon's bind succeed.
+    try {
+      fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    } catch {
+      /* the daemon's stale-recovery also tries */
+    }
+    if (process.platform !== 'win32') {
+      try {
+        fs.mkdirSync(path.dirname(this.opts.socketPath), { recursive: true });
+      } catch {
+        /* the daemon's stale-recovery also tries */
+      }
+    }
+
+    const deadline = Date.now() + acquireTimeoutMs;
+    for (;;) {
+      const claim = {
+        pid: process.pid,
+        socketPath: this.opts.socketPath,
+        startedAt: new Date().toISOString(),
+        version: 1 as const,
+      };
+      if (acquireDaemonLock(lockPath, claim)) {
+        this.opts.log?.(`won the sundayd spawn lock ${lockPath}; spawning the shared daemon`);
+        return this.spawnSharedDaemon(lockPath);
+      }
+      const holder = readDaemonLock(lockPath);
+      if (!holder || !isPidAlive(holder.pid)) {
+        this.opts.log?.(
+          `stale sundayd lock ${lockPath} (${holder ? `pid ${holder.pid} is dead` : 'unreadable'}); stealing it`,
+        );
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          /* someone else may have beaten us; loop retries */
+        }
+        continue;
+      }
+      // A live process holds the lock — it is spawning (or serving) the
+      // daemon. Poll for its socket until the deadline.
+      this.opts.log?.(
+        `sundayd spawn in progress by pid ${holder.pid}; waiting for the socket`,
+      );
+      try {
+        await this.waitForSocketUntil(deadline, pollIntervalMs);
+        return await this.connectSocket();
+      } catch (e) {
+        throw new DaemonSpawnError(
+          `timed out waiting for the sundayd socket (lock held by pid ${holder.pid}): ${(e as Error).message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * We won the lock: spawn the shared daemon. The child is unref'd and is
+   * never killed on dispose — it outlives this window by design. On spawn
+   * failure we release our claim so another window can retry.
+   */
+  private async spawnSharedDaemon(lockPath: string): Promise<RpcClient> {
+    let proc: ChildProcess;
+    try {
+      proc = this.opts.spawnDaemon();
+    } catch (e) {
+      releaseDaemonLockIfOurs(lockPath, process.pid);
+      throw new DaemonSpawnError((e as Error).message);
+    }
+    this.proc = proc;
+    try {
+      proc.unref();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await this.waitForSocket();
+    } catch (e) {
+      // Never became reachable: best-effort kill of the child we started
+      // (no one could have attached yet — the socket never came up),
+      // release our claim, surface as a spawn failure.
+      try {
+        if (proc.exitCode === null) proc.kill();
+      } catch {
+        /* ignore */
+      }
+      this.proc = undefined;
+      releaseDaemonLockIfOurs(lockPath, process.pid);
+      throw new DaemonSpawnError((e as Error).message);
+    }
+    try {
+      // The daemon overwrites the lockfile with its own PID once serving
+      // (cli.ts); our claim stays until then as the mutex record.
+      return await this.connectSocket();
+    } catch (e) {
+      // The daemon is up but the handshake failed for us (e.g. version
+      // skew). Leave the shared daemon alone — another client may use it —
+      // and just detach.
+      this.proc = undefined;
+      throw e;
+    }
+  }
+
+  /** Poll until the socket accepts connections, up to an absolute deadline. */
+  private async waitForSocketUntil(deadline: number, intervalMs: number): Promise<void> {
+    let lastErr: unknown;
+    while (Date.now() < deadline) {
+      try {
+        const probe = await openSocket(this.opts.socketPath, 500);
+        try {
+          probe.destroy();
+        } catch {
+          /* ignore */
+        }
+        return;
+      } catch (e) {
+        lastErr = e;
+      }
+      await sleep(Math.min(intervalMs, Math.max(0, deadline - Date.now())));
+    }
+    throw lastErr ?? new Error('timed out waiting for the sundayd socket');
+  }
+
   /** True when this connector spawned (and therefore owns) the daemon. */
   get ownsDaemon(): boolean {
     return this.proc !== undefined;
@@ -166,15 +354,24 @@ export class DaemonConnector {
   /**
    * Best-effort `sunday/shutdown`, then close the socket and terminate the
    * owned child (SIGTERM → SIGKILL fallback). Never throws.
+   *
+   * Single-flight mode: the daemon is shared, so dispose only detaches —
+   * no `sunday/shutdown`, no kill. The daemon's own lifecycle (explicit
+   * stop, idle shutdown) owns its teardown.
    */
   async dispose(): Promise<void> {
+    const singleFlight = this.opts.singleFlight !== undefined;
     const rpc = this.rpc;
     this.rpc = undefined;
     if (rpc && !rpc.isClosed) {
-      try {
-        await rpc.request('sunday/shutdown', {}, { timeoutMs: 5000 });
-      } catch {
-        /* best-effort */
+      if (singleFlight) {
+        this.opts.log?.('detaching from the shared sundayd; leaving the daemon running');
+      } else {
+        try {
+          await rpc.request('sunday/shutdown', {}, { timeoutMs: 5000 });
+        } catch {
+          /* best-effort */
+        }
       }
       rpc.close();
     }
@@ -187,7 +384,7 @@ export class DaemonConnector {
     }
     const proc = this.proc;
     this.proc = undefined;
-    if (proc && proc.exitCode === null) {
+    if (proc && !singleFlight && proc.exitCode === null) {
       try {
         proc.kill();
       } catch {

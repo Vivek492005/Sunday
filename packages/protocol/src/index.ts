@@ -19,6 +19,7 @@ export * from './browser-panel.js';
 export * from './orchestrate.js';
 export * from './mcp.js';
 export * from './policy.js';
+export * from './daemon-paths.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';

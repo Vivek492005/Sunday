@@ -5,6 +5,12 @@ import path from 'node:path';
 import { homedir } from 'node:os';
 import { SundayDaemon } from './daemon.js';
 import { SocketServerTransport, type ServerTransport } from './rpc-transport.js';
+import {
+  isSharedDaemonSocket,
+  releaseDaemonLockIfOurs,
+  sharedDaemonLockPath,
+  writeDaemonLock,
+} from '@sunday/protocol';
 import { createContextHandlers } from '@sunday/context';
 import { registerManagerMethods } from './manager.js';
 import { registerOrchestrationMethods } from '@sunday/orchestrator';
@@ -187,6 +193,12 @@ async function serveSocket(socketPath: string): Promise<void> {
     } catch {
       /* ignore */
     }
+    // Phase 8 Stage 2: on clean shutdown of the shared per-user daemon,
+    // drop the lockfile — but only when it still names us, so we never
+    // delete a successor daemon's lock after a crash + respawn.
+    if (isSharedDaemonSocket(socketPath)) {
+      releaseDaemonLockIfOurs(sharedDaemonLockPath(), process.pid);
+    }
     // Best-effort socket file removal (POSIX). Named pipes on Windows are
     // released by the OS when the last handle closes — no unlink needed.
     if (process.platform !== 'win32') {
@@ -229,6 +241,22 @@ async function serveSocket(socketPath: string): Promise<void> {
       fs.chmodSync(socketPath, 0o600);
     } catch (e) {
       console.error(`[sundayd] warning: could not chmod ${socketPath}: ${(e as Error).message}`);
+    }
+  }
+  // Phase 8 Stage 2: single-flight — when serving the well-known per-user
+  // socket, record our PID in the lockfile (overwrites the winning
+  // connector's claim) so other windows can tell a live daemon apart from
+  // a stale lock. Best-effort: logs, never fatal.
+  if (isSharedDaemonSocket(socketPath)) {
+    try {
+      writeDaemonLock(sharedDaemonLockPath(), {
+        pid: process.pid,
+        socketPath,
+        startedAt: new Date().toISOString(),
+        version: 1,
+      });
+    } catch (e) {
+      console.error(`[sundayd] warning: could not write lockfile: ${(e as Error).message}`);
     }
   }
   console.error(`[sundayd] listening on socket ${socketPath}`);

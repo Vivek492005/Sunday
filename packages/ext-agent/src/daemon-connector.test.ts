@@ -15,7 +15,10 @@ import {
   DaemonSpawnError,
   ProtocolMismatchError,
   defaultSocketPath,
+  sharedDaemonSocketPath,
+  sharedDaemonLockPath,
 } from './daemon-connector.js';
+import { isPidAlive, readDaemonLock } from '@sunday/protocol';
 
 const FIXTURE = fileURLToPath(new URL('./test/fixtures/mini-socket-sundayd.mjs', import.meta.url));
 
@@ -202,5 +205,173 @@ describe('DaemonConnector', () => {
     expect(p).toContain('.sunday');
     expect(p).toContain(String(process.pid));
     expect(p.endsWith('.sock')).toBe(true);
+  });
+});
+
+describe('DaemonConnector single-flight (Stage 2)', () => {
+  /** Hermetic per-user socket + lock pair (never touches the real ~/.sunday). */
+  function sharedPaths(): { sock: string; lock: string } {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-sf-'));
+    tmpDirs.push(dir);
+    return { sock: path.join(dir, 'sundayd.sock'), lock: path.join(dir, 'sundayd.lock') };
+  }
+
+  function writeLock(lock: string, pid: number): void {
+    fs.writeFileSync(
+      lock,
+      JSON.stringify({ pid, socketPath: 'x', startedAt: new Date().toISOString(), version: 1 }),
+    );
+  }
+
+  it(
+    'second connector attaches to the same daemon without spawning',
+    { timeout: 20000 },
+    async () => {
+      const { sock, lock } = sharedPaths();
+      const spawnDaemon = vi.fn(() => spawnFixture(sock));
+      const a = track(
+        new DaemonConnector({
+          socketPath: sock,
+          spawnDaemon,
+          clientVersion: '1.2.3-test',
+          singleFlight: { lockPath: lock },
+          spawnTimeoutMs: 10000,
+        }),
+      );
+      const rpcA = await a.connect();
+      expect(spawnDaemon).toHaveBeenCalledTimes(1);
+      expect(a.ownsDaemon).toBe(true);
+      expect(await rpcA.request('sunday/ping', {})).toEqual({ ok: true });
+
+      const spawnB = vi.fn((): ChildProcess => {
+        throw new Error('second window must not spawn');
+      });
+      const b = track(
+        new DaemonConnector({
+          socketPath: sock,
+          spawnDaemon: spawnB,
+          clientVersion: '1.2.3-test',
+          singleFlight: { lockPath: lock },
+        }),
+      );
+      const rpcB = await b.connect();
+      expect(spawnB).not.toHaveBeenCalled();
+      expect(b.ownsDaemon).toBe(false);
+      expect(await rpcB.request('sunday/ping', {})).toEqual({ ok: true });
+
+      // Disposing either window must NOT shut down or kill the shared daemon.
+      await b.dispose();
+      await a.dispose();
+      await new Promise((r) => setTimeout(r, 400));
+      // Still listening: the fixture would have exited 50ms after a
+      // sunday/shutdown RPC, and would be dead had it been SIGKILLed.
+      await waitForSocket(sock);
+    },
+  );
+
+  it(
+    'waits for another spawner when the lock is held by a live pid',
+    { timeout: 20000 },
+    async () => {
+      const { sock, lock } = sharedPaths();
+      // Simulate another window mid-spawn: live PID (our own), socket not up yet.
+      writeLock(lock, process.pid);
+      const spawnDaemon = vi.fn((): ChildProcess => {
+        throw new Error('loser must not spawn');
+      });
+      const c = track(
+        new DaemonConnector({
+          socketPath: sock,
+          spawnDaemon,
+          clientVersion: '1.2.3-test',
+          singleFlight: { lockPath: lock, acquireTimeoutMs: 10000 },
+        }),
+      );
+      // The "other window's" daemon comes up shortly after.
+      const timer = setTimeout(() => spawnFixture(sock), 500);
+      try {
+        const rpc = await c.connect();
+        expect(spawnDaemon).not.toHaveBeenCalled();
+        expect(c.ownsDaemon).toBe(false);
+        expect(await rpc.request('sunday/ping', {})).toEqual({ ok: true });
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  );
+
+  it(
+    'steals a stale lock (dead pid) and spawns',
+    { timeout: 20000 },
+    async () => {
+      const { sock, lock } = sharedPaths();
+      // Deterministic dead PID: a child that has already exited.
+      const doomed = spawn(process.execPath, ['--version']);
+      const deadPid = doomed.pid as number;
+      await new Promise<void>((resolve) => doomed.on('exit', () => resolve()));
+      expect(isPidAlive(deadPid)).toBe(false);
+      writeLock(lock, deadPid);
+
+      const spawnDaemon = vi.fn(() => spawnFixture(sock));
+      const c = track(
+        new DaemonConnector({
+          socketPath: sock,
+          spawnDaemon,
+          clientVersion: '1.2.3-test',
+          singleFlight: { lockPath: lock },
+          spawnTimeoutMs: 10000,
+        }),
+      );
+      const rpc = await c.connect();
+      expect(spawnDaemon).toHaveBeenCalledTimes(1);
+      expect(await rpc.request('sunday/ping', {})).toEqual({ ok: true });
+      // The stolen lock now names us.
+      expect(readDaemonLock(lock)?.pid).toBe(process.pid);
+    },
+  );
+
+  it('times out cleanly when the lock holder never serves a socket', { timeout: 20000 }, async () => {
+    const { sock, lock } = sharedPaths();
+    writeLock(lock, process.pid); // live holder, but no daemon ever appears
+    const c = track(
+      new DaemonConnector({
+        socketPath: sock,
+        spawnDaemon: () => {
+          throw new Error('must not spawn');
+        },
+        clientVersion: '1.2.3-test',
+        singleFlight: { lockPath: lock, acquireTimeoutMs: 1500, pollIntervalMs: 100 },
+      }),
+    );
+    await expect(c.connect()).rejects.toBeInstanceOf(DaemonSpawnError);
+  });
+
+  it('sharedDaemonSocketPath()/sharedDaemonLockPath() follow the per-user convention', () => {
+    const sock = sharedDaemonSocketPath();
+    const lock = sharedDaemonLockPath();
+    if (process.platform === 'win32') {
+      expect(sock.startsWith('\\\\.\\pipe\\sundayd-')).toBe(true);
+    } else {
+      expect(sock.endsWith(`${path.sep}.sunday${path.sep}sundayd.sock`)).toBe(true);
+    }
+    expect(lock.endsWith(`${path.sep}.sunday${path.sep}sundayd.lock`)).toBe(true);
+    // Windows named-pipe branch, exercised via overrides on any platform.
+    expect(sharedDaemonSocketPath({ platform: 'win32', username: 'bob' })).toBe(
+      '\\\\.\\pipe\\sundayd-bob',
+    );
+    expect(sharedDaemonSocketPath({ platform: 'win32', username: 'b ob!' })).toBe(
+      '\\\\.\\pipe\\sundayd-b_ob_',
+    );
+    expect(sharedDaemonSocketPath({ platform: 'win32', username: '' })).toBe(
+      '\\\\.\\pipe\\sundayd-user',
+    );
+  });
+
+  it('isPidAlive() distinguishes live and dead pids', async () => {
+    expect(isPidAlive(process.pid)).toBe(true);
+    const doomed = spawn(process.execPath, ['--version']);
+    const deadPid = doomed.pid as number;
+    await new Promise<void>((resolve) => doomed.on('exit', () => resolve()));
+    expect(isPidAlive(deadPid)).toBe(false);
   });
 });
