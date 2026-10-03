@@ -74,6 +74,16 @@ function createMockHost(behaviors: Record<string, UnitBehavior> = {}, defaultDif
   const titles: string[] = [];
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sun-par-'));
   const cwdToUnit = new Map<string, string>();
+  // Windows: temp paths may contain 8.3 short names (RUNNER~1) or differ in
+  // case/separators between the mkdtemp return and later lookups. Canonicalize
+  // both sides so the worktree→unit correlation is robust.
+  function canonWorktreePath(p: string): string {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  }
   let active = 0;
   let peak = 0;
   const verdictCounts = new Map<string, number>();
@@ -86,7 +96,7 @@ function createMockHost(behaviors: Record<string, UnitBehavior> = {}, defaultDif
       parameters: { type: 'object', properties: { path: { type: 'string' } } },
     },
     async execute(_args, ctx) {
-      const unitId = cwdToUnit.get(ctx.cwd);
+      const unitId = cwdToUnit.get(canonWorktreePath(ctx.cwd));
       const d = (unitId && behaviors[unitId]?.diff) ?? defaultDiff;
       return { output: typeof d === 'function' ? d(ctx.cwd) : d };
     },
@@ -102,7 +112,7 @@ function createMockHost(behaviors: Record<string, UnitBehavior> = {}, defaultDif
       if (method === 'worktree/add') {
         const dir = fs.mkdtempSync(path.join(tmpRoot, 'wt-'));
         const unitId = String(p['branch']).split('/').pop() ?? 'unknown';
-        cwdToUnit.set(dir, unitId);
+        cwdToUnit.set(canonWorktreePath(dir), unitId);
         return { path: dir, branch: p['branch'] };
       }
       if (method === 'worktree/merge') return { merged: true, sha: `sha-${p['path']}`, target: 'main' };

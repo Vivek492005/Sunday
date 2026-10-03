@@ -244,8 +244,14 @@ jobs:
         # @github/copilot SDK must be present for the packaging shim
         # (prepareBuiltInCopilotRipgrepShim). Upstream installs it via
         # `npm run copilot:setup`; plain npm ci suffices for the shim.
+        # The root postinstall already ran this once and left BROKEN
+        # .claude symlinks (target vscode/extensions/copilot/.github/…
+        # does not exist); its existsSync guard misses broken links, so
+        # a second postinstall dies with EEXIST. Clear .claude first.
         working-directory: vscode/extensions/copilot
-        run: npm ci
+        run: |
+          rm -rf .claude
+          npm ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
