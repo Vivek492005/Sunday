@@ -1,5 +1,8 @@
-// Tests for ManagerViewProvider: webview message routing to the manager
-// RPC surface (sessions, chat/cancel, checkpoint/*, worktree/*), state
+// Tests for the Agent Manager webview hosts: ManagerViewProvider (sidebar
+// WebviewView) and ManagerPanelManager (P-030 Stage 1 editor-area
+// WebviewPanel). Both share HTML serving + message routing via
+// ManagerWebviewController: webview message routing to the manager RPC
+// surface (sessions, chat/cancel, checkpoint/*, worktree/*), state
 // snapshots, per-session turn tracking, and disposal. `vscode` is mocked;
 // HostBridge is a manual mock. No DOM, no network, no real VS Code.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,13 +10,31 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+const { mockCreateWebviewPanel } = vi.hoisted(() => ({
+  mockCreateWebviewPanel: vi.fn(),
+}));
+
 vi.mock('vscode', () => ({
   Uri: {
     file: (p: string) => ({ fsPath: p, toString: () => p, scheme: 'file' }),
   },
+  ViewColumn: { One: 1, Beside: 2 },
+  window: {
+    createWebviewPanel: mockCreateWebviewPanel,
+    showInformationMessage: vi.fn(),
+    showWarningMessage: vi.fn(),
+  },
+  commands: {
+    executeCommand: vi.fn(),
+  },
 }));
 
-import { ManagerViewProvider, resolveManagerDistDir } from './managerView.js';
+import {
+  ManagerViewProvider,
+  ManagerPanelManager,
+  MANAGER_PANEL_TYPE,
+  resolveManagerDistDir,
+} from './managerView.js';
 import type { HostBridge } from './hostBridge.js';
 
 type MockBridge = ReturnType<typeof makeBridge>;
@@ -271,6 +292,162 @@ describe('ManagerViewProvider', () => {
     expect(bridge.listeners.size).toBe(0);
     expect(replacement.listeners.size).toBe(1);
     provider.dispose();
+    expect(replacement.listeners.size).toBe(0);
+  });
+});
+
+/** Fake WebviewPanel: webview + reveal/dispose + onDidDispose. */
+function makePanel() {
+  const handlers: Array<(m: any) => void> = [];
+  const webview = {
+    options: undefined as any,
+    html: '',
+    cspSource: 'https://null',
+    asWebviewUri: (u: { toString(): string }) => ({ toString: () => `webview://${u.toString()}` }),
+    postMessage: vi.fn(),
+    onDidReceiveMessage: vi.fn((h: (m: any) => void) => {
+      handlers.push(h);
+      return { dispose: () => undefined };
+    }),
+  };
+  const disposeHandlers: Array<() => void> = [];
+  const panel = {
+    webview,
+    reveal: vi.fn(),
+    dispose: vi.fn(),
+    onDidDispose: vi.fn((h: () => void) => {
+      disposeHandlers.push(h);
+      return { dispose: () => undefined };
+    }),
+  };
+  return { panel, webview, handlers, disposeHandlers };
+}
+
+function makePanelManager(bridge: ReturnType<typeof makeBridge>, extensionPath: string) {
+  const logs: string[] = [];
+  const manager = new ManagerPanelManager({
+    extensionPath,
+    getBridge: () => asBridge(bridge),
+    ensureBridge: async () => asBridge(bridge),
+    getCwd: () => '/fake/cwd',
+    log: (m) => logs.push(m),
+  });
+  return { manager, logs };
+}
+
+describe('ManagerPanelManager', () => {
+  let root: string;
+  let extensionPath: string;
+  let bridge: ReturnType<typeof makeBridge>;
+
+  beforeEach(() => {
+    ({ root, extensionPath } = makeExtLayout());
+    bridge = makeBridge();
+    mockCreateWebviewPanel.mockReset();
+    return () => fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reveal() creates a webview panel with the manager type, title, and column', () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    manager.reveal();
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(1);
+    const [viewType, title, column, options] = mockCreateWebviewPanel.mock.calls[0];
+    expect(viewType).toBe(MANAGER_PANEL_TYPE);
+    expect(viewType).toBe('sunday.managerPanel');
+    expect(title).toBe('Sunday Manager');
+    expect(column).toBe(1); // ViewColumn.One
+    expect(options.enableScripts).toBe(true);
+    expect(options.retainContextWhenHidden).toBe(true);
+    manager.dispose();
+  });
+
+  it('reveal() reuses the existing panel instead of creating a new one', () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    manager.reveal();
+    manager.reveal();
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(1);
+    expect(panel.reveal).toHaveBeenCalledTimes(1);
+    expect(panel.reveal).toHaveBeenCalledWith(1); // ViewColumn.One
+    manager.dispose();
+  });
+
+  it('serves the same HTML (webview URIs, nonced scripts, strict CSP) as the sidebar view', () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel, webview } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    manager.reveal();
+    expect(webview.options.enableScripts).toBe(true);
+    expect(webview.html).toContain('Content-Security-Policy');
+    expect(webview.html).toContain(`script-src 'nonce-`);
+    expect(webview.html).not.toContain('./assets/');
+    expect(webview.html).toContain('webview://');
+    manager.dispose();
+  });
+
+  it('pushes an initial state snapshot and routes messages like the sidebar view', async () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel, webview, handlers } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    manager.reveal();
+    await flush();
+    expect(bridge.sessionList).toHaveBeenCalledTimes(1);
+    const state = lastStateMessage(webview);
+    expect(state.workspaceRoot).toBe('/fake/cwd');
+    expect(state.agents).toHaveLength(1);
+    await handlers[0]({ type: 'sunday/manager/stop-turn', turnId: 'turn-7' });
+    await flush();
+    expect(bridge.chatCancel).toHaveBeenCalledWith('turn-7');
+    manager.dispose();
+  });
+
+  it('creates a fresh panel after the old one is disposed', () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const first = makePanel();
+    const second = makePanel();
+    mockCreateWebviewPanel.mockReturnValueOnce(first.panel).mockReturnValueOnce(second.panel);
+    manager.reveal();
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(1);
+    // Simulate the user closing the panel.
+    first.disposeHandlers.forEach((h) => h());
+    manager.reveal();
+    expect(mockCreateWebviewPanel).toHaveBeenCalledTimes(2);
+    expect(second.panel.reveal).not.toHaveBeenCalled();
+    manager.dispose();
+  });
+
+  it('detaches the bridge listener on dispose', () => {
+    const { manager } = makePanelManager(bridge, extensionPath);
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    manager.reveal();
+    expect(bridge.listeners.size).toBe(1);
+    manager.dispose();
+    expect(bridge.listeners.size).toBe(0);
+  });
+
+  it('notifyBridgeChanged re-subscribes when the bridge instance changes', () => {
+    let current = bridge;
+    const { panel } = makePanel();
+    mockCreateWebviewPanel.mockReturnValue(panel);
+    const manager = new ManagerPanelManager({
+      extensionPath,
+      getBridge: () => asBridge(current),
+      ensureBridge: async () => asBridge(current),
+      getCwd: () => undefined,
+      log: () => undefined,
+    });
+    manager.reveal();
+    expect(bridge.listeners.size).toBe(1);
+    const replacement = makeBridge();
+    current = replacement as any;
+    manager.notifyBridgeChanged();
+    expect(bridge.listeners.size).toBe(0);
+    expect(replacement.listeners.size).toBe(1);
+    manager.dispose();
     expect(replacement.listeners.size).toBe(0);
   });
 });

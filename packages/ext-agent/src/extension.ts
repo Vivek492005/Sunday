@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { SidecarManager, BROWSER_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
-import { ManagerViewProvider } from './managerView.js';
+import { ManagerViewProvider, ManagerPanelManager } from './managerView.js';
 import { McpViewProvider } from './mcpView.js';
 import { BrowserViewProvider } from './browserPanel.js';
 import {
@@ -107,6 +107,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let bridge: HostBridge | undefined;
   let chatProvider: ChatViewProvider | undefined;
   let managerProvider: ManagerViewProvider | undefined;
+  let managerPanel: ManagerPanelManager | undefined;
   let mcpProvider: McpViewProvider | undefined;
   let browserProvider: BrowserViewProvider | undefined;
   const refreshBridge = () => {
@@ -121,6 +122,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     chatProvider?.notifyBridgeChanged();
     managerProvider?.notifyBridgeChanged();
+    managerPanel?.notifyBridgeChanged();
     mcpProvider?.notifyBridgeChanged();
     browserProvider?.notifyBridgeChanged();
   };
@@ -192,6 +194,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       log('HostBridge attached to sundayd');
       chatProvider?.notifyBridgeChanged();
       managerProvider?.notifyBridgeChanged();
+      managerPanel?.notifyBridgeChanged();
       mcpProvider?.notifyBridgeChanged();
     }
     return bridge;
@@ -207,7 +210,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   // -- agent manager webview ------------------------------------------------------
+  // Sidebar WebviewView (legacy, kept registered for now) and the editor-area
+  // WebviewPanel (P-030 Stage 1 — the canonical surface; `sunday.manager.open`
+  // reveals it). Both share HTML + message routing via ManagerWebviewController.
   managerProvider = new ManagerViewProvider({
+    extensionPath: context.extensionPath,
+    getBridge: () => bridge,
+    ensureBridge,
+    getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    log,
+  });
+  managerPanel = new ManagerPanelManager({
     extensionPath: context.extensionPath,
     getBridge: () => bridge,
     ensureBridge,
@@ -338,6 +351,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     statusSub,
     chatProvider,
     managerProvider,
+    managerPanel,
     mcpProvider,
     browserProvider,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
@@ -356,7 +370,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void vscode.commands.executeCommand('sunday.chatView.focus');
     }),
     vscode.commands.registerCommand('sunday.manager.open', () => {
-      void vscode.commands.executeCommand('sunday.managerView.focus');
+      // P-030 Stage 1: reveal the editor-area panel (create-or-reveal).
+      // The sidebar WebviewView stays registered for now (backward compat).
+      managerPanel?.reveal();
     }),
     vscode.commands.registerCommand('sunday.turn.stop', async () => {
       if (!bridge) {
@@ -400,9 +416,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerOrchestrationCommands(context, {
     getBridge: getBridgeForCommands,
     getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    getActiveRunId: () => managerProvider?.getActiveRunId(),
+    // Prefer the panel (P-030 Stage 1 canonical surface); fall back to the
+    // legacy sidebar view so "Stop all" keeps working during the transition.
+    getActiveRunId: () => managerPanel?.getActiveRunId() ?? managerProvider?.getActiveRunId(),
     openManagerView: () => {
-      void vscode.commands.executeCommand('sunday.managerView.focus');
+      managerPanel?.reveal();
     },
     log,
   });

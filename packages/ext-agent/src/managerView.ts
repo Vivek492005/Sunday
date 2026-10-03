@@ -1,10 +1,17 @@
-// sunday-agent — ManagerViewProvider: hosts the @sunday/ui-manager webview.
+// sunday-agent — Agent Manager webview host.
 //
-// Serves the built ui-manager bundle (dist/index.html) inside a VS Code
-// WebviewView, routes webview messages to the HostBridge/sundayd sidecar
-// (session list, chat/cancel, checkpoint/*, worktree/*), and pushes state
-// snapshots back. vscode-coupled by design; covered by managerView.test.ts
-// with a mocked `vscode` module. Mirrors chatView.ts.
+// Serves the built ui-manager bundle (dist/index.html), routes webview
+// messages to the HostBridge/sundayd sidecar (session list, chat/cancel,
+// checkpoint/*, worktree/*, orchestration), and pushes state snapshots
+// back. vscode-coupled by design; covered by managerView.test.ts with a
+// mocked `vscode` module. Mirrors chatView.ts.
+//
+// P-030 Stage 1: the shared logic lives in ManagerWebviewController, which
+// works against any vscode.Webview. ManagerViewProvider (sidebar
+// WebviewView, view type `sunday.managerView`) is the legacy host and stays
+// registered for now; ManagerPanelManager (editor-area WebviewPanel, panel
+// type `sunday.managerPanel`) is the design-doc §20.2 surface and is what
+// `sunday.manager.open` reveals.
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as crypto from 'node:crypto';
@@ -21,6 +28,8 @@ import type {
 } from '@sunday/protocol';
 
 export const MANAGER_VIEW_TYPE = 'sunday.managerView';
+/** Editor-area panel type for the Agent Manager (P-030 Stage 1). */
+export const MANAGER_PANEL_TYPE = 'sunday.managerPanel';
 
 /** Webview → extension: resolve one merge conflict in favour of a unit. */
 export const ORCHESTRATION_RESOLVE_MESSAGE = 'sunday/orchestration/resolve';
@@ -119,13 +128,18 @@ export function resolveManagerDistDir(extensionPath: string): string {
   );
 }
 
-export class ManagerViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = MANAGER_VIEW_TYPE;
-
-  private view: vscode.WebviewView | undefined;
+/**
+ * Shared Agent Manager webview controller. Owns the ui-manager HTML,
+ * the webview↔HostBridge message protocol, orchestration run tracking,
+ * and bridge (re)subscription. Works against any vscode.Webview, so both
+ * the sidebar WebviewView and the editor-area WebviewPanel build on it
+ * without duplicating logic.
+ */
+export class ManagerWebviewController {
+  protected readonly disposables: vscode.Disposable[] = [];
+  private webview: vscode.Webview | undefined;
   private detachBridge: (() => void) | undefined;
   private detachOrchestrate: (() => void) | undefined;
-  private readonly disposables: vscode.Disposable[] = [];
   /** sessionId → turnId for turns currently streaming (from chat events). */
   private readonly activeTurns = new Map<string, string>();
   /** runId → latest known run view (from orchestrate/event + orchestrate/status). */
@@ -135,9 +149,14 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
 
   constructor(private readonly deps: ManagerViewDeps) {}
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
-    this.view = webviewView;
-    const { webview } = webviewView;
+  /**
+   * Bind this controller to a webview: set webview options, serve the
+   * ui-manager HTML, subscribe to the bridge, push the initial state,
+   * and route incoming messages. Shared by the sidebar view and the
+   * editor-area panel.
+   */
+  protected attachWebview(webview: vscode.Webview): void {
+    this.webview = webview;
     webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.file(this.distDir())],
@@ -152,23 +171,38 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
       undefined,
       this.disposables,
     );
-    webviewView.onDidDispose(() => this.disposeView(), undefined, this.disposables);
+  }
+
+  /** Detach from the webview: drop bridge subscriptions and disposables. */
+  protected detachWebview(): void {
+    this.detachBridge?.();
+    this.detachBridge = undefined;
+    this.detachOrchestrate?.();
+    this.detachOrchestrate = undefined;
+    this.webview = undefined;
+    for (const d of this.disposables.splice(0)) {
+      try {
+        d.dispose();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   /** Re-subscribe when the bridge instance changes (sidecar restart/crash). */
   notifyBridgeChanged(): void {
-    if (this.view) this.attachBridge();
+    if (this.webview) this.attachBridge();
   }
 
   dispose(): void {
-    this.disposeView();
+    this.detachWebview();
   }
 
-  private distDir(): string {
+  protected distDir(): string {
     return resolveManagerDistDir(this.deps.extensionPath);
   }
 
-  private attachBridge(): void {
+  protected attachBridge(): void {
     this.detachBridge?.();
     this.detachBridge = undefined;
     this.detachOrchestrate?.();
@@ -413,8 +447,8 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
   }
 
   private post(msg: unknown): void {
-    if (this.view) {
-      void this.view.webview.postMessage(msg);
+    if (this.webview) {
+      void this.webview.postMessage(msg);
     }
   }
 
@@ -597,19 +631,80 @@ export class ManagerViewProvider implements vscode.WebviewViewProvider {
     html = html.includes('<head>') ? html.replace('<head>', `<head>\n${csp}`) : `${csp}\n${html}`;
     return html;
   }
+}
 
-  private disposeView(): void {
-    this.detachBridge?.();
-    this.detachBridge = undefined;
-    this.detachOrchestrate?.();
-    this.detachOrchestrate = undefined;
+/**
+ * Legacy host: the Agent Manager as an Explorer-sidebar WebviewView
+ * (view type `sunday.managerView`). Kept registered for now; P-030 Stage 1
+ * moves the canonical surface to ManagerPanelManager below.
+ */
+export class ManagerViewProvider extends ManagerWebviewController implements vscode.WebviewViewProvider {
+  public static readonly viewType = MANAGER_VIEW_TYPE;
+
+  private view: vscode.WebviewView | undefined;
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+    this.view = webviewView;
+    this.attachWebview(webviewView.webview);
+    webviewView.onDidDispose(
+      () => {
+        this.view = undefined;
+        this.detachWebview();
+      },
+      undefined,
+      this.disposables,
+    );
+  }
+
+  dispose(): void {
     this.view = undefined;
-    for (const d of this.disposables.splice(0)) {
-      try {
-        d.dispose();
-      } catch {
-        /* ignore */
-      }
+    this.detachWebview();
+  }
+}
+
+/**
+ * P-030 Stage 1: the Agent Manager as an editor-area WebviewPanel
+ * (panel type `sunday.managerPanel`), matching design doc §20.2. Shares
+ * all HTML serving and message routing with the sidebar view via
+ * ManagerWebviewController — the ui-manager bundle and protocol are
+ * unchanged.
+ */
+export class ManagerPanelManager extends ManagerWebviewController {
+  public static readonly panelType = MANAGER_PANEL_TYPE;
+
+  private panel: vscode.WebviewPanel | undefined;
+
+  /** Create-or-reveal: focus the existing panel, or create it on first use. */
+  reveal(): void {
+    const existing = this.panel;
+    if (existing) {
+      existing.reveal(vscode.ViewColumn.One);
+      return;
     }
+    const panel = vscode.window.createWebviewPanel(
+      MANAGER_PANEL_TYPE,
+      'Sunday Manager',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      },
+    );
+    this.panel = panel;
+    this.attachWebview(panel.webview);
+    panel.onDidDispose(
+      () => {
+        this.panel = undefined;
+        this.detachWebview();
+      },
+      undefined,
+      this.disposables,
+    );
+  }
+
+  dispose(): void {
+    this.panel?.dispose();
+    this.panel = undefined;
+    this.detachWebview();
   }
 }
