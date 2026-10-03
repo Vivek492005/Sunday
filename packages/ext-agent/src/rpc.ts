@@ -1,8 +1,12 @@
-// sunday-agent — NDJSON JSON-RPC 2.0 client over the sundayd child-process
-// stdio (§23.1). One JSON object per line; stdout carries responses +
-// notifications, stderr is diagnostics (forwarded, never parsed).
+// sunday-agent — NDJSON JSON-RPC 2.0 client over the sundayd sidecar.
+//
+// Phase 8 Stage 1: two transports, one framing. The classic path is the
+// child-process stdio (§23.1); `--socket` mode speaks the same NDJSON frames
+// over a `node:net` socket (unix socket / Windows named pipe). Both go
+// through the same `RpcWire` byte interface below.
 
 import type { ChildProcess } from 'node:child_process';
+import type { Socket } from 'node:net';
 import { parseMessage } from '@sunday/protocol';
 
 /** Server answered with a JSON-RPC error object. */
@@ -50,13 +54,88 @@ interface Pending {
 export type NotificationHandler = (params: unknown) => void;
 
 /**
+ * Phase 8 Stage 1: byte-level transport behind `RpcClient`. The stdio path
+ * adapts a `ChildProcess` (stdout = frames, stderr = diagnostics, stdin =
+ * writes); the socket path adapts a `net.Socket` (frames both ways, no
+ * diagnostics channel).
+ */
+export interface RpcWire {
+  /** Inbound NDJSON frame bytes. */
+  onData(cb: (chunk: Buffer) => void): void;
+  /** Diagnostic bytes (stderr). Never parsed as RPC; no-op on sockets. */
+  onDiagnostic(cb: (chunk: Buffer) => void): void;
+  /** The peer went away (process exit / socket close / error). */
+  onTerminated(cb: () => void): void;
+  /** Write one `\n`-terminated frame. */
+  writeLine(line: string, cb: (err?: Error | null | undefined) => void): void;
+  /** False once the write side is gone. */
+  isWritable(): boolean;
+}
+
+function childProcessWire(proc: ChildProcess): RpcWire {
+  return {
+    onData: (cb) => proc.stdout?.on('data', cb),
+    onDiagnostic: (cb) => proc.stderr?.on('data', cb),
+    onTerminated: (cb) => {
+      proc.on('exit', cb);
+      proc.on('error', cb);
+    },
+    writeLine: (line, cb) => {
+      const stdin = proc.stdin;
+      if (!stdin || stdin.destroyed || !stdin.writable) {
+        cb(new Error('sundayd stdin is not writable'));
+        return;
+      }
+      stdin.write(line + '\n', cb);
+    },
+    isWritable: () => {
+      const stdin = proc.stdin;
+      return !!stdin && !stdin.destroyed && stdin.writable;
+    },
+  };
+}
+
+function socketWire(socket: Socket): RpcWire {
+  return {
+    onData: (cb) => socket.on('data', cb),
+    onDiagnostic: () => undefined,
+    onTerminated: (cb) => {
+      socket.on('close', cb);
+      // 'error' precedes 'close' on a dead peer; the close handler owns
+      // teardown, this just prevents an unhandled 'error' throw.
+      socket.on('error', () => undefined);
+    },
+    writeLine: (line, cb) => {
+      if (socket.destroyed || !socket.writable) {
+        cb(new Error('sundayd socket is not writable'));
+        return;
+      }
+      socket.write(line + '\n', cb);
+    },
+    isWritable: () => !socket.destroyed && socket.writable,
+  };
+}
+
+/** Distinguish `new RpcClient(childProc)` from `new RpcClient(wire)`. */
+function isChildProcess(v: ChildProcess | RpcWire): v is ChildProcess {
+  return (
+    typeof (v as ChildProcess).stdin !== 'undefined' ||
+    typeof (v as ChildProcess).stdout !== 'undefined'
+  );
+}
+
+/**
  * Minimal JSON-RPC client. Owns no process lifecycle — the SidecarManager
  * spawns/kills; this class only frames bytes and correlates ids.
+ *
+ * Phase 8 Stage 1: construct from a child process (`new RpcClient(proc)`,
+ * stdio) or from a connected socket (`RpcClient.fromSocket(socket)`).
  */
 export class RpcClient {
   private nextId = 1;
   private readonly pending = new Map<string | number, Pending>();
   private readonly notificationHandlers = new Map<string, Set<NotificationHandler>>();
+  private readonly wire: RpcWire;
   private stdoutBuffer = '';
   private stderrBuffer = '';
   private closed = false;
@@ -66,11 +145,23 @@ export class RpcClient {
   /** stderr is diagnostics — one call per line, never parsed as RPC. */
   onStderrLine: (line: string) => void = () => undefined;
 
-  constructor(private readonly proc: ChildProcess) {
-    proc.stdout?.on('data', (chunk: Buffer) => this.onStdout(chunk));
-    proc.stderr?.on('data', (chunk: Buffer) => this.onStderr(chunk));
-    proc.on('exit', () => this.close());
-    proc.on('error', () => this.close());
+  constructor(proc: ChildProcess);
+  constructor(wire: RpcWire);
+  constructor(procOrWire: ChildProcess | RpcWire) {
+    this.wire = isChildProcess(procOrWire) ? childProcessWire(procOrWire) : procOrWire;
+    this.wire.onData((chunk: Buffer) => this.onStdout(chunk));
+    this.wire.onDiagnostic((chunk: Buffer) => this.onStderr(chunk));
+    this.wire.onTerminated(() => this.close());
+  }
+
+  /**
+   * Phase 8 Stage 1: build a client over an already-connected `net.Socket`
+   * (unix socket / Windows named pipe). The caller owns the socket lifecycle;
+   * `close()` here only tears down RPC state, mirroring the stdio contract
+   * ("does NOT kill the process").
+   */
+  static fromSocket(socket: Socket): RpcClient {
+    return new RpcClient(socketWire(socket));
   }
 
   /** Is the underlying transport still usable? */
@@ -81,9 +172,8 @@ export class RpcClient {
   /** Send a request and resolve with `result` (rejects on error/timeout/close). */
   request(method: string, params: unknown = {}, opts: RequestOptions = {}): Promise<unknown> {
     if (this.closed) return Promise.reject(new RpcClosedError());
-    const stdin = this.proc.stdin;
-    if (!stdin || stdin.destroyed || !stdin.writable) {
-      return Promise.reject(new RpcClosedError('sundayd stdin is not writable'));
+    if (!this.wire.isWritable()) {
+      return Promise.reject(new RpcClosedError('sundayd transport is not writable'));
     }
     const timeoutMs = opts.timeoutMs ?? 30000;
     const id = this.nextId++;
@@ -96,7 +186,7 @@ export class RpcClient {
       timer.unref?.();
       this.pending.set(id, { method, resolve, reject, timer });
       const line = JSON.stringify({ jsonrpc: '2.0', id, method, params });
-      stdin.write(line + '\n', (err) => {
+      this.wire.writeLine(line, (err) => {
         if (err) {
           const p = this.pending.get(id);
           if (p) {
@@ -112,9 +202,10 @@ export class RpcClient {
   /** Fire-and-forget notification (no id, no response). */
   notify(method: string, params: unknown = {}): void {
     if (this.closed) throw new RpcClosedError();
-    const stdin = this.proc.stdin;
-    if (!stdin || stdin.destroyed || !stdin.writable) throw new RpcClosedError('sundayd stdin is not writable');
-    stdin.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n');
+    if (!this.wire.isWritable()) throw new RpcClosedError('sundayd transport is not writable');
+    // Fire-and-forget: async write failures are unobserved, matching the
+    // original stdio behaviour.
+    this.wire.writeLine(JSON.stringify({ jsonrpc: '2.0', method, params }), () => undefined);
   }
 
   /** Subscribe to a server→client notification method. Returns an unsubscribe fn. */

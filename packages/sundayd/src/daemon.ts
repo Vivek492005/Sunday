@@ -21,7 +21,7 @@ import {
 } from '@sunday/gateway';
 import { homedir } from 'node:os';
 import { ToolRegistry, createDefaultRegistry as createDefaultTools, type SandboxConfig } from '@sunday/tools';
-import { RpcError, StdioTransport } from './transport.js';
+import { RpcError, StdioTransport, type ServerTransport } from './transport.js';
 import { sandboxConfigFromEnv } from './sandbox.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
 import { PolicyGate, syncDangerousFlags, type PolicyOptions } from './policy.js';
@@ -138,6 +138,11 @@ export interface DaemonOptions {
    * extension from `sunday.sandbox.*`); mode 'off' = host execution.
    */
   sandbox?: SandboxConfig;
+  /**
+   * Phase 8 Stage 1: inject a pre-built server transport (e.g. a socket
+   * fan-out in `--socket` mode). Defaults to NDJSON-over-stdio.
+   */
+  transport?: ServerTransport;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -152,7 +157,7 @@ function publicSession(s: StoredSession): Session {
  * OpenRouter/Groq provider registry; tests inject mocks.
  */
 export class SundayDaemon {
-  private readonly transport: StdioTransport;
+  private readonly transport: ServerTransport;
   private readonly sessions: SessionStore;
   private readonly tools: ToolRegistry;
   private readonly providers: ProviderRegistry;
@@ -248,7 +253,7 @@ export class SundayDaemon {
       },
       { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
     );
-    this.transport = new StdioTransport((req) => this.dispatch(req), input, output, {
+    this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
     });
   }
@@ -311,6 +316,16 @@ export class SundayDaemon {
    *  orchestrator for the `worktree/*` and `checkpoint/*` primitives). */
   async dispatchLocal(method: string, params: unknown): Promise<unknown> {
     return this.dispatch(createRequest(`local-${Date.now()}`, method, params));
+  }
+
+  /**
+   * Phase 8 Stage 1: per-connection JSON-RPC dispatch for `--socket` mode.
+   * The socket server binds one `SocketServerTransport` per accepted
+   * connection to this method, so many connections can share one daemon
+   * while request ids and responses stay correctly correlated per peer.
+   */
+  handleRequest(req: JsonRpcRequest): Promise<unknown> {
+    return this.dispatch(req);
   }
 
   /** Phase 5: emit an `orchestrate/event` notification to connected clients. */

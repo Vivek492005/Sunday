@@ -1,5 +1,15 @@
 // @sunday/sundayd — the Sunday sidecar daemon (§6.3).
 export * from './transport.js';
+// Phase 8 Stage 1: shared NDJSON codec + socket server transport.
+// (RpcError/RequestHandler/ServerTransport come via transport.js above;
+// only the socket-specific names are re-exported here to avoid duplicates.)
+export {
+  SocketServerTransport,
+  NdjsonFramer,
+  encodeFrame,
+  dispatchRequestLine,
+  toErrorResponse,
+} from './rpc-transport.js';
 export * from './sessions.js';
 export * from './policy.js';
 export * from './loop.js';
