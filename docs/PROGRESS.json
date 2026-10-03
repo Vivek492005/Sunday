@@ -37,10 +37,10 @@
       "status": "active"
     },
     {
-      "detail": "P-030 done; daemon done; next-edit done; background agents done; voice done; CLI done; 1 item remains",
+      "detail": "All 7 items done: P-030, daemon (3 stages), next-edit, background agents, voice, CLI, hosted gateway",
       "name": "Phase 8 (Backlog)",
-      "percent": 80,
-      "status": "active"
+      "percent": 100,
+      "status": "done"
     }
   ],
   "project": "Sunday IDE",
@@ -49,5 +49,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-04T00:34:38+00:00"
+  "updated": "2026-10-04T00:38:50+00:00"
 }
