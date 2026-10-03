@@ -37,6 +37,7 @@ import {
 } from '@sunday/tools';
 import { PolicyGate, type PolicyOptions } from './policy.js';
 import { isWorkspaceTrusted, mcpSecretEnvName } from './trust.js';
+import { adaptMcpToolForWorkspace } from './workspace-mcp.js';
 
 const SKILL_NAME_RE = /^[a-z][a-z0-9_]*$/;
 
@@ -154,7 +155,12 @@ function createLoadSkillTool(userDir: string): Tool {
       // disabled in an untrusted workspace until the user approves it (by
       // trusting the workspace). Reading the SKILL.md body is safe; the
       // scripts it may instruct the agent to run are not.
-      if (skill.scope === 'workspace' && skill.hasScripts && !isWorkspaceTrusted()) {
+      //
+      // Phase 8 Stage 3: the verdict is per-workspace, resolved from the
+      // session's cwd (which the daemon confines per workspace). In
+      // single-workspace mode this falls back to the daemon's
+      // SUNDAY_WORKSPACE_TRUSTED env verdict (unchanged behavior).
+      if (skill.scope === 'workspace' && skill.hasScripts && !isWorkspaceTrusted(ctx.cwd)) {
         return err(
           `skill "${name}" contains scripts and the workspace is not trusted, so it is ` +
             `disabled until approved. Ask the user to trust the workspace (or explicitly approve ` +
@@ -224,7 +230,11 @@ export function createSundaydTools(opts: SundaydToolsOptions = {}): SundaydTools
   // SEC-04: fail closed — an untrusted (or verdict-less) workspace never
   // loads workspace-scope MCP servers, which could otherwise spawn
   // arbitrary local processes via stdio `command` entries.
-  const workspaceTrusted = mcpOpts.workspaceTrusted ?? isWorkspaceTrusted();
+  //
+  // Phase 8 Stage 3: resolved per workspace root. In multi-workspace mode
+  // the daemon's trust map decides; in single-workspace mode this falls
+  // back to the SUNDAY_WORKSPACE_TRUSTED env verdict (unchanged behavior).
+  const workspaceTrusted = mcpOpts.workspaceTrusted ?? isWorkspaceTrusted(workspaceDir);
   const workspaceConfigPath =
     mcpOpts.workspaceConfigPath ?? defaultWorkspaceConfigPath(workspaceDir);
 
@@ -257,7 +267,10 @@ export function createSundaydTools(opts: SundaydToolsOptions = {}): SundaydTools
     for (const t of hub.toTools({ maxTools: mcpOpts.maxTools })) {
       const name = t.definition.name;
       if (registry.names().includes(name)) continue;
-      registry.register(adaptMcpTool(t));
+      // Phase 8 Stage 3: execution-gated to this workspace. Permissive in
+      // single-workspace mode (backward compat for sessions with any cwd),
+      // strict once any workspace is configured (multi-workspace mode).
+      registry.register(adaptMcpToolForWorkspace(t, adaptMcpTool, workspaceDir));
       policy.markDangerous(name);
       // Per-server default approval posture: 'allow' pre-approves the tools.
       const info = infos.get(name);

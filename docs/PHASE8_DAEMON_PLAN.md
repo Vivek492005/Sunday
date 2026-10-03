@@ -1,6 +1,6 @@
 # Phase 8 Plan — Per-User Agent Daemon
 
-**Status:** Planning only. No code modified.
+**Status:** Stages 1–3 implemented (uncommitted). Stage 4 pending.
 **Date:** 2026-10-03
 **Design refs:** `~/workspace/user/files/merged_step1.md` §5.3 ("In v1.2 a per-user **daemon** (named pipe/unix socket) keeps background agents alive; windows attach/detach"), §28 (Phase 8 backlog)
 
@@ -199,11 +199,11 @@ Everything is extension + daemon side. **Zero divergence budget.**
 - Session `workspaceRoot` attribution; `session/list` filter.
 - **Visible win:** second window opens instantly (no 800 ms daemon cold start, no duplicate 41.5 MB).
 
-### Stage 3 — Multi-workspace correctness
-- Per-workspace trust map (`daemon/setWorkspaceTrust`), per-workspace MCP hubs + secret stores (`mcp/secrets/provide`).
-- `SUNDAY_WORKSPACE*` env vars stop being read (or become daemon-start defaults only).
-- Notification routing rules finalized (owning client + workspace peers).
-- Tests: two workspaces, different trust verdicts, isolated MCP servers.
+### Stage 3 — Multi-workspace correctness ✅ IMPLEMENTED (2026-10-04, uncommitted)
+- Per-workspace trust map (`daemon/set-workspace-trust`), per-workspace MCP hubs + secret stores (`mcp/secrets/provide`).
+- `SUNDAY_WORKSPACE*` env vars remain as single-workspace fallback (backward compat).
+- Notification routing rules finalized (owning client + workspace peers) — *deferred to Stage 4*.
+- Tests: two workspaces, different trust verdicts, isolated MCP servers. ✅
 
 ### Stage 4 — Lifecycle polish
 - Idle shutdown (`daemon.idleShutdownMinutes`), `sundayd --shutdown`, "Sunday: Stop Daemon" command.

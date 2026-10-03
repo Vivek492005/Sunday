@@ -22,7 +22,9 @@ import { BrowserdManager } from './browserd.js';
 import { registerBrowserPanelMethods } from './browser-panel.js';
 import { registerBrowserWalkthroughTools } from './browser-walkthrough.js';
 import { EnvSecretResolver, createSundaydTools } from './agent-tools.js';
-import { registerMcpMethods } from './mcp-methods.js';
+import { registerMcpMethods, type McpHubResolver } from './mcp-methods.js';
+import { WorkspaceMcpManager, adaptMcpToolForWorkspace } from './workspace-mcp.js';
+import { adaptMcpTool } from './agent-tools.js';
 import { isWorkspaceTrusted } from './trust.js';
 
 // sundayd entrypoint: JSON-RPC over stdio by default (`--socket <path>`
@@ -93,6 +95,63 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
   // Registered before the daemon so syncDangerousFlags picks up its dangerous flag.
   registerBrowserWalkthroughTools(agentTools.registry, browserdManager, { workspaceDir });
 
+  // Phase 8 Stage 3: per-workspace MCP hubs. The default hub (from
+  // createSundaydTools above) serves the legacy single-workspace path;
+  // additional workspaces get lazily-created hubs with their own trust
+  // verdict, mcp.json, and secret namespace.
+  const mcpManager = new WorkspaceMcpManager();
+  const syncedWorkspaceRoots = new Set<string>();
+
+  /** Sync one workspace hub's tools into the registry, execution-gated to that workspace. */
+  const syncWorkspaceHubTools = (entry: { root: string; hub: import('@sunday/mcp').McpHub }): void => {
+    for (const t of entry.hub.toTools()) {
+      const name = t.definition.name;
+      if (agentTools.registry.names().includes(name)) continue;
+      agentTools.registry.register(adaptMcpToolForWorkspace(t, adaptMcpTool, entry.root));
+      agentTools.policy.markDangerous(name);
+    }
+    // Re-sync when servers start later (attach once per workspace).
+    if (!syncedWorkspaceRoots.has(entry.root)) {
+      syncedWorkspaceRoots.add(entry.root);
+      entry.hub.events.on('tools-changed', () => {
+        try {
+          for (const t of entry.hub.toTools()) {
+            const name = t.definition.name;
+            if (agentTools.registry.names().includes(name)) continue;
+            agentTools.registry.register(adaptMcpToolForWorkspace(t, adaptMcpTool, entry.root));
+            agentTools.policy.markDangerous(name);
+          }
+        } catch (e) {
+          console.error(`[sundayd] MCP tool sync failed for ${entry.root}: ${(e as Error).message}`);
+        }
+      });
+    }
+  };
+
+  /** Route `mcp/*` RPCs to the default hub or a workspace hub. */
+  const mcpResolver: McpHubResolver = {
+    resolve: (workspaceRoot?: string) => {
+      if (!workspaceRoot) {
+        return {
+          hub: agentTools.hub,
+          workspaceConfigPath: agentTools.workspaceConfigPath,
+          workspaceTrusted: agentTools.workspaceTrusted,
+        };
+      }
+      const entry = mcpManager.get(workspaceRoot);
+      // Lazy tool sync on first routing to this workspace.
+      entry.ready.then(
+        () => syncWorkspaceHubTools(entry),
+        () => undefined,
+      );
+      return {
+        hub: entry.hub,
+        workspaceConfigPath: entry.workspaceConfigPath,
+        workspaceTrusted: entry.workspaceTrusted,
+      };
+    },
+  };
+
   const daemon = new SundayDaemon({
     tools: agentTools.registry,
     policyGate: agentTools.policy,
@@ -103,6 +162,13 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
       'context/search': bindPerCall('context/search'),
     },
     browserd: browserdManager,
+    // Phase 8 Stage 3: a trust-verdict change rebuilds that workspace's MCP
+    // hub (the hub captures its workspace's verdict at construction) and
+    // re-syncs its tools into the registry with workspace execution gating.
+    onWorkspaceTrustChanged: (root) => {
+      const entry = mcpManager.rebuild(root);
+      syncWorkspaceHubTools(entry);
+    },
     // Phase 8 Stage 1: socket mode injects a fan-out transport; onShutdown
     // is overridden so the socket file is cleaned up on graceful shutdown.
     ...(extra.transport ? { transport: extra.transport } : {}),
@@ -113,13 +179,10 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
   // primitives (`worktree/*`, `checkpoint/*`) are consumed verbatim by Phase 5.
   registerManagerMethods(daemon);
 
-  // Part A: mcp/* server lifecycle + policy/* approvals. The panel-visible
-  // trust verdict is the daemon env verdict (SUNDAY_WORKSPACE_TRUSTED), not
-  // the hub's always-true constructor flag (Design B').
-  registerMcpMethods(daemon, agentTools.hub, agentTools.policy, {
-    workspaceConfigPath: agentTools.workspaceConfigPath,
-    workspaceTrusted: isWorkspaceTrusted(),
-  });
+  // Part A: mcp/* server lifecycle + policy/* approvals. Routes to the
+  // default hub or a per-workspace hub (Phase 8 Stage 3); the reported
+  // trust verdict is the routed workspace's.
+  registerMcpMethods(daemon, mcpResolver, agentTools.policy);
 
   // Browser Agent UI phase: the Agent Browser panel (`browser/panel/*`).
   // Opt-in only — every handler returns a disabled error unless

@@ -25,6 +25,13 @@ import { RpcError, StdioTransport, type ServerTransport } from './transport.js';
 import { sandboxConfigFromEnv } from './sandbox.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
 import { PolicyGate, syncDangerousFlags, type PolicyOptions } from './policy.js';
+import {
+  canonicalizeWorkspaceRoot,
+  isWorkspaceTrusted,
+  setWorkspaceTrust,
+  workspaceTrust,
+} from './trust.js';
+import { workspaceSecrets } from './workspace-secrets.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
@@ -143,6 +150,13 @@ export interface DaemonOptions {
    * fan-out in `--socket` mode). Defaults to NDJSON-over-stdio.
    */
   transport?: ServerTransport;
+  /**
+   * Phase 8 Stage 3: called after a workspace's trust verdict changes via
+   * `daemon/configure` or `daemon/set-workspace-trust`, so the composition
+   * root can rebuild that workspace's MCP hub (the hub captures its
+   * workspace's trust verdict at construction). Defaults to no-op.
+   */
+  onWorkspaceTrustChanged?: (workspaceRoot: string) => void;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -180,6 +194,8 @@ export class SundayDaemon {
   private readonly onShutdown: () => void;
   /** Phase 6: managed browserd child (if the composition root opted in). */
   private readonly browserdManager: BrowserdManager | undefined;
+  /** Phase 8 Stage 3: workspace trust-change hook (MCP hub rebuild). */
+  private readonly onWorkspaceTrustChanged: ((workspaceRoot: string) => void) | undefined;
   /** Home dir for user skills/rules/memory (system prompt injection). */
   private readonly userDir: string;
   /** Hardening: sandbox config for agent shell commands (from opts or env). */
@@ -226,6 +242,7 @@ export class SundayDaemon {
     // Phase 6: opt-in browser tools. browserd stays a lazy child — it only
     // spawns on first tool use — and is stopped with the daemon.
     this.browserdManager = opts.browserd;
+    this.onWorkspaceTrustChanged = opts.onWorkspaceTrustChanged;
     if (opts.browserd) {
       registerBrowserTools(this.tools, opts.browserd);
     }
@@ -412,6 +429,39 @@ export class SundayDaemon {
       case 'sunday/shutdown':
         setImmediate(() => void this.gracefulExit());
         return { ok: true as const };
+      case 'daemon/configure': {
+        const p = parseParams('daemon/configure', req.params);
+        const root = canonicalizeWorkspaceRoot(p.workspaceRoot);
+        if (p.trusted !== undefined) {
+          setWorkspaceTrust(root, p.trusted);
+          this.onWorkspaceTrustChanged?.(root);
+        }
+        // browserEnabled / sandboxMode are accepted for forward-compat;
+        // per-workspace enforcement of those lands with the browser +
+        // sandbox Stage 3 follow-up (daemon-global behavior unchanged).
+        return { ok: true as const };
+      }
+      case 'daemon/set-workspace-trust': {
+        const p = parseParams('daemon/set-workspace-trust', req.params);
+        const root = canonicalizeWorkspaceRoot(p.workspaceRoot);
+        setWorkspaceTrust(root, p.trusted);
+        this.onWorkspaceTrustChanged?.(root);
+        return { ok: true as const, workspaceRoot: root };
+      }
+      case 'daemon/status': {
+        parseParams('daemon/status', req.params);
+        return {
+          workspaces: workspaceTrust
+            .roots()
+            .map((root) => ({ root, trusted: isWorkspaceTrusted(root) })),
+          multiWorkspace: workspaceTrust.isMultiWorkspace,
+        };
+      }
+      case 'mcp/secrets/provide': {
+        const p = parseParams('mcp/secrets/provide', req.params);
+        const count = workspaceSecrets.provide(p.workspaceRoot, p.secrets);
+        return { ok: true as const, count };
+      }
       case 'session/create': {
         const p = parseParams(method, req.params);
         const s = this.sessions.create(p);

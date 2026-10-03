@@ -20,6 +20,7 @@ export * from './orchestrate.js';
 export * from './mcp.js';
 export * from './policy.js';
 export * from './daemon-paths.js';
+export * from './daemon.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';
@@ -34,6 +35,7 @@ import { BROWSER_PANEL_METHODS } from './browser-panel.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
 import { MCP_METHODS } from './mcp.js';
 import { POLICY_METHODS } from './policy.js';
+import { DAEMON_METHODS } from './daemon.js';
 
 export const METHODS = {
   ...HANDSHAKE_METHODS,
@@ -49,6 +51,7 @@ export const METHODS = {
   ...ORCHESTRATE_METHODS,
   ...MCP_METHODS,
   ...POLICY_METHODS,
+  ...DAEMON_METHODS,
 } as const;
 export type MethodName = keyof typeof METHODS;
 export type MethodParams<M extends MethodName> = z.infer<(typeof METHODS)[M]['params']>;

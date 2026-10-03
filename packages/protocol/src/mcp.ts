@@ -41,36 +41,42 @@ export type McpCallRecord = z.infer<typeof mcpCallRecordSchema>;
 /** MCP method registry (Part A): server lifecycle, tool listing, call
  *  history — the surface behind the extension's MCP panel and the
  *  `sunday.mcp.*` commands. Same shape as the other `*_METHODS` registries:
- *  params/result zod schemas. */
+ *  params/result zod schemas.
+ *
+ *  Phase 8 Stage 3: every method accepts an optional `workspaceRoot`. When
+ *  present the daemon routes to that workspace's MCP hub; when absent the
+ *  daemon-wide (legacy single-workspace) hub is used. */
+const workspaceRootParam = { workspaceRoot: z.string().min(1).optional() };
+
 export const MCP_METHODS = {
   'mcp/servers/list': {
-    params: z.object({}),
+    params: z.object({ ...workspaceRootParam }),
     result: z.object({
       servers: z.array(mcpServerStatusSchema),
       /** True when a workspace-scope mcp.json existed but was ignored. */
       workspaceConfigIgnored: z.boolean(),
-      /** The workspace-trust value the daemon was spawned with. */
+      /** The workspace-trust value for the routed workspace. */
       workspaceTrusted: z.boolean(),
     }),
   },
   'mcp/server/start': {
-    params: z.object({ name: z.string().min(1) }),
+    params: z.object({ name: z.string().min(1), ...workspaceRootParam }),
     result: z.object({ status: mcpServerStatusSchema }),
   },
   'mcp/server/stop': {
-    params: z.object({ name: z.string().min(1) }),
+    params: z.object({ name: z.string().min(1), ...workspaceRootParam }),
     result: z.object({ status: mcpServerStatusSchema }),
   },
   'mcp/server/restart': {
-    params: z.object({ name: z.string().min(1) }),
+    params: z.object({ name: z.string().min(1), ...workspaceRootParam }),
     result: z.object({ status: mcpServerStatusSchema }),
   },
   'mcp/tools/list': {
-    params: z.object({ server: z.string().min(1).optional() }),
+    params: z.object({ server: z.string().min(1).optional(), ...workspaceRootParam }),
     result: z.object({ tools: z.array(mcpToolInfoSchema) }),
   },
   'mcp/calls/history': {
-    params: z.object({ limit: z.number().int().min(1).max(200).optional() }),
+    params: z.object({ limit: z.number().int().min(1).max(200).optional(), ...workspaceRootParam }),
     result: z.object({ calls: z.array(mcpCallRecordSchema) }),
   },
 } as const;

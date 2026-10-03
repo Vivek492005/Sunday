@@ -206,6 +206,80 @@ describe('DaemonConnector', () => {
     expect(p).toContain(String(process.pid));
     expect(p.endsWith('.sock')).toBe(true);
   });
+
+  it('configureWorkspace() sends daemon/configure + mcp/secrets/provide', async () => {
+    const sock = socketPath();
+    const recordFile = path.join(path.dirname(sock), 'record.jsonl');
+    spawnFixture(sock, ['--record-file', recordFile]);
+    await waitForSocket(sock);
+
+    const c = track(
+      new DaemonConnector({
+        socketPath: sock,
+        spawnDaemon: () => spawnFixture(sock),
+        clientVersion: '1.2.3-test',
+      }),
+    );
+    await c.connect();
+    await c.configureWorkspace({
+      workspaceRoot: '/tmp/ws-a',
+      trusted: true,
+      mcpSecrets: { API_KEY: 'aaa' },
+    });
+
+    const lines = fs
+      .readFileSync(recordFile, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { method: string; params: Record<string, unknown> });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]?.method).toBe('daemon/configure');
+    expect(lines[0]?.params).toMatchObject({ workspaceRoot: '/tmp/ws-a', trusted: true });
+    expect(lines[1]?.method).toBe('mcp/secrets/provide');
+    expect(lines[1]?.params).toMatchObject({
+      workspaceRoot: '/tmp/ws-a',
+      secrets: { API_KEY: 'aaa' },
+    });
+  });
+
+  it('configureWorkspace() skips secrets when none are provided', async () => {
+    const sock = socketPath();
+    const recordFile = path.join(path.dirname(sock), 'record.jsonl');
+    spawnFixture(sock, ['--record-file', recordFile]);
+    await waitForSocket(sock);
+
+    const c = track(
+      new DaemonConnector({
+        socketPath: sock,
+        spawnDaemon: () => spawnFixture(sock),
+        clientVersion: '1.2.3-test',
+      }),
+    );
+    await c.connect();
+    await c.configureWorkspace({ workspaceRoot: '/tmp/ws-a', trusted: false });
+
+    const lines = fs
+      .readFileSync(recordFile, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { method: string; params: Record<string, unknown> });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.method).toBe('daemon/configure');
+    expect(lines[0]?.params).toMatchObject({ workspaceRoot: '/tmp/ws-a', trusted: false });
+  });
+
+  it('configureWorkspace() throws before connect()', async () => {
+    const c = track(
+      new DaemonConnector({
+        socketPath: socketPath(),
+        spawnDaemon: () => spawnFixture(socketPath()),
+        clientVersion: '1.2.3-test',
+      }),
+    );
+    await expect(c.configureWorkspace({ workspaceRoot: '/tmp/ws' })).rejects.toThrow(
+      /before connect/,
+    );
+  });
 });
 
 describe('DaemonConnector single-flight (Stage 2)', () => {

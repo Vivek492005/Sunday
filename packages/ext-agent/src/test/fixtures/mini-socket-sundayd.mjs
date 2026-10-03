@@ -23,6 +23,17 @@ if (!SOCKET_PATH) {
 }
 const PROTOCOL_VERSION = Number(opt('--protocol-version', '1'));
 const NO_SHUTDOWN_EXIT = has('--no-shutdown-exit');
+// Phase 8 Stage 3: optional JSON-lines record of daemon/configure +
+// mcp/secrets/provide calls, for test assertions.
+const RECORD_FILE = opt('--record-file', null);
+function record(entry) {
+  if (!RECORD_FILE) return;
+  try {
+    fs.appendFileSync(RECORD_FILE, JSON.stringify(entry) + '\n');
+  } catch {
+    /* best-effort */
+  }
+}
 
 function send(sock, obj) {
   sock.write(JSON.stringify(obj) + '\n');
@@ -60,6 +71,14 @@ const server = net.createServer((sock) => {
       } else if (msg.method === 'sunday/shutdown') {
         send(sock, { jsonrpc: '2.0', id: msg.id, result: { ok: true } });
         if (!NO_SHUTDOWN_EXIT) setTimeout(() => process.exit(0), 50);
+      } else if (msg.method === 'daemon/configure') {
+        // Phase 8 Stage 3: record the workspace config for test assertions.
+        record({ method: 'daemon/configure', params: msg.params });
+        send(sock, { jsonrpc: '2.0', id: msg.id, result: { ok: true } });
+      } else if (msg.method === 'mcp/secrets/provide') {
+        record({ method: 'mcp/secrets/provide', params: msg.params });
+        const count = msg.params?.secrets ? Object.keys(msg.params.secrets).length : 0;
+        send(sock, { jsonrpc: '2.0', id: msg.id, result: { ok: true, count } });
       } else {
         send(sock, { jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'unknown method' } });
       }

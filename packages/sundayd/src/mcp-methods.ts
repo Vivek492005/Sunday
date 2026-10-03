@@ -2,6 +2,10 @@
 // approvals, registered on the daemon by the composition root (cli.ts),
 // mirroring manager.ts. Handlers validate params against the protocol
 // registry and return plain objects matching the result schemas.
+//
+// Phase 8 Stage 3: handlers accept an optional `workspaceRoot` param and
+// route to that workspace's MCP hub. Without it they use the default
+// (legacy single-workspace) hub.
 
 import { ErrorCode, parseParams, type McpMethodName, type PolicyMethodName } from '@sunday/protocol';
 import { loadConfigFile, type McpHub } from '@sunday/mcp';
@@ -9,15 +13,19 @@ import type { SundayDaemon } from './daemon.js';
 import type { PolicyGate } from './policy.js';
 import { RpcError } from './transport.js';
 
-export interface McpMethodsOptions {
-  /** Resolved workspace mcp.json path (for per-server scope detection). */
-  workspaceConfigPath: string;
-  /**
-   * The workspace-trust verdict the daemon was spawned with
-   * (SUNDAY_WORKSPACE_TRUSTED). Reported to the MCP panel; this is NOT the
-   * hub's own workspaceTrusted constructor flag (always true by Design B').
-   */
-  workspaceTrusted: boolean;
+/**
+ * Phase 8 Stage 3: resolves the MCP hub for an optional workspace root.
+ * The default hub (no workspaceRoot) preserves legacy single-workspace
+ * behavior.
+ */
+export interface McpHubResolver {
+  resolve(workspaceRoot?: string): {
+    hub: McpHub;
+    /** Resolved workspace mcp.json path (for per-server scope detection). */
+    workspaceConfigPath: string;
+    /** The workspace-trust verdict for the routed workspace. */
+    workspaceTrusted: boolean;
+  };
 }
 
 type McpHandler = (params: unknown) => Promise<unknown>;
@@ -25,14 +33,16 @@ type McpHandler = (params: unknown) => Promise<unknown>;
 /** Register the `mcp/*` + `policy/*` methods on a daemon instance. */
 export function registerMcpMethods(
   daemon: SundayDaemon,
-  hub: McpHub,
+  hubs: McpHubResolver,
   policy: PolicyGate,
-  opts: McpMethodsOptions,
 ): void {
   /** 'workspace' when the server name is defined in the workspace mcp.json. */
-  const serverScope = async (name: string): Promise<'user' | 'workspace'> => {
+  const serverScope = async (
+    hub: { hub: McpHub; workspaceConfigPath: string },
+    name: string,
+  ): Promise<'user' | 'workspace'> => {
     try {
-      const cfg = await loadConfigFile(opts.workspaceConfigPath);
+      const cfg = await loadConfigFile(hub.workspaceConfigPath);
       if (cfg && Object.prototype.hasOwnProperty.call(cfg.servers, name)) return 'workspace';
     } catch {
       // Unreadable workspace config — treat as user scope.
@@ -40,59 +50,69 @@ export function registerMcpMethods(
     return 'user';
   };
 
-  const toStatus = async (name: string) => {
-    const s = hub.serverStatus(name);
-    return { ...s, scope: await serverScope(name) };
+  const toStatus = async (
+    resolved: { hub: McpHub; workspaceConfigPath: string },
+    name: string,
+  ) => {
+    const s = resolved.hub.serverStatus(name);
+    return { ...s, scope: await serverScope(resolved, name) };
   };
 
   const handlers: Record<McpMethodName | PolicyMethodName, McpHandler> = {
     'mcp/servers/list': async (params) => {
-      parseParams('mcp/servers/list', params);
-      const servers = await Promise.all(hub.listServers().map((s) => toStatus(s.name)));
+      const { workspaceRoot } = parseParams('mcp/servers/list', params);
+      const resolved = hubs.resolve(workspaceRoot);
+      const servers = await Promise.all(
+        resolved.hub.listServers().map((s) => toStatus(resolved, s.name)),
+      );
       return {
         servers,
-        workspaceConfigIgnored: hub.workspaceConfigIgnored,
-        workspaceTrusted: opts.workspaceTrusted,
+        workspaceConfigIgnored: resolved.hub.workspaceConfigIgnored,
+        workspaceTrusted: resolved.workspaceTrusted,
       };
     },
     'mcp/server/start': async (params) => {
-      const { name } = parseParams('mcp/server/start', params);
+      const { name, workspaceRoot } = parseParams('mcp/server/start', params);
+      const resolved = hubs.resolve(workspaceRoot);
       try {
-        await hub.startServer(name);
+        await resolved.hub.startServer(name);
       } catch (e) {
         throw toRpcError(e);
       }
-      return { status: await toStatus(name) };
+      return { status: await toStatus(resolved, name) };
     },
     'mcp/server/stop': async (params) => {
-      const { name } = parseParams('mcp/server/stop', params);
+      const { name, workspaceRoot } = parseParams('mcp/server/stop', params);
+      const resolved = hubs.resolve(workspaceRoot);
       // Capture tool names first: stopping clears the hub's tool index, and
       // the policy approvals for a stopped server's tools are revoked so a
       // stale registered wrapper can never run without fresh approval.
-      const toolNames = hub
+      const toolNames = resolved.hub
         .listTools()
         .filter((t) => t.server === name)
         .map((t) => t.namespaced);
       try {
-        await hub.stopServer(name);
+        await resolved.hub.stopServer(name);
       } catch (e) {
         throw toRpcError(e);
       }
       for (const t of toolNames) policy.revoke(t);
-      return { status: await toStatus(name) };
+      return { status: await toStatus(resolved, name) };
     },
     'mcp/server/restart': async (params) => {
-      const { name } = parseParams('mcp/server/restart', params);
+      const { name, workspaceRoot } = parseParams('mcp/server/restart', params);
+      const resolved = hubs.resolve(workspaceRoot);
       try {
-        await hub.restartServer(name);
+        await resolved.hub.restartServer(name);
       } catch (e) {
         throw toRpcError(e);
       }
-      return { status: await toStatus(name) };
+      return { status: await toStatus(resolved, name) };
     },
     'mcp/tools/list': async (params) => {
-      const { server } = parseParams('mcp/tools/list', params);
-      const tools = hub
+      const { server, workspaceRoot } = parseParams('mcp/tools/list', params);
+      const resolved = hubs.resolve(workspaceRoot);
+      const tools = resolved.hub
         .listTools()
         .filter((t) => !server || t.server === server)
         .map((t) => ({
@@ -105,8 +125,9 @@ export function registerMcpMethods(
       return { tools };
     },
     'mcp/calls/history': async (params) => {
-      const { limit } = parseParams('mcp/calls/history', params);
-      return { calls: hub.getCallHistory(limit ?? 100) };
+      const { limit, workspaceRoot } = parseParams('mcp/calls/history', params);
+      const resolved = hubs.resolve(workspaceRoot);
+      return { calls: resolved.hub.getCallHistory(limit ?? 100) };
     },
     'policy/approve': async (params) => {
       const { tool } = parseParams('policy/approve', params);

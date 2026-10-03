@@ -205,6 +205,42 @@ export class DaemonConnector {
   }
 
   /**
+   * Phase 8 Stage 3 — push this window's workspace configuration to the
+   * daemon after `connect()`. In single-flight (shared daemon) mode every
+   * window calls this so the daemon learns each workspace's trust verdict
+   * and can scope MCP secrets per workspace. Idempotent.
+   *
+   * When `secrets` are provided they are shipped via `mcp/secrets/provide`
+   * scoped to `workspaceRoot` (never stored globally).
+   */
+  async configureWorkspace(opts: {
+    workspaceRoot: string;
+    trusted?: boolean;
+    browserEnabled?: boolean;
+    sandboxMode?: string;
+    mcpSecrets?: Record<string, string>;
+  }): Promise<void> {
+    const rpc = this.rpc;
+    if (!rpc || rpc.isClosed) {
+      throw new DaemonConnectorError('configureWorkspace called before connect()');
+    }
+    const params: Record<string, unknown> = { workspaceRoot: opts.workspaceRoot };
+    if (opts.trusted !== undefined) params.trusted = opts.trusted;
+    if (opts.browserEnabled !== undefined) params.browserEnabled = opts.browserEnabled;
+    if (opts.sandboxMode !== undefined) params.sandboxMode = opts.sandboxMode;
+    await rpc.request('daemon/configure', params, {
+      timeoutMs: this.opts.handshakeTimeoutMs ?? 15000,
+    });
+    if (opts.mcpSecrets && Object.keys(opts.mcpSecrets).length > 0) {
+      await rpc.request(
+        'mcp/secrets/provide',
+        { workspaceRoot: opts.workspaceRoot, secrets: opts.mcpSecrets },
+        { timeoutMs: this.opts.handshakeTimeoutMs ?? 15000 },
+      );
+    }
+  }
+
+  /**
    * Phase 8 Stage 2 — single-flight connect. Exactly one daemon per OS user:
    * attach when live, win the lockfile mutex and spawn when free, wait for
    * the winner when contended, steal when stale.
