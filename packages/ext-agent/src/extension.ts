@@ -26,6 +26,7 @@ import {
 } from './secretResolver.js';
 import { registerInlineCompletion } from './inlineCompletion.js';
 import { registerInlineEdit } from './inlineEdit.js';
+import { registerNextEdit } from './nextEdit.js';
 import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
@@ -460,6 +461,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerCodeActions(context, { ensureBridge, getCwd: partBCwd, log });
   registerGitCommitMessage(context, { ensureBridge, getCwd: partBCwd, log });
   registerTerminalExplain(context, { ensureBridge, getCwd: partBCwd, log });
+
+  // Phase 8 — next-edit suggestions (experimental). Gated by
+  // `sunday.nextEdit.enabled` (default false) and fully isolated from the
+  // completion pipeline: a bug here cannot break ghost text.
+  registerNextEdit(context);
 
   // -- autostart -------------------------------------------------------------------
   if (vscode.workspace.getConfiguration('sunday').get<boolean>('sidecar.autoStart', true)) {

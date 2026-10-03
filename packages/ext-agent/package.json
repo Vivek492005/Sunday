@@ -101,6 +101,11 @@
         "category": "Sunday",
         "command": "sunday.browser.takeover",
         "title": "Take Over Browser Control"
+      },
+      {
+        "command": "sunday.nextEdit.apply",
+        "title": "Apply Sunday next-edit suggestion",
+        "category": "Sunday"
       }
     ],
     "keybindings": [
@@ -137,6 +142,11 @@
           "default": "groq:llama-3.1-8b-instant",
           "description": "Model ref (\"provider:model\") used for inline completions. Fast/cheap models recommended; providers without a native FIM endpoint fall back to a prefix-only chat continuation.",
           "type": "string"
+        },
+        "sunday.nextEdit.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: after a rename-like edit, suggest applying the same rename to the next occurrence via CodeLens. Default off."
         },
         "sunday.orchestration.parallel": {
           "default": false,
