@@ -10,6 +10,11 @@ vi.mock('vscode', () => ({
   Uri: {
     file: (p: string) => ({ fsPath: p, toString: () => p, scheme: 'file' }),
   },
+  workspace: {
+    getConfiguration: (_section?: string) => ({
+      get: (_key: string, def: unknown) => def,
+    }),
+  },
 }));
 
 import { ChatViewProvider, resolveChatDistDir } from './chatView.js';
@@ -116,6 +121,32 @@ describe('ChatViewProvider', () => {
     expect(webview.html).toContain(`script-src 'nonce-`);
     expect(webview.html).not.toContain('./assets/');
     expect(webview.html).toContain('webview://');
+    provider.dispose();
+  });
+
+  it('posts voice config to the webview on resolve', () => {
+    const { provider } = makeProvider(bridge, extensionPath);
+    const { view, webview } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    const voiceMsg = (webview.postMessage as any).mock.calls
+      .map((c: any[]) => c[0])
+      .find((m: any) => m?.type === 'sunday/voice/config');
+    expect(voiceMsg).toMatchObject({ type: 'sunday/voice/config' });
+    expect(typeof voiceMsg.inputEnabled).toBe('boolean');
+    expect(typeof voiceMsg.outputEnabled).toBe('boolean');
+    provider.dispose();
+  });
+
+  it('notifyVoiceConfigChanged re-posts voice config', () => {
+    const { provider } = makeProvider(bridge, extensionPath);
+    const { view, webview } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    (webview.postMessage as any).mockClear();
+    provider.notifyVoiceConfigChanged();
+    const voiceMsg = (webview.postMessage as any).mock.calls
+      .map((c: any[]) => c[0])
+      .find((m: any) => m?.type === 'sunday/voice/config');
+    expect(voiceMsg).toBeDefined();
     provider.dispose();
   });
 

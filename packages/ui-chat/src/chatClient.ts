@@ -53,7 +53,8 @@ export interface ModelView {
 export type InboundMessage =
   | ({ type: 'sunday/chat/event' } & ChatEventNotificationWire)
   | { type: 'sunday/models/list'; models: ModelView[] }
-  | { type: 'sunday/chat/state'; activeTurn: string | null };
+  | { type: 'sunday/chat/state'; activeTurn: string | null }
+  | { type: 'sunday/voice/config'; inputEnabled: boolean; outputEnabled: boolean };
 
 /** Webview → extension. */
 export type OutboundMessage =

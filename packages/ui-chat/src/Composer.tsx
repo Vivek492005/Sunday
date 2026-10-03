@@ -15,6 +15,12 @@ import {
   type ImageWire,
 } from './images.js';
 import { MentionPopup } from './MentionPopup.js';
+import {
+  VoiceRecognizer,
+  getSpeechRecognitionCtor,
+  isSpeechRecognitionSupported,
+  type VoiceInputState,
+} from './voice.js';
 
 interface KeyEvent {
   key: string;
@@ -30,15 +36,55 @@ interface PasteFile {
 export function Composer({
   onSend,
   disabled,
+  voiceInputEnabled = false,
 }: {
   /** Text plus image attachments (data: URLs) from pastes. */
   onSend: (text: string, images: ImageWire[]) => void;
   disabled: boolean;
+  /** Show the microphone button (Web Speech API). Default off. */
+  voiceInputEnabled?: boolean;
 }): JSX.Element {
   const [text, setText] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [voiceState, setVoiceState] = useState<VoiceInputState>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [interim, setInterim] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recognizerRef = useRef<VoiceRecognizer | null>(null);
+
+  const voiceSupported = voiceInputEnabled && isSpeechRecognitionSupported();
+
+  const toggleVoice = (): void => {
+    if (!voiceSupported) return;
+    if (recognizerRef.current?.state === 'listening') {
+      recognizerRef.current.stop();
+      return;
+    }
+    setVoiceError(null);
+    setInterim('');
+    const rec = new VoiceRecognizer(getSpeechRecognitionCtor(), {
+      onTranscript: (t, isFinal) => {
+        if (isFinal) {
+          setText((prev) => (prev ? `${prev} ${t}` : t));
+          setInterim('');
+        } else {
+          setInterim(t);
+        }
+      },
+      onError: (msg) => {
+        setVoiceError(msg);
+        setVoiceState('error');
+      },
+      onEnd: () => {
+        setVoiceState('idle');
+        setInterim('');
+      },
+    });
+    recognizerRef.current = rec;
+    if (rec.start()) setVoiceState('listening');
+    else setVoiceState('error');
+  };
 
   const refreshPopup = (nextText: string, caret: number): void => {
     const q = mentionQueryAtCaret(nextText, caret);
@@ -203,6 +249,32 @@ export function Composer({
       >
         ↑
       </button>
+      {voiceSupported && (
+        <button
+          type="button"
+          className={`mic-btn${voiceState === 'listening' ? ' listening' : ''}`}
+          onClick={toggleVoice}
+          disabled={disabled}
+          aria-label={voiceState === 'listening' ? 'Stop voice input' : 'Start voice input'}
+          title={
+            voiceState === 'listening'
+              ? 'Stop listening'
+              : 'Dictate with your microphone (processed on-device by your browser)'
+          }
+        >
+          {voiceState === 'listening' ? '⏹' : '🎤'}
+        </button>
+      )}
+      {voiceState === 'listening' && (
+        <span className="voice-status" role="status" aria-live="polite">
+          Listening…{interim ? ` "${interim}"` : ''}
+        </span>
+      )}
+      {voiceError && (
+        <span className="voice-error" role="alert">
+          {voiceError}
+        </span>
+      )}
     </div>
   );
 }

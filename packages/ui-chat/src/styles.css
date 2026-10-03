@@ -270,6 +270,7 @@ body {
   display: flex;
   gap: 8px;
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .composer textarea {
@@ -313,6 +314,78 @@ body {
 .send-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Voice input: mic button next to send */
+.mic-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.mic-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mic-btn.listening {
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.mic-btn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
+}
+
+.voice-status {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #999);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-error {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+/* TTS toggle in the chat header */
+.tts-toggle {
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #999);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tts-toggle[aria-pressed="true"] {
+  color: var(--vscode-button-foreground, #ffffff);
+  background: var(--vscode-button-background, #0e639c);
+  border-color: transparent;
+}
+
+.tts-toggle:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
 }
 
 .stop-btn {

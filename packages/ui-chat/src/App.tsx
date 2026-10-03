@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   applyEvent,
   applyModelsList,
@@ -17,6 +17,13 @@ import { MessageList } from './MessageList.js';
 import { Composer } from './Composer.js';
 import { ModelPill } from './ModelPill.js';
 import { StopButton } from './StopButton.js';
+import {
+  VOICE_CONFIG_DEFAULTS,
+  isSpeechSynthesisSupported,
+  speakText,
+  stopSpeaking,
+  type VoiceConfig,
+} from './voice.js';
 
 type Action =
   | { kind: 'event'; notif: ChatEventNotificationWire }
@@ -42,20 +49,50 @@ function reducer(state: ChatState, action: Action): ChatState {
 
 export function App(): JSX.Element {
   const [state, dispatch] = useReducer(reducer, createInitialState());
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(VOICE_CONFIG_DEFAULTS);
+  const [ttsMuted, setTtsMuted] = useState(false);
+  const voiceRef = useRef(voiceConfig);
+  voiceRef.current = voiceConfig;
+  const ttsMutedRef = useRef(ttsMuted);
+  ttsMutedRef.current = ttsMuted;
+  /** Accumulates the in-flight assistant text so turn-end can speak it. */
+  const turnTextRef = useRef('');
 
   useEffect(() => {
     const onMessage = (e: MessageEvent): void => {
       const m = e.data as InboundMessage | undefined;
       if (!m || typeof m.type !== 'string') return;
       switch (m.type) {
-        case 'sunday/chat/event':
+        case 'sunday/chat/event': {
+          const ev: { type: string; delta?: string } = m.event as { type: string; delta?: string };
+          if (ev.type === 'text-delta' && typeof ev.delta === 'string') {
+            turnTextRef.current += ev.delta;
+            // A new turn's speech cancels any in-progress TTS of the old one.
+            if (voiceRef.current.outputEnabled) stopSpeaking();
+          }
+          if (ev.type === 'turn-end') {
+            dispatch({ kind: 'event', notif: m });
+            // Speak the final assistant text when voice output is on.
+            if (voiceRef.current.outputEnabled && !ttsMutedRef.current && turnTextRef.current.trim()) {
+              speakText(turnTextRef.current);
+            }
+            turnTextRef.current = '';
+            break;
+          }
+          if (ev.type === 'turn-error') {
+            turnTextRef.current = '';
+          }
           dispatch({ kind: 'event', notif: m });
           break;
+        }
         case 'sunday/models/list':
           dispatch({ kind: 'models', models: Array.isArray(m.models) ? m.models : [] });
           break;
         case 'sunday/chat/state':
           dispatch({ kind: 'turn-state', activeTurn: m.activeTurn });
+          break;
+        case 'sunday/voice/config':
+          setVoiceConfig({ inputEnabled: !!m.inputEnabled, outputEnabled: !!m.outputEnabled });
           break;
       }
     };
@@ -65,6 +102,7 @@ export function App(): JSX.Element {
   }, []);
 
   const busy = state.activeTurnId !== undefined;
+  const ttsAvailable = voiceConfig.outputEnabled && isSpeechSynthesisSupported();
 
   const send = (text: string, images: ImageWire[]): void => {
     const displayText =
@@ -86,11 +124,28 @@ export function App(): JSX.Element {
           selected={state.selectedModel}
           onSelect={(id) => dispatch({ kind: 'select-model', id })}
         />
+        {ttsAvailable && (
+          <button
+            type="button"
+            className="tts-toggle"
+            aria-pressed={!ttsMuted}
+            aria-label={ttsMuted ? 'Unmute spoken responses' : 'Mute spoken responses'}
+            title="Toggle spoken responses (on-device speech synthesis)"
+            onClick={() => {
+              setTtsMuted((prev) => {
+                if (!prev) stopSpeaking();
+                return !prev;
+              });
+            }}
+          >
+            {ttsMuted ? '🔇' : '🔊'}
+          </button>
+        )}
       </header>
       {state.error && <div className="conn-error" role="alert">{state.error}</div>}
       <MessageList messages={state.messages} />
       <div className="composer-row">
-        <Composer onSend={send} disabled={false} />
+        <Composer onSend={send} disabled={false} voiceInputEnabled={voiceConfig.inputEnabled} />
         <StopButton visible={busy} onStop={() => postToExtension({ type: 'sunday/chat/cancel' })} />
       </div>
     </div>

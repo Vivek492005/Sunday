@@ -148,6 +148,16 @@
           "default": false,
           "description": "Experimental: after a rename-like edit, suggest applying the same rename to the next occurrence via CodeLens. Default off."
         },
+        "sunday.voice.inputEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: show a microphone button in the chat input for voice dictation via the browser Web Speech API (on-device; no audio leaves your machine). Default off."
+        },
+        "sunday.voice.outputEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: speak agent responses aloud via the browser speechSynthesis API (on-device). Default off."
+        },
         "sunday.orchestration.parallel": {
           "default": false,
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",

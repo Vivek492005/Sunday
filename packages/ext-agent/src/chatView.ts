@@ -79,6 +79,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
     webview.html = this.renderHtml(webview);
     this.attachBridge();
+    this.postVoiceConfig();
     webview.onDidReceiveMessage(
       (msg: unknown) => {
         void this.onMessage(msg);
@@ -89,9 +90,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidDispose(() => this.disposeView(), undefined, this.disposables);
   }
 
+  /** Read sunday.voice.* config and push it to the webview. */
+  private postVoiceConfig(): void {
+    const cfg = vscode.workspace.getConfiguration('sunday');
+    this.post({
+      type: 'sunday/voice/config',
+      inputEnabled: cfg.get<boolean>('voice.inputEnabled', false),
+      outputEnabled: cfg.get<boolean>('voice.outputEnabled', false),
+    });
+  }
+
   /** Re-subscribe when the bridge instance changes (sidecar restart/crash). */
   notifyBridgeChanged(): void {
     if (this.view) this.attachBridge();
+  }
+
+  /** Re-push sunday.voice.* config (e.g. after a settings change). */
+  notifyVoiceConfigChanged(): void {
+    if (this.view) this.postVoiceConfig();
   }
 
   dispose(): void {
