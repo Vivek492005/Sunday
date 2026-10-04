@@ -58,6 +58,38 @@
     } catch (e) { /* storage unavailable */ }
   }
 
+  /* ---------- Live GitHub stats (stars / forks / watchers / issues) ---------- */
+  (function liveGitHubStats() {
+    var map = { stargazers_count: 'gh-stars', forks_count: 'gh-forks', watchers_count: 'gh-watchers', open_issues_count: 'gh-issues' };
+    var els = {};
+    var found = false;
+    Object.keys(map).forEach(function (k) {
+      var el = document.getElementById(map[k]);
+      if (el) { els[k] = el; found = true; }
+    });
+    if (!found) return;
+    function fmt(n) {
+      if (typeof n !== 'number') return '—';
+      return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+    }
+    // Show cached values instantly, then refresh live
+    try {
+      var cached = sessionStorage.getItem('sunday-gh-stats');
+      if (cached) {
+        var c = JSON.parse(cached);
+        Object.keys(els).forEach(function (k) { if (typeof c[k] === 'number') els[k].textContent = fmt(c[k]); });
+      }
+    } catch (e) { /* ignore */ }
+    fetch('https://api.github.com/repos/Vivek492005/Sunday')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || typeof d.stargazers_count !== 'number') return;
+        Object.keys(els).forEach(function (k) { els[k].textContent = fmt(d[k]); });
+        try { sessionStorage.setItem('sunday-gh-stats', JSON.stringify(d)); } catch (e) { /* ignore */ }
+      })
+      .catch(function () { /* keep cached or placeholder */ });
+  })();
+
   /* ---------- Scroll reveals ---------- */
   var revealEls = document.querySelectorAll('.reveal');
   if ('IntersectionObserver' in window && !reducedMotion) {

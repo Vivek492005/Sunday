@@ -211,6 +211,12 @@ code { font-family: var(--font-mono); font-size: 0.9em; color: var(--neon); }
 .stat-num { display: block; font-family: var(--font-mono); font-size: 2rem; font-weight: 700; }
 .stat-label { font-size: 0.85rem; color: var(--text-3); }
 
+/* Live GitHub stats */
+.github-stats { margin-top: 8px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); }
+.live-note { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-3); margin: 0; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
 /* ============ CARDS ============ */
 .card, .dl-card {
   display: block; background: var(--surface);
