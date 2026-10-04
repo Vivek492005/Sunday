@@ -1,0 +1,49 @@
+# Deploy the Sunday landing page to GitHub Pages.
+#
+# Triggers on pushes to main that touch landing/**.
+# Uses GitHub's official Pages actions — no gh-pages branch needed.
+#
+# One-time setup (repo Settings → Pages → Source: "GitHub Actions"):
+#   1. Go to https://github.com/Vivek492005/Sunday/settings/pages
+#   2. Under "Build and deployment", select Source: "GitHub Actions"
+#   3. Push to main — this workflow handles the rest.
+#   4. Site will be live at https://vivek492005.github.io/Sunday/
+
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths: ['landing/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: landing/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
