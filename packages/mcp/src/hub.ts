@@ -4,6 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { toolDefinitionSchema } from '@sunday/protocol';
+import { redactSecrets } from '@sunday/skills';
 import {
   defaultUserConfigPath,
   defaultWorkspaceConfigPath,
@@ -477,6 +478,10 @@ export class McpHub {
     if (argsSummary.length > ARGS_SUMMARY_LEN) {
       argsSummary = `${argsSummary.slice(0, ARGS_SUMMARY_LEN)}…`;
     }
+    // SEC-07: redact secret shapes from the stored summary — the history
+    // surface (mcp/calls/history) is same-user, but args may contain
+    // user-typed secrets that should never persist in cleartext.
+    argsSummary = redactSecrets(argsSummary);
     const record: McpCallRecord = {
       at: new Date().toISOString(),
       server: rec.server,

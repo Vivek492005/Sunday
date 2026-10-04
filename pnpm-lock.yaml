@@ -113,6 +113,9 @@ importers:
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@sunday/skills':
+        specifier: workspace:*
+        version: link:../skills
     devDependencies:
       '@types/node':
         specifier: ^22.10.0

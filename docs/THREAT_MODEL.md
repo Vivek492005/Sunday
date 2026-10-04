@@ -81,11 +81,11 @@ in workspaces the user may not fully trust.
 | SEC-04 | D | Workspace MCP config loaded even in untrusted workspaces (fail-open) | High | **Fixed** | `agent-tools.ts`/`cli.ts`: fail-closed on `isWorkspaceTrusted()`; `agent-tools.test.ts` SEC-04 (4) |
 | SEC-05 | F | Symlink escape in `resolveWithinRoot` (lexical check only) | High | **Fixed** | `tools/paths.ts`: realpath canonicalization; `tools.test.ts` (3 new) |
 | SEC-06 | D | `defaultApproval: 'allow'` in workspace MCP config auto-approves dangerous tools | Medium | Mitigated | Only reachable in *trusted* workspaces after SEC-04; the user's trust decision is explicit there. |
-| SEC-07 | A | `mcp/calls/history` argsSummary may hold user-typed secrets | Low | Open | Same-user UI surface; recommend a redaction pass on display. |
+| SEC-07 | A | `mcp/calls/history` argsSummary may hold user-typed secrets | Low | **Fixed** | `hub.ts` `recordCall()` applies `redactSecrets()` to `argsSummary`; `mcp.test.ts` SEC-07 test. See `docs/SECURITY_DISPOSITIONS.md`. |
 | SEC-08 | A | `policy/approve` has no origin check | Low | Accepted | Same-user stdio client is not a privilege boundary (documented). |
-| SEC-09 | B, D | No taint escalation (state-changing call right after untrusted content → ask) | Medium | Open | Delimiters + guard landed; escalation is the follow-up. |
-| SEC-10 | F | Credential-file reads (`.env`, `*.pem`) not ask-gated (design §15.2 class R+) | Low | Open | Output redaction (SEC-03) contains the blast radius; ask-gating is follow-up. |
-| SEC-11 | B | Browser policy: DNS rebinding can bypass private-IP block | Low | Open | Documented limitation in browserd policy; real-Chromium verification pending. |
+| SEC-09 | B, D | No taint escalation (state-changing call right after untrusted content → ask) | Medium | Deferred | Delimiters + guard landed; full taint tracking is post-beta. See `docs/SECURITY_DISPOSITIONS.md`. |
+| SEC-10 | F | Credential-file reads (`.env`, `*.pem`) not ask-gated (design §15.2 class R+) | Low | Deferred | Output redaction (SEC-03) contains the blast radius; ask-gating is post-beta. See `docs/SECURITY_DISPOSITIONS.md`. |
+| SEC-11 | B | Browser policy: DNS rebinding can bypass private-IP block | Low | Accepted | Documented limitation; real-Chromium verification pending. See `docs/SECURITY_DISPOSITIONS.md`. |
 | SEC-12 | A | Session files world-readable; full history incl. tool args on disk | Medium | **Fixed** | `sessions.ts`: 0700 dir + 0600 files; `sessions-permissions.test.ts` (1) |
 
 ## Residual risk statement

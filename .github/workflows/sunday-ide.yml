@@ -114,6 +114,34 @@ jobs:
           Write-Host 'Secret scan clean.'
           exit 0
 
+  # Hardening: scan dependencies against the OSV advisory database.
+  # Scans pnpm-lock.yaml (product packages) for known vulnerabilities.
+  # TODO(security-gate): flip continue-on-error to false (blocking) after
+  # one green run confirms no false positives — see gate #5 in
+  # docs/RELEASE_GATES.md.
+  advisory-scan:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan lockfile with OSV-Scanner
+        uses: google/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --lockfile=pnpm-lock.yaml
+            --format=sarif
+            --output=osv-results.sarif
+          # Fail on High/Critical once blocking (see TODO above).
+          # For now, report-only: the SARIF output is uploaded below.
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: osv-results.sarif
+          category: osv-scanner
+
   # Creates the GitHub release for `ide-v*` tags BEFORE the matrix starts, so
   # the three OS jobs can upload concurrently without racing `release create`.
   # No-op on workflow_dispatch runs (the job itself never skips, so `needs`

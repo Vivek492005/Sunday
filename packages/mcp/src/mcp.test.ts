@@ -496,6 +496,25 @@ describe('callTool and history', () => {
     }
   });
 
+  it('SEC-07: redacts secret shapes from history argsSummary', async () => {
+    const { hub, factory, cleanup } = await makeHubWithFakeServer('demo', [{ name: 'echo' }]);
+    try {
+      await hub.startServer('demo', factory);
+      // Simulate user-typed secrets in tool args — they must not persist
+      // in cleartext in the call history.
+      await hub.callTool('mcp__demo__echo', {
+        text: 'hello',
+        token: 'github_pat_11ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd',
+      });
+      const [rec] = hub.getCallHistory(1);
+      expect(rec.argsSummary).toContain('hello');
+      expect(rec.argsSummary).not.toContain('github_pat_11ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd');
+      expect(rec.argsSummary).toMatch(/\[REDACTED:[^\]]+\]/);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('starts a stopped server on demand', async () => {
     const { hub, factory, cleanup } = await makeHubWithFakeServer('demo', [{ name: 'ping' }]);
     try {
