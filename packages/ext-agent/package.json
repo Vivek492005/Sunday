@@ -187,6 +187,22 @@
           "default": "",
           "description": "Container image for sunday.sandbox.mode=docker. Must be present locally (docker pull it once); empty = alpine:latest.",
           "type": "string"
+        },
+        "sunday.daemon.idleTimeoutMinutes": {
+          "default": 30,
+          "description": "Minutes of daemon inactivity (no RPC, no connected clients, no active sessions) before sundayd exits cleanly. 0 = disabled. Applies on the next sidecar (re)start.",
+          "type": "number",
+          "minimum": 0
+        },
+        "sunday.notifications.level": {
+          "default": "all",
+          "description": "Which daemon notifications surface as VS Code popups. all = everything; important = turn errors and provider-relay failovers only; none = suppress popups (the chat view still updates).",
+          "enum": [
+            "all",
+            "important",
+            "none"
+          ],
+          "type": "string"
         }
       },
       "title": "Sunday"
