@@ -8,6 +8,30 @@ with a visible Relay fallback, and scales to hierarchical multi-agent work
 
 **Status: 0.1.0 dev preview.** See [CHANGELOG.md](CHANGELOG.md).
 
+## Phase 8 features
+
+Seven features built on the dev preview — see [docs/PHASE8.md](docs/PHASE8.md)
+for details. Most are experimental and off by default.
+
+- **Agent Manager part** — the ui-manager now opens as an editor-area panel
+  (`sunday.manager.open`) or in a dedicated window (`sunday.manager.openWindow`).
+- **Per-user daemon** — one `sundayd` per OS user on a shared socket
+  (`~/.sunday/sundayd.sock`); single-flight startup via lockfile; per-workspace
+  trust, MCP hubs, and secret namespaces (fail-closed).
+- **Next-edit suggestions** (`sunday.nextEdit.enabled`) — after a rename,
+  offers the next occurrence as a CodeLens.
+- **Background agents** (`sunday.backgroundAgents.enabled`) — detached runs
+  that survive editor close and deliver results as GitHub PRs (never
+  auto-merged).
+- **Voice** (`sunday.voice.inputEnabled` / `sunday.voice.outputEnabled`) —
+  mic input and spoken responses via browser Web Speech APIs; no audio
+  touches Sunday servers.
+- **CLI** — `sunday chat|status|sessions` terminal frontend sharing the same
+  daemon (`packages/sunday-cli`).
+- **Hosted gateway** — optional OpenAI-compatible text-chat server with abuse
+  controls (API-key auth, rate limits, audit logging) for users without their
+  own provider keys (`packages/hosted-gateway`).
+
 ## Install (Windows)
 
 1. Download `Sunday-Agent-Setup-0.1.0.exe` from the
@@ -33,6 +57,8 @@ Or install the `.vsix` directly:
 | `packages/ext-agent` | Built-in VS Code extension (esbuild bundle) |
 | `packages/ui-chat` | React chat webview |
 | `packages/ui-manager` | React Agent Manager webview |
+| `packages/sunday-cli` | `sunday` terminal frontend for the per-user daemon (Phase 8) |
+| `packages/hosted-gateway` | Optional OpenAI-compatible chat server with abuse controls (Phase 8) |
 | `packages/eval` | Benchmark harness + fixtures (`sunday-eval run`) |
 | `patches/` | PATCHES.md — register of every upstream VS Code edit |
 | `packaging/` | Windows NSIS installer script |

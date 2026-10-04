@@ -218,3 +218,59 @@ sidecar spawn; every browser_* tool returns a clear disabled error otherwise.
 (`sunday-eval run`), reporting pass/fail and tool-call reliability as JSON +
 Markdown. `SUNDAY_EVAL_LIVE=1` replays the same tasks against a real model
 through sundayd.
+
+## Per-user daemon (Phase 8)
+
+One `sundayd` per OS user instead of one per VS Code window.
+
+```
+┌─ VS Code window 1 ─┐   ┌─ VS Code window 2 ─┐   ┌─ sunday CLI ─┐
+│  sunday-agent       │   │  sunday-agent       │   │  sunday chat │
+└──────┬─────────────┘   └──────┬─────────────┘   └──────┬───────┘
+       └──────── socket JSON-RPC (NDJSON framing) ───────┘
+              ┌─ sundayd (single, per-user) ─────────────┐
+              │  ~/.sunday/sundayd.sock (POSIX)           │
+              │  \\.\pipe\sundayd-<user> (Windows)        │
+              │  lockfile ~/.sunday/sundayd.lock (single- │
+              │  flight: first client spawns detached,    │
+              │  rest attach; stale locks stolen)         │
+              │  per-workspace trust map (fail-closed)    │
+              │  per-workspace MCP hubs + secret scopes   │
+              └──────────────────────────────────────────┘
+```
+
+- **Transport.** The NDJSON codec is shared (`rpc-transport.ts`); the stdio
+  path is unchanged and still works. Socket servers fan notifications out to
+  all connected clients; each connection dispatches against the same daemon.
+- **Trust model.** `daemon/configure` (or `daemon/set-workspace-trust`) runs
+  after `sunday/hello`. Roots are canonicalized (realpath); session cwds
+  inherit their workspace's verdict via ancestor-walk. Once any workspace is
+  configured, unconfigured paths are untrusted and resolve zero secrets —
+  fail-closed. With nothing configured, legacy env-var behavior applies
+  (single-workspace mode).
+- **Lifecycle.** Dispose detaches only; a client never kills a daemon it
+  didn't spawn. Daemon restart reconciles in-flight background/orchestration
+  runs to a terminal state.
+- Protocol additions: `daemon/configure`, `daemon/set-workspace-trust`,
+  `daemon/status`, `mcp/secrets/provide`, `background/run|status|cancel`,
+  `background/event`. Shared path/lock helpers live in `@sunday/protocol`
+  (`daemon-paths.ts`) so CLI, extension, and daemon agree.
+
+## Hosted gateway (Phase 8, optional)
+
+`@sunday/hosted-gateway`: an inference endpoint for users without their own
+provider keys — **not** an agent endpoint. The operator holds the provider
+keys; clients get an OpenAI-compatible text-chat API (`GET /health`,
+`GET /v1/models`, `POST /v1/chat/completions` with SSE).
+
+- **Text-only by construction.** `tools`/`tool_choice`/`functions` in a
+  request → `400`; model-emitted tool chunks are dropped. There is no shell,
+  no file access, nothing to execute tools with.
+- **Abuse controls:** Bearer API-key auth (constant-time compare; audit logs
+  carry truncated SHA-256 fingerprints, never secrets), per-key token-bucket
+  rate limits on requests/min and input-tokens/min (`429` + `Retry-After`),
+  request size limits, `max_tokens` clamping, model allowlist, IP/CIDR
+  allowlist (`X-Forwarded-For` not trusted), one JSONL audit line per request
+  (content never logged), upstream timeout with client-disconnect abort.
+- Config: `SUNDAY_HOSTED_*` env vars; operator runbook in
+  `packages/hosted-gateway/README.md`. Never expose without TLS in front.
