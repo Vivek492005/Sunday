@@ -57,6 +57,41 @@ Playwright Chromium install before the browserd tests:
 - run: pnpm --filter @sunday/browserd test
 ```
 
+## Live-model baseline & pass targets (1.0-beta gate #3)
+
+Per-release live baselines are recorded with:
+
+```sh
+node packages/eval/dist/live-baseline.js [--tasks id1,id2] [--model <id>] [--out dir]
+# or: pnpm --filter @sunday/eval eval:live-baseline
+```
+
+- Requires `OPENROUTER_API_KEY` or `GROQ_API_KEY` (either one; key *names* are
+  recorded, values never are). `SUNDAY_EVAL_MODEL` optionally pins the model;
+  `SUNDAY_EVAL_TASK_TIMEOUT_MS` overrides the per-task budget (default 10 min).
+- With no keys the script prints `live baseline skipped: no keys` and exits 0
+  — safe to run in CI without secrets.
+- Drives a real model through `sundayd` over stdio using the current wire
+  protocol (`LiveBaselineAdapter` in `packages/eval/src/adapters.ts`):
+  `sunday/hello` handshake, `session/create`, `chat/send`, then harvests
+  `tool-call` / `tool-result` / `usage` events from the nested `chat/event`
+  notifications until `turn-end`. A `tool-result` with `isError: true` marks
+  its call invalid; token counts accumulate per task.
+- Writes `eval-results/baseline-<timestamp>/{report.json,RESULTS.md}` and
+  `docs/eval-baseline-<YYYY-MM-DD>.md`. Exit code is 1 when targets are not met.
+
+### Pass targets (1.0-beta)
+
+| Metric | Target | Rationale |
+|---|---|---|
+| Task pass rate | ≥ 80% | Fake-scripted ceiling is 100% (14/14); live models are stochastic, so the bar allows a few model-variance failures while catching systematic regressions. |
+| Mean tool reliability | ≥ 95% | Tool calls are schema-validated server-side; the overwhelming majority should be valid. |
+| Max task duration | ≤ 10 min (harness timeout) | Hung turns are failures, not slow passes. |
+
+Latency (p50/p95) and total token usage are recorded per baseline for trend
+tracking but are **not** gating — provider latency varies too much to gate a
+release on it.
+
 ## Current baseline (hardening phase, fake-scripted)
 
 14/14 tasks passed · mean tool reliability 100.0%.

@@ -9,8 +9,23 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PROTOCOL_VERSION } from '@sunday/protocol';
 import { createDefaultRegistry, type Tool, type ToolContext } from '@sunday/tools';
-import type { EvalTask, ExecutedCall, ModelAdapter, ScriptStep } from './types.js';
+import type { BaselineUsage, EvalTask, ExecutedCall, ModelAdapter, ScriptStep } from './types.js';
+
+/** Token usage harvested from `usage` chat events during one task. */
+export type { BaselineUsage };
+
+/** Env vars accepted as provider credentials for a live baseline run. */
+export const BASELINE_KEY_ENV_VARS = ['OPENROUTER_API_KEY', 'GROQ_API_KEY'] as const;
+
+/**
+ * Returns the names of provider-key env vars that are set and non-blank.
+ * Names only — values are never read or logged by the baseline harness.
+ */
+export function detectProviderKeys(env: NodeJS.ProcessEnv = process.env): string[] {
+  return BASELINE_KEY_ENV_VARS.filter((k) => (env[k] ?? '').trim().length > 0);
+}
 
 /**
  * Eval-local stub browser tools (browser eval exit criteria).
@@ -244,6 +259,177 @@ export class SundaydAdapter implements ModelAdapter {
 
 export function isLiveRequested(): boolean {
   return process.env.SUNDAY_EVAL_LIVE === '1';
+}
+
+/**
+ * Live baseline adapter: drives a REAL provider model through sundayd over
+ * stdio JSON-RPC using the current wire protocol, and harvests token usage.
+ *
+ * Wire-format notes (this is what `SundaydAdapter` above predates):
+ * - `sunday/hello` requires `{ protocolVersion, client: { name, version, os } }`.
+ * - `session/create` returns `{ session: { id, ... } }` (not a bare sessionId).
+ * - `chat/send` returns `{ turnId }` immediately; the turn streams as
+ *   `chat/event` notifications whose params are `{ turnId, sessionId, event }`
+ *   — the event payload is NESTED under `event`, not flat on params.
+ * - `tool-result` events carry `{ toolCallId, isError, content }`; a call
+ *   whose result has `isError: true` is marked invalid in the transcript.
+ * - `usage` events carry `{ inputTokens, outputTokens }` and are accumulated
+ *   per task.
+ *
+ * A per-task timeout guards against hung turns (default 10 min, override via
+ * `taskTimeoutMs`); the daemon child is always SIGTERM'd afterwards.
+ */
+export class LiveBaselineAdapter implements ModelAdapter {
+  readonly name = 'sundayd-live-baseline';
+  private readonly taskTimeoutMs: number;
+  private readonly model?: string;
+
+  constructor(
+    private readonly cliPath: string,
+    opts: { taskTimeoutMs?: number; model?: string } = {},
+  ) {
+    this.taskTimeoutMs = opts.taskTimeoutMs ?? 600_000;
+    this.model = opts.model;
+  }
+
+  async runTask(task: EvalTask, workspaceRoot: string): Promise<ExecutedCall[]> {
+    return (await this.runTaskDetailed(task, workspaceRoot)).transcript;
+  }
+
+  async runTaskDetailed(
+    task: EvalTask,
+    workspaceRoot: string,
+  ): Promise<{ transcript: ExecutedCall[]; usage: BaselineUsage }> {
+    const proc = spawn('node', [this.cliPath], { stdio: ['pipe', 'pipe', 'inherit'] });
+    const transcript: ExecutedCall[] = [];
+    const usage: BaselineUsage = { inputTokens: 0, outputTokens: 0 };
+    const callsById = new Map<string, ExecutedCall>();
+    let turnFailure: string | null = null;
+    try {
+      const send = (id: number, method: string, params: unknown): void => {
+        proc.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      };
+      const pending = new Map<number, (r: RpcResponse) => void>();
+      const rl = createInterface({ input: proc.stdout! });
+      const turnDone = new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          turnFailure = `task timeout after ${this.taskTimeoutMs}ms`;
+          resolve();
+        }, this.taskTimeoutMs);
+        // Don't let a hung turn keep the process alive after the timeout.
+        timer.unref?.();
+        rl.on('line', (line) => {
+          let msg: {
+            id?: unknown;
+            method?: unknown;
+            params?: { event?: { type?: unknown; call?: unknown; result?: unknown; usage?: unknown; finishReason?: unknown; code?: unknown; message?: unknown } };
+          };
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            return;
+          }
+          if (msg && typeof msg.id === 'number') {
+            pending.get(msg.id)?.(msg as RpcResponse);
+            pending.delete(msg.id);
+            return;
+          }
+          if (msg?.method !== 'chat/event') return;
+          const event = msg?.params?.event;
+          if (!event || typeof event.type !== 'string') return;
+          switch (event.type) {
+            case 'tool-call': {
+              const call = (event.call ?? {}) as { id?: unknown; name?: unknown; arguments?: unknown };
+              const entry: ExecutedCall = {
+                tool: String(call.name ?? 'unknown'),
+                args: (call.arguments ?? {}) as Record<string, unknown>,
+                valid: true,
+                result: { output: '' },
+                durationMs: 0,
+              };
+              if (call.id != null) callsById.set(String(call.id), entry);
+              transcript.push(entry);
+              break;
+            }
+            case 'tool-result': {
+              const r = (event.result ?? {}) as {
+                toolCallId?: unknown;
+                isError?: unknown;
+                content?: unknown;
+              };
+              const entry = r.toolCallId != null ? callsById.get(String(r.toolCallId)) : undefined;
+              if (entry) {
+                if (Array.isArray(r.content)) {
+                  const text = r.content
+                    .filter((c) => (c as { type?: unknown })?.type === 'text')
+                    .map((c) => String((c as { text?: unknown })?.text ?? ''))
+                    .join('\n');
+                  if (text) entry.result = { output: text };
+                }
+                if (r.isError === true) entry.valid = false;
+              }
+              break;
+            }
+            case 'usage': {
+              const u = (event.usage ?? {}) as { inputTokens?: unknown; outputTokens?: unknown };
+              usage.inputTokens += Math.max(0, Math.floor(Number(u.inputTokens ?? 0) || 0));
+              usage.outputTokens += Math.max(0, Math.floor(Number(u.outputTokens ?? 0) || 0));
+              break;
+            }
+            case 'turn-end':
+              clearTimeout(timer);
+              if (event.finishReason != null && event.finishReason !== 'stop') {
+                turnFailure = `turn ended with finishReason=${String(event.finishReason)}`;
+              }
+              resolve();
+              break;
+            case 'turn-error':
+              clearTimeout(timer);
+              turnFailure = `turn-error ${String(event.code ?? '')}: ${String(event.message ?? 'unknown')}`.trim();
+              resolve();
+              break;
+          }
+        });
+      });
+      const rpc = (method: string, params: unknown): Promise<unknown> =>
+        new Promise((resolve, reject) => {
+          const id = Math.floor(Math.random() * 1e9);
+          const timer = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error(`rpc timeout: ${method}`));
+          }, 120_000);
+          timer.unref?.();
+          pending.set(id, (r) => {
+            clearTimeout(timer);
+            if (r.error) reject(new Error(r.error.message));
+            else resolve(r.result);
+          });
+          send(id, method, params);
+        });
+
+      await rpc('sunday/hello', {
+        protocolVersion: PROTOCOL_VERSION,
+        client: { name: 'sunday-eval-baseline', version: '0.1.0', os: process.platform },
+      });
+      const created = (await rpc('session/create', { cwd: workspaceRoot })) as {
+        session?: { id?: unknown };
+      };
+      const sessionId = created?.session?.id;
+      if (typeof sessionId !== 'string' || sessionId.length === 0) {
+        throw new Error('session/create returned no session id');
+      }
+      await rpc('chat/send', {
+        sessionId,
+        message: task.prompt,
+        ...(this.model ? { model: this.model } : {}),
+      });
+      await turnDone;
+      if (turnFailure) throw new Error(turnFailure);
+      return { transcript, usage };
+    } finally {
+      proc.kill('SIGTERM');
+    }
+  }
 }
 
 export type { ScriptStep };

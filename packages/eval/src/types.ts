@@ -66,3 +66,48 @@ export interface BenchmarkReport {
   /** Mean tool reliability across tasks. */
   meanToolReliability: number;
 }
+
+/** Token usage harvested from `usage` chat events during one task. */
+export interface BaselineUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Per-task result for a live-model baseline run (extends TaskResult with token usage). */
+export interface BaselineTaskResult extends TaskResult {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Release pass targets for a live-model baseline (1.0-beta gate #3). */
+export interface BaselineTargets {
+  /** Minimum fraction of tasks that must pass, e.g. 0.8. */
+  minPassRate: number;
+  /** Minimum mean tool reliability across tasks, e.g. 0.95. */
+  minMeanToolReliability: number;
+  /** Per-task wall-clock budget; a task exceeding it is a failure. */
+  maxTaskDurationMs: number;
+}
+
+/** Full live-model baseline report (JSON-serializable). */
+export interface BaselineReport {
+  adapter: string;
+  /** Model override used, if any (SUNDAY_EVAL_MODEL). */
+  model?: string;
+  /** Provider key env vars that were present (names only — never values). */
+  providerKeys: string[];
+  startedAt: string;
+  durationMs: number;
+  tasks: BaselineTaskResult[];
+  passed: number;
+  total: number;
+  meanToolReliability: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  /** p50/p95 task latency in ms (informational — not gating). */
+  latencyP50Ms: number;
+  latencyP95Ms: number;
+  targets: BaselineTargets;
+  targetsMet: boolean;
+  targetNotes: string[];
+}
