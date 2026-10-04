@@ -1,0 +1,61 @@
+<idea-plugin>
+  <id>com.sunday.agent</id>
+  <name>Sunday Agent</name>
+  <version>0.1.0</version>
+  <vendor>Sunday</vendor>
+
+  <description><![CDATA[
+    Sunday Agent for JetBrains IDEs — chat with the Sunday agent, send selections,
+    and explain code, powered by your local per-user sundayd daemon.
+    <br/><br/>
+    Requires a running sundayd daemon (shared with the Sunday CLI and VS Code
+    extension). The plugin attaches to <code>~/.sunday/sundayd.sock</code>
+    (Windows: <code>\\.\pipe\sundayd-&lt;user&gt;</code>) or spawns
+    <code>sundayd</code> from <code>PATH</code> / <code>SUNDAY_DAEMON_PATH</code>.
+  ]]></description>
+
+  <change-notes><![CDATA[
+    0.1.0 — Initial JetBrains frontend: Sunday tool window with streaming chat,
+    "Send selection to Sunday" and "Explain code" editor actions, all backed by
+    the shared per-user sundayd daemon over the existing socket protocol.
+  ]]></change-notes>
+
+  <!-- IntelliJ Platform 2024.1+ (build 241). Works in IDEA, PyCharm, WebStorm, etc. -->
+  <idea-version since-build="241" until-build="251.*"/>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="Sunday"
+                anchor="right"
+                factoryClass="com.sunday.agent.toolwindow.SundayToolWindowFactory"
+                icon="/icons/sunday.svg"/>
+
+    <projectService serviceClass="com.sunday.agent.services.SundayProjectService"/>
+  </extensions>
+
+  <actions>
+    <action id="sunday.openChat"
+            class="com.sunday.agent.actions.OpenSundayChatAction"
+            text="Open Sunday Chat"
+            description="Open the Sunday agent chat tool window">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+      <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt S"/>
+    </action>
+
+    <action id="sunday.sendSelection"
+            class="com.sunday.agent.actions.SendSelectionToSundayAction"
+            text="Send Selection to Sunday"
+            description="Send the current selection to Sunday chat">
+      <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+      <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+    </action>
+
+    <action id="sunday.explainCode"
+            class="com.sunday.agent.actions.ExplainCodeAction"
+            text="Explain Code with Sunday"
+            description="Ask Sunday to explain the selected code">
+      <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>
