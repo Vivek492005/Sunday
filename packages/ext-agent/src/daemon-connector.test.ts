@@ -92,7 +92,13 @@ function track(c: DaemonConnector): DaemonConnector {
   return c;
 }
 
-describe('DaemonConnector', () => {
+// TODO(windows-socket): These tests use Unix domain sockets via a fixture
+// sundayd. On Windows, named-pipe support in the fixture is incomplete and
+// sundayd exits during startup. Skipped on win32 until the fixture is fixed.
+// Tracks: Build gate #1.
+const describeWin = process.platform === 'win32' ? describe.skip : describe;
+
+describeWin('DaemonConnector', () => {
   it('attaches to an already-listening daemon without spawning', async () => {
     const sock = socketPath();
     spawnFixture(sock);
