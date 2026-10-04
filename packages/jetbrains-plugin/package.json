@@ -1,0 +1,1 @@
+{"description":"Sunday agent plugin for JetBrains IDEs (IntelliJ Platform, Kotlin)","name":"@sunday/jetbrains-plugin","private":true,"scripts":{"build":"echo 'JetBrains plugin builds with Gradle (./gradlew buildPlugin), not pnpm'","test":"echo 'JetBrains plugin tests run with Gradle (./gradlew test), not pnpm'"},"version":"0.1.0"}
