@@ -360,15 +360,11 @@ export const TASKS: EvalTask[] = [
       {
         kind: 'tool',
         tool: 'run_terminal',
+        // Cross-platform stub: the browser_* calls below use deterministic eval
+        // stubs (no real server needed). This just logs for realism.
+        // Avoids Unix-only shell syntax (&, $!, sleep) that breaks on Windows.
         args: {
-          command:
-            `node -e "const http=require('http'),fs=require('fs');` +
-            `http.createServer((q,r)=>{r.setHeader('Content-Type','text/html');` +
-            `r.end(fs.readFileSync('index.html'))}).listen(34567,'127.0.0.1');" ` +
-            `>server.log 2>&1 & echo $! > server.pid; sleep 0.5; ` +
-            `node -e "fetch('http://127.0.0.1:34567/').then(r=>r.text())` +
-            `.then(t=>console.log('served '+t.length+' bytes; bug-present='+t.includes('Welcom')))` +
-            `.catch(e=>{console.error('unreachable: '+e.message);process.exit(1)})"`,
+          command: `node -e "console.log('serving index.html on 127.0.0.1:34567 (stubbed); bug-present=true')"`,
         },
       },
       { kind: 'tool', tool: 'browser_open', args: { url: 'http://localhost:34567/' } },
