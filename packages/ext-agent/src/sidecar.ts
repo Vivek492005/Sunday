@@ -26,14 +26,6 @@ export const BROWSER_ENABLED_ENV = 'SUNDAY_BROWSER_ENABLED';
 export const SANDBOX_MODE_ENV = 'SUNDAY_SANDBOX_MODE';
 export const SANDBOX_DOCKER_IMAGE_ENV = 'SUNDAY_SANDBOX_DOCKER_IMAGE';
 
-/**
- * Stage 4: env var handed to the sundayd child for idle shutdown.
- * Stamped from the `sunday.daemon.idleTimeoutMinutes` setting in
- * extension.ts extraEnv() (same pattern as SANDBOX_MODE_ENV).
- * sundayd reads it via parseIdleTimeoutMinutes(); 0 = disabled.
- */
-export const DAEMON_IDLE_TIMEOUT_ENV = 'SUNDAY_DAEMON_IDLE_TIMEOUT_MINUTES';
-
 /** The sidecar binary/script could not be found anywhere we look. */
 export class SidecarNotFoundError extends Error {
   constructor(detail: string) {

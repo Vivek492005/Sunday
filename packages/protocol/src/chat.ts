@@ -57,11 +57,6 @@ export const chatEventNotificationSchema = z.object({
       reason: z.string().min(1),
     })
     .optional(),
-  // Stage 4: per-workspace notification routing. The daemon stamps the
-  // session's workspace root so a multi-window client can route the
-  // notification to the right window (and suppress it elsewhere). Optional
-  // so every existing message still validates.
-  workspaceRoot: z.string().min(1).optional(),
 });
 export type ChatEventNotification = z.infer<typeof chatEventNotificationSchema>;
 export type ChatEventRelay = NonNullable<ChatEventNotification['relay']>;

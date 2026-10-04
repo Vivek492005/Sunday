@@ -27,15 +27,6 @@ import { registerMcpMethods, type McpHubResolver } from './mcp-methods.js';
 import { WorkspaceMcpManager, adaptMcpToolForWorkspace } from './workspace-mcp.js';
 import { adaptMcpTool } from './agent-tools.js';
 import { isWorkspaceTrusted } from './trust.js';
-import { IDLE_TIMEOUT_ENV, parseIdleTimeoutMinutes } from './idle-shutdown.js';
-import {
-  autostartDisableHint,
-  autostartEnableHint,
-  autostartPlatform,
-  autostartTarget,
-  installAutostart,
-  uninstallAutostart,
-} from './autostart.js';
 
 // sundayd entrypoint: JSON-RPC over stdio by default (`--socket <path>`
 // switches to a unix-socket / Windows-named-pipe listener with the same
@@ -47,27 +38,6 @@ function socketFlag(): string | undefined {
   const i = process.argv.indexOf('--socket');
   if (i >= 0 && i + 1 < process.argv.length) return process.argv[i + 1];
   return undefined;
-}
-
-/**
- * Stage 4: `--idle-timeout-minutes <n>` overrides the idle shutdown
- * timeout (0 = disabled). Falls back to `SUNDAY_DAEMON_IDLE_TIMEOUT_MINUTES`
- * (stamped by the extension from `sunday.daemon.idleTimeoutMinutes`), then
- * the 30-minute default. Exported for tests.
- */
-export function idleTimeoutMinutes(): number {
-  const i = process.argv.indexOf('--idle-timeout-minutes');
-  if (i >= 0 && i + 1 < process.argv.length) {
-    const n = Number(process.argv[i + 1]);
-    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
-  }
-  return parseIdleTimeoutMinutes();
-}
-
-/** Absolute path to this CLI entrypoint (for autostart ExecStart). */
-function cliEntryPath(): string {
-  // dist/cli.js at runtime; fall back to the source path in dev.
-  return path.resolve(path.dirname(new URL(import.meta.url).pathname), 'cli.js');
 }
 
 // context/* methods take an explicit `workspaceRoot` per call (the same
@@ -94,16 +64,7 @@ function bindPerCall<K extends 'context/map' | 'context/index' | 'context/search
   };
 }
 
-async function buildDaemon(
-  extra: {
-    transport?: ServerTransport;
-    onShutdown?: () => void;
-    /** Stage 4: connected-client count (socket fan-out wires its peer set). */
-    getClientCount?: () => number;
-    /** Stage 4: idle timeout override (CLI flag wins over env). */
-    idleTimeoutMinutes?: number;
-  } = {},
-): Promise<SundayDaemon> {
+async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: () => void } = {}): Promise<SundayDaemon> {
   // Part A: the daemon-level workspace (the extension stamps SUNDAY_WORKSPACE
   // at spawn; falls back to the process cwd). The MCP hub is daemon-global
   // and reads this workspace's .sunday/mcp.json; per-session tools
@@ -213,9 +174,6 @@ async function buildDaemon(
     // is overridden so the socket file is cleaned up on graceful shutdown.
     ...(extra.transport ? { transport: extra.transport } : {}),
     ...(extra.onShutdown ? { onShutdown: extra.onShutdown } : {}),
-    // Stage 4: idle shutdown wiring (timeout from CLI flag → env → default).
-    idleTimeoutMinutes: extra.idleTimeoutMinutes ?? idleTimeoutMinutes(),
-    ...(extra.getClientCount ? { getClientCount: extra.getClientCount } : {}),
   });
 
   // Phase 4: checkpoints + worktrees. Registered first — the orchestration
@@ -329,9 +287,6 @@ async function serveSocket(socketPath: string): Promise<void> {
   const daemon = await buildDaemon({
     transport: fanout,
     onShutdown: () => cleanupAndExit(0),
-    // Stage 4: the fan-out peer set is the connected-client count for the
-    // idle-shutdown check.
-    getClientCount: () => attached.size,
   });
   await daemon.start().catch((e) => {
     console.error(`sundayd failed to start: ${(e as Error).message}`);
@@ -460,27 +415,6 @@ async function listenWithStaleRecovery(server: net.Server, socketPath: string): 
 }
 
 async function main(): Promise<void> {
-  // Stage 4: autostart management. These run before anything else and exit
-  // immediately — they never start the daemon.
-  if (process.argv.includes('--install-autostart')) {
-    const platform = autostartPlatform();
-    const target = installAutostart(platform, { execPath: cliEntryPath() });
-    console.log(`sundayd autostart installed (${target.kind}).`);
-    console.log(autostartEnableHint(platform, target));
-    return;
-  }
-  if (process.argv.includes('--uninstall-autostart')) {
-    const platform = autostartPlatform();
-    const target = autostartTarget(platform);
-    const removed = uninstallAutostart(platform);
-    console.log(
-      removed
-        ? `sundayd autostart removed from ${target.path}.`
-        : `no sundayd autostart entry found at ${target.path}.`,
-    );
-    if (removed) console.log(autostartDisableHint(platform, target));
-    return;
-  }
   const socketPath = socketFlag();
   if (socketPath) {
     await serveSocket(socketPath);

@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SidecarManager, BROWSER_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, DAEMON_IDLE_TIMEOUT_ENV, type SidecarStatus } from './sidecar.js';
+import { SidecarManager, BROWSER_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
 import { ManagerViewProvider, ManagerPanelManager } from './managerView.js';
@@ -110,14 +110,6 @@ export async function activate(
         if (image) env[SANDBOX_DOCKER_IMAGE_ENV] = image;
         return env;
       })(),
-      // Stage 4: idle shutdown (sundayd exits after N idle minutes with no
-      // clients/sessions). Stamped from sunday.daemon.idleTimeoutMinutes;
-      // applies on the next sidecar (re)start.
-      ...{
-        [DAEMON_IDLE_TIMEOUT_ENV]: String(
-          vscode.workspace.getConfiguration('sunday.daemon').get<number>('idleTimeoutMinutes', 30),
-        ),
-      },
       ...mcpSecretEnv,
     }),
   });

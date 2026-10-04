@@ -37,7 +37,6 @@ import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
 import { buildSessionSystemPrompt } from './system-prompt.js';
 import { CompletionOrchestrator } from './completion.js';
-import { IDLE_TIMEOUT_ENV, IdleShutdownManager, parseIdleTimeoutMinutes } from './idle-shutdown.js';
 
 /** Part B: default inline-completion model (fast/cheap). */
 export const DEFAULT_COMPLETION_MODEL = 'groq:llama-3.1-8b-instant';
@@ -160,19 +159,6 @@ export interface DaemonOptions {
    * workspace's trust verdict at construction). Defaults to no-op.
    */
   onWorkspaceTrustChanged?: (workspaceRoot: string) => void;
-  /**
-   * Stage 4: idle shutdown. Minutes of inactivity (no RPC) before the
-   * daemon exits cleanly — requires 0 connected clients AND 0 active
-   * sessions. 0 = disabled. Defaults to the `SUNDAY_DAEMON_IDLE_TIMEOUT_MINUTES`
-   * env (stamped by the extension from `sunday.daemon.idleTimeoutMinutes`).
-   */
-  idleTimeoutMinutes?: number;
-  /**
-   * Stage 4: number of currently connected clients. The socket-mode
-   * composition root wires this to its fan-out peer count; stdio mode
-   * defaults to 1 (the owning parent) so idle shutdown never fires there.
-   */
-  getClientCount?: () => number;
 }
 
 function publicSession(s: StoredSession): Session {
@@ -225,10 +211,6 @@ export class SundayDaemon {
    *  never truncate a session file. */
   private readonly pendingPersists = new Set<Promise<void>>();
   private shuttingDown = false;
-  /** Stage 4: idle shutdown manager (armed in start()). */
-  private readonly idleShutdown: IdleShutdownManager;
-  /** Stage 4: connected-client count supplier (socket fan-out or stdio default). */
-  private readonly getClientCount: () => number;
 
   constructor(
     opts: DaemonOptions = {},
@@ -274,9 +256,6 @@ export class SundayDaemon {
       {
         // Phase 3: visible Relay — when the loop relays mid-turn, the
         // notification carries via:'relay' + from/to/reason (never silent).
-        // Stage 4: workspaceRoot stamps the session's workspace so
-        // multi-window clients can route the notification to the right
-        // window.
         event: (sessionId, turnId, event, relay) =>
           this.transport.notify(
             'chat/event',
@@ -287,36 +266,20 @@ export class SundayDaemon {
                   event,
                   via: 'relay' as const,
                   relay: { from: relay.from, to: relay.to, reason: relay.reason },
-                  workspaceRoot: this.sessions.get(sessionId)?.cwd,
                 }
-              : { turnId, sessionId, event, workspaceRoot: this.sessions.get(sessionId)?.cwd },
+              : { turnId, sessionId, event },
           ),
       },
       { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
     );
     this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
-      onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit('stdin-close')),
-    });
-    // Stage 4: idle shutdown. In stdio mode the single client is the owning
-    // parent — getClientCount defaults to 1 so the timer can never fire
-    // there (the parent owns the lifecycle); socket mode wires the real
-    // fan-out peer count via DaemonOptions.getClientCount.
-    const idleTimeoutMinutes =
-      opts.idleTimeoutMinutes ?? parseIdleTimeoutMinutes();
-    this.getClientCount = opts.getClientCount ?? (() => 1);
-    this.idleShutdown = new IdleShutdownManager({
-      idleTimeoutMinutes,
-      onIdleShutdown: () => void this.gracefulExit('idle-timeout'),
-      getClientCount: () => this.getClientCount(),
-      getActiveSessionCount: () => this.sessions.list().length,
-      log: (msg) => console.error(msg),
+      onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
     });
   }
 
   async start(): Promise<void> {
     await this.sessions.init();
     this.transport.start();
-    this.idleShutdown.start();
   }
 
   /**
@@ -425,13 +388,10 @@ export class SundayDaemon {
   }
 
   /** Drain in-flight session writes, then hand off to onShutdown (process.exit
-   *  by default). Idempotent — a second call while draining is a no-op.
-   *  Stage 4: `reason` is logged for observability (e.g. 'idle-timeout'). */
-  private async gracefulExit(reason = 'shutdown'): Promise<void> {
+   *  by default). Idempotent — a second call while draining is a no-op. */
+  private async gracefulExit(): Promise<void> {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
-    this.idleShutdown.stop();
-    console.error(`[sundayd] shutting down: ${reason}`);
     try {
       await Promise.allSettled([...this.pendingPersists]);
       // Phase 6: stop the browser child (no-op when never started).
@@ -442,8 +402,6 @@ export class SundayDaemon {
   }
 
   private async dispatch(req: JsonRpcRequest): Promise<unknown> {
-    // Stage 4: every RPC counts as activity for the idle-shutdown clock.
-    this.idleShutdown.recordActivity();
     // Phase 2: context — dispatched ahead of the switch. CONTEXT_METHODS is
     // part of the central METHODS registry, but these calls are served by
     // the injected @sunday/context handler table (each validates params
@@ -477,7 +435,7 @@ export class SundayDaemon {
       case 'sunday/ping':
         return { ok: true as const, time: new Date().toISOString() };
       case 'sunday/shutdown':
-        setImmediate(() => void this.gracefulExit('rpc-shutdown'));
+        setImmediate(() => void this.gracefulExit());
         return { ok: true as const };
       case 'daemon/configure': {
         const p = parseParams('daemon/configure', req.params);
@@ -505,12 +463,6 @@ export class SundayDaemon {
             .roots()
             .map((root) => ({ root, trusted: isWorkspaceTrusted(root) })),
           multiWorkspace: workspaceTrust.isMultiWorkspace,
-          // Stage 4: idle-shutdown observability.
-          idle: {
-            idleMs: this.idleShutdown.idleMs(),
-            clients: this.getClientCount(),
-            activeSessions: this.sessions.list().length,
-          },
         };
       }
       case 'mcp/secrets/provide': {
