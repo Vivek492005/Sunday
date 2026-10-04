@@ -6,6 +6,8 @@
 // additionally assert against the real planner and policy modules.
 
 import { describe, expect, it } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { validatePlanUnits } from '@sunday/orchestrator';
 import { BrowserPolicy, BrowserPolicyError } from '@sunday/browserd';
 import { FakeModelAdapter } from './adapters.js';
@@ -15,7 +17,7 @@ import { TASKS } from './tasks.js';
 describe('eval harness (fake-scripted adapter)', () => {
   it('all 14 benchmark tasks pass with 100% tool reliability', async () => {
     const report = await runBenchmark(new FakeModelAdapter(), {
-      outDir: '/tmp/sunday-eval-test',
+      outDir: join(tmpdir(), 'sunday-eval-test'),
     });
     expect(report.total).toBe(14);
     expect(report.passed).toBe(14);
