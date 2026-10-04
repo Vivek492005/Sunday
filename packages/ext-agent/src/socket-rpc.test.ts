@@ -15,6 +15,10 @@ const clients: RpcClient[] = [];
 const sockets: net.Socket[] = [];
 
 function socketPath(): string {
+  // Windows uses named pipes, not Unix sockets.
+  if (process.platform === 'win32') {
+    return `\\\\.\\pipe\\sunday-rpc-test-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-rpc-'));
   tmpDirs.push(dir);
   return path.join(dir, 'test.sock');

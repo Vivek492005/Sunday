@@ -27,6 +27,10 @@ const connectors: DaemonConnector[] = [];
 const procs: ChildProcess[] = [];
 
 function socketPath(): string {
+  // Windows uses named pipes, not Unix sockets.
+  if (process.platform === 'win32') {
+    return `\\\\.\\pipe\\sunday-test-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-conn-'));
   tmpDirs.push(dir);
   return path.join(dir, 'daemon.sock');
