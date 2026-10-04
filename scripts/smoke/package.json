@@ -1,0 +1,1 @@
+{"dependencies":{"@vscode/test-electron":"^2.4.1"},"description":"Electron smoke test harness for the Sunday VS Code extension","name":"@sunday/smoke","private":true,"scripts":{"smoke":"node src/run.mjs","typecheck":"node --check src/run.mjs && node --check src/suite.mjs"},"type":"module","version":"0.1.0"}

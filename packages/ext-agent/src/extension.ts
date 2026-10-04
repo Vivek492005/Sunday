@@ -34,7 +34,16 @@ import { registerOrchestrationCommands } from './orchestrationCommands.js';
 
 const EXT_ID = 'sunday.sunday-agent';
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+/** Smoke-test hooks exposed via `activate()` return value (see bottom of activate). */
+export interface SundaySmokeApi {
+  getSidecarStatus: () => string;
+  getServerInfo: () => { name: string; version: string } | undefined;
+  ensureStarted: () => Promise<unknown>;
+}
+
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<{ __sundaySmoke: SundaySmokeApi } | void> {
   const output = vscode.window.createOutputChannel('Sunday');
   const log = (msg: string) => output.appendLine(`[${new Date().toISOString()}] ${msg}`);
   const version = String(vscode.extensions.getExtension(EXT_ID)?.packageJSON?.version ?? '0.0.1');
@@ -482,6 +491,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   log(`sunday-agent v${version} activated`);
+
+  // -- smoke-test API ---------------------------------------------------------
+  // Minimal hooks for the Electron smoke harness (scripts/smoke/). Not part of
+  // the public extension API; used only by automated tests to verify activation,
+  // sidecar lifecycle, and the hello handshake without a UI.
+  return {
+    __sundaySmoke: {
+      getSidecarStatus: () => manager.getStatus(),
+      getServerInfo: () => manager.getServerInfo(),
+      ensureStarted: () => manager.start(),
+    },
+  };
 }
 
 export function deactivate(): void {

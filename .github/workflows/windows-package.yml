@@ -93,6 +93,14 @@ jobs:
       - name: Package .vsix
         run: node scripts/package-vsix.mjs --out dist-package
 
+      - name: Electron smoke test (VS Code + VSIX) — release evidence
+        run: |
+          $version = (node -p "require('./packages/ext-agent/package.json').version")
+          cd scripts/smoke
+          npm install --no-audit --no-fund
+          node src/run.mjs --vsix ../../dist-package/sunday-agent-$version.vsix
+        # Windows runners have a display; Linux would need xvfb-run -a.
+
       - name: Install NSIS
         shell: pwsh
         run: choco install nsis -y --no-progress
