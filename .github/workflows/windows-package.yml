@@ -74,6 +74,19 @@ jobs:
       - name: Run test suites
         run: pnpm -r --workspace-concurrency=1 test
 
+      - name: Relay matrix (§24.3) — release evidence
+        run: |
+          cd packages/gateway
+          npx vitest run src/relay-matrix.test.ts --reporter=verbose 2>&1 | tee relay-matrix-report.txt
+          echo "--- relay matrix: all tests must pass ---"
+          grep -q "Test Files  1 passed" relay-matrix-report.txt
+
+      - name: Upload relay matrix report
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-matrix-report
+          path: packages/gateway/relay-matrix-report.txt
+
       - name: Install vsce
         run: npm i -g @vscode/vsce
 
