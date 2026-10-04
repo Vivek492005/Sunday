@@ -105,6 +105,25 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.4)
 
+  packages/hosted-gateway:
+    dependencies:
+      '@sunday/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@sunday/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.4)
+
   packages/mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -173,6 +192,25 @@ importers:
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.4)
+
+  packages/sunday-cli:
+    dependencies:
+      '@sunday/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@sunday/sundayd':
+        specifier: workspace:*
+        version: link:../sundayd
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
