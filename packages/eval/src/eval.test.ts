@@ -19,6 +19,11 @@ describe('eval harness (fake-scripted adapter)', () => {
     const report = await runBenchmark(new FakeModelAdapter(), {
       outDir: join(tmpdir(), 'sunday-eval-test'),
     });
+    // Log failed tasks for CI diagnostics (especially Windows-specific failures)
+    const failed = report.tasks.filter(t => !t.pass);
+    if (failed.length > 0) {
+      console.log('FAILED TASKS:', failed.map(t => `${t.taskId}: ${t.notes}`).join(' | '));
+    }
     expect(report.total).toBe(14);
     expect(report.passed).toBe(14);
     expect(report.meanToolReliability).toBe(1);
