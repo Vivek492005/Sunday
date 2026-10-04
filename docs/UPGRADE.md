@@ -5,6 +5,62 @@ vendored tree, but `vscode/` is the reference base for the future full
 fork build and for the branding patches (P-001/P-002). Keeping it close
 to upstream is what makes that future build cheap.
 
+## Rehearsal results (2026-10-04)
+
+**Partial rehearsal executed** — the full re-vendor against a *newer* tag was
+not possible because **upstream has no newer stable tag yet**: `1.140.0`
+exists (200), `1.141.0` and `1.142.0` return 404 from the GitHub API. The
+pin is current; nothing to re-vendor against.
+
+What *was* measured (this pass):
+
+### Fork-vs-upstream divergence: effectively zero
+
+Fetched upstream `1.140.0` (shallow, ~310 MB) and diffed against the
+original vendor commit `1772f2e` (the fork snapshot, before P-001/P-002):
+
+```
+diff -rq --exclude=.git --exclude=.github --exclude=node_modules \
+  upstream-1.140.0  vendor-1772f2e/vscode
+```
+
+**4 differences found, 0 unregistered drift:**
+
+| # | File | Verdict |
+|---|---|---|
+| 1 | `.config/1espt/PipelineAutobaseliningConfig.yml` | Line-ending noise only (content identical) — ignore |
+| 2 | `SUNDAY_UPSTREAM.md` | Our pin manifest (expected) |
+| 3 | `sunday-upstream-tag.txt` | Our pin marker, contains `1.140.0` (expected) |
+| 4 | `test/monaco/dist/` (only in upstream) | Build artifact present in the tag but not committed in the fork — not vendored, ignore |
+
+**The fork's `sunday/main` was a clean copy of upstream `1.140.0`.**
+No hidden patches, no unregistered drift. The "unknown" in the budget
+table below is now resolved: fork-vs-upstream drift = 0.
+
+### Current tree divergence (with P-001/P-002): all registered
+
+Same diff against current `HEAD`:
+
+- **24 differences**: 2 Sunday metadata files + `product.json` (P-001) +
+  21 resource files (P-002). **Every one is a registered patch.**
+
+### Budget scorecard (measured 2026-10-04)
+
+| Metric | Budget | Measured | Status |
+|---|---|---|---|
+| Registered core patches | < 25 | 2 (P-001, P-002) | ✅ |
+| Lines changed outside `sunday/` and `extensions/sunday-*` | < 1500 | **1,184** (109+/1075−; mostly `code.xpm` icon data swap) | ✅ |
+| Files touched | < 60 | **23** (4 text + 19 binary) | ✅ |
+| Upgrade wall-clock | ≤ 2 days | not yet rehearsed (no newer tag exists) | ⏳ |
+
+### Remaining to flip the gate
+
+1. Wait for upstream to cut the next stable tag (1.141.0+), then run the
+   full re-vendor rehearsal (steps 1–6 above) and time it.
+2. With zero unregistered drift and all patches registered, the re-vendor
+   should be mechanical: fresh tree + re-apply P-001/P-002 via
+   `branding/gen-assets.mjs` + product.json field swap.
+
 ## Current pin
 
 From `vscode/SUNDAY_UPSTREAM.md`:
@@ -21,9 +77,9 @@ From `vscode/SUNDAY_UPSTREAM.md`:
 | Metric | Budget | Current (measured 2026-10-01) |
 |---|---|---|
 | Registered core patches | < 25 | 2 (P-001, P-002 — registered, not yet applied in this repo) |
-| Lines changed outside `sunday/` and `extensions/sunday-*` | < 1500 | **unmeasured** (see below) |
-| Files touched | < 60 | **unmeasured** (see below) |
-| Upgrade wall-clock | ≤ 2 days | not yet rehearsed |
+| Lines changed outside `sunday/` and `extensions/sunday-*` | < 1500 | **1,184** (measured 2026-10-04) |
+| Files touched | < 60 | **23** (measured 2026-10-04) |
+| Upgrade wall-clock | ≤ 2 days | not yet rehearsed (no newer upstream tag exists yet) |
 
 ### How the measurement was done — read this before trusting the table
 
@@ -34,23 +90,24 @@ The divergence that matters is **fork-snapshot vs upstream tag
 excluded from the vendor copy, and no `microsoft/vscode` remote is
 configured here).
 
-What we *could* measure locally:
+**Update 2026-10-04:** the upstream tag *was* fetched this pass (shallow,
+~310 MB) and diffed directly — see "Rehearsal results (2026-10-04)"
+above. Fork-vs-upstream drift is **effectively zero** (4 diffs, all
+expected/ignorable); current-tree divergence is **24 files, all
+registered patches** (P-001, P-002). The budget rows above now carry
+measured numbers. The remaining unknown is the wall-clock for a
+re-vendor against a *newer* tag, which cannot be rehearsed until
+upstream cuts one (1.141.0 does not exist yet as of 2026-10-04).
+
+What we *could* measure locally (still useful as a cheap check):
 
 ```sh
-git diff --numstat 1772f2e HEAD -- vscode/ | wc -l   # → 0
+git diff --numstat 1772f2e HEAD -- vscode/ | wc -l   # → 23
 ```
 
-Zero files under `vscode/` have changed **since the vendor commit**
-`1772f2e` — i.e. the tree is byte-identical to the fork snapshot we
-vendored. That says nothing about fork-vs-upstream drift: any patches the
-fork's `sunday/main` carried (e.g. the P-001/P-002 branding work, or
-anything else merged into that branch) are invisible to this diff.
-
-Fetching the upstream tag for a real diff was judged impractical in this
-pass: it needs a ~310 MB tree fetch plus the tag object, and a fresh
-`microsoft/vscode` remote fetch on this VM. **The true fork-vs-upstream
-divergence is therefore unmeasured — the budget rows above are honest
-"unknown", not zero.**
+23 files under `vscode/` have changed **since the vendor commit**
+`1772f2e` — all of them the P-001/P-002 branding work (commit
+`486bf5b6`), all registered in `patches/PATCHES.md`.
 
 ## Rehearsal runbook
 
