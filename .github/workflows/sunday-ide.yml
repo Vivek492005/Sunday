@@ -410,6 +410,10 @@ jobs:
       - name: Build Windows installers (Inno Setup)
         if: matrix.platform == 'win32'
         working-directory: vscode
+        env:
+          # SUNDAY-CI: getVersion() needs the commit hash; vscode/ is not a
+          # git root, so provide it explicitly.
+          BUILD_SOURCEVERSION: ${{ github.sha }}
         run: |
           set -o pipefail
           npm run gulp vscode-win32-x64-inno-updater 2>&1 | tee -a "$GITHUB_WORKSPACE/build-win32-x64.log"
