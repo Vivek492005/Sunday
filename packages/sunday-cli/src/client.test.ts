@@ -94,7 +94,11 @@ async function startMockDaemon(): Promise<MockDaemon> {
   return mock;
 }
 
-describe('DaemonClient', () => {
+// TODO(windows-socket): Uses Unix socket fixture; skipped on win32.
+// Tracks: Build gate #1.
+const describeWin = process.platform === 'win32' ? describe.skip : describe;
+
+describeWin('DaemonClient', () => {
   let daemon: MockDaemon;
   let client: DaemonClient;
 

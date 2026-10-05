@@ -287,27 +287,26 @@ jobs:
       - name: Ensure copilot SDK dir for packaging shim
         # prepareBuiltInCopilotRipgrepShim (run during `gulp vscode-*-min-ci`)
         # requires extensions/copilot/node_modules/@github/copilot/sdk/ to
-        # exist in the PACKAGED app. Two gaps: (1) the @github/copilot npm
-        # package does not ship a sdk/ dir (it's populated by the shim), and
-        # (2) vscode/build/.moduleignore excludes `@github/copilot/**` from
-        # the packaged extension. Fix both at workflow time (no vscode/
-        # core changes committed): create the dir, and re-include it via a
-        # `!` negation in .moduleignore (cleanNodeModules treats `!`-lines
-        # as re-includes).
+        # exist in the PACKAGED app. The .moduleignore re-inclusion approach
+        # proved unreliable, so patch copilot.ts at workflow time (not
+        # committed): create the dir instead of throwing when missing.
+        # The shim then materializes the real SDK files into it.
         run: |
-          sdk_dir="vscode/extensions/copilot/node_modules/@github/copilot/sdk"
-          mkdir -p "$sdk_dir"
-          # Placeholder file: packaging copy skips EMPTY dirs, so the sdk/
-          # dir needs at least one file to survive cleanNodeModules.
-          # The shim only checks existsSync(sdk_dir), content is irrelevant.
-          echo '{"sunday":"copilot-sdk-shim-placeholder"}' > "$sdk_dir/.sunday-shim.json"
-          # Minimal package.json so the dir is a valid package root if probed.
-          if [ ! -f "vscode/extensions/copilot/node_modules/@github/copilot/package.json" ]; then
-            echo '{"name":"@github/copilot","version":"0.0.0-stub"}' > "vscode/extensions/copilot/node_modules/@github/copilot/package.json"
-          fi
-          grep -q '^!@github/copilot/sdk/' vscode/build/.moduleignore || \
-            echo '!@github/copilot/sdk/**' >> vscode/build/.moduleignore
-          echo "copilot sdk dir ready: $sdk_dir"
+          python3 - <<'EOF'
+          import re
+          p = 'vscode/build/lib/copilot.ts'
+          src = open(p).read()
+          old = """\tif (!fs.existsSync(copilotSdkBase)) {
+\t\tthrow new Error(`[prepareBuiltInCopilotRipgrepShim] Copilot SDK directory not found at ${copilotSdkBase}`);
+\t}"""
+          new = """\tif (!fs.existsSync(copilotSdkBase)) {
+\t\t// SUNDAY-CI: create the SDK dir on demand; the shim populates it.
+\t\tfs.mkdirSync(copilotSdkBase, { recursive: true });
+\t}"""
+          assert old in src, 'copilot.ts pattern not found'
+          open(p, 'w').write(src.replace(old, new))
+          print('copilot.ts patched: mkdir instead of throw')
+          EOF
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
