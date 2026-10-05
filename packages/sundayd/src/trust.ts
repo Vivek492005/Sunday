@@ -16,7 +16,7 @@
 // `daemon/configure` / `daemon/set-workspace-trust` after the hello handshake.
 
 import { realpathSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 
 /** Env var carrying the VS Code workspace-trust verdict ('1' = trusted). */
 export const WORKSPACE_TRUSTED_ENV = 'SUNDAY_WORKSPACE_TRUSTED';
@@ -41,7 +41,8 @@ export function isPathWithin(child: string, parent: string): boolean {
   const p = canonicalizeWorkspaceRoot(parent);
   if (c === p) return true;
   // Ensure `parent` is a path prefix on a segment boundary.
-  const withSep = p.endsWith('/') ? p : `${p}/`;
+  // Use path.sep (not hardcoded '/') for Windows compatibility.
+  const withSep = p.endsWith(sep) ? p : `${p}${sep}`;
   return c.startsWith(withSep);
 }
 

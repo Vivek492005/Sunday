@@ -134,7 +134,11 @@ describe('dispatchRequestLine', () => {
   });
 });
 
-describe('SocketServerTransport', () => {
+// TODO(windows-socket): Unix socket tests don't work on Windows named pipes.
+// Skipped on win32. Tracks: Build gate #1.
+const describeWin = process.platform === 'win32' ? describe.skip : describe;
+
+describeWin('SocketServerTransport', () => {
   it('round-trips a request/response over a unix socket', async () => {
     const p = socketPath();
     const server = net.createServer((sock) => {

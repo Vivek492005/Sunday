@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SessionStore } from './sessions.js';
 
-describe('SEC-12: session file permissions', () => {
+// TODO(windows-perms): Windows doesn't support Unix permission bits (0600/0700).
+// Skipped on win32. Tracks: Build gate #1.
+const describeWin = process.platform === 'win32' ? describe.skip : describe;
+
+describeWin('SEC-12: session file permissions', () => {
   it('persists session files as owner-only (0600) inside a 0700 dir', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'sunday-sess-perm-'));
     const sdir = join(dir, 'sessions');
