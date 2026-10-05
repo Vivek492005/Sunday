@@ -166,10 +166,20 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
     const path = require('path');
     const src = process.argv[1];
     const dest = process.argv[2];
-    for (const entry of fs.readdirSync(src)) {
-      fs.cpSync(path.join(src, entry), path.join(dest, entry), { recursive: true, force: true });
+    const entries = fs.readdirSync(src);
+    console.log('sync-builtin: source entries: ' + entries.join(', '));
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry);
+      const destPath = path.join(dest, entry);
+      try {
+        fs.cpSync(srcPath, destPath, { recursive: true, force: true });
+        console.log('sync-builtin: copied ' + entry);
+      } catch (e) {
+        console.log('sync-builtin: FAILED to copy ' + entry + ': ' + e.message);
+      }
     }
-    console.log('sync-builtin: copied contents of ' + src + ' -> ' + dest);
+    const destEntries = fs.readdirSync(dest);
+    console.log('sync-builtin: dest entries after copy: ' + destEntries.join(', '));
   " "$src" "$LAYOUT" || {
     echo "sync-builtin: node copy failed, trying cp fallback" >&2
     cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/" || true
