@@ -158,36 +158,42 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
   local src="$1"
   need_dir "$src" "unpacked VSIX tree"
   need_file "$src/package.json" "extension manifest in unpacked VSIX tree"
-  # SUNDAY-CI: Use node for copying (cross-platform, reliable).
-  # cp -r fails on Windows Git Bash. NOTE: fs.cpSync(src, dest) copies
-  # src AS a subdirectory; we need the CONTENTS, so copy each entry.
+  # SUNDAY-CI: Pure Node.js copy (cross-platform, no bash cp issues).
+  # Validates as it copies; fails fast with clear errors.
   node -e "
     const fs = require('fs');
     const path = require('path');
     const src = process.argv[1];
     const dest = process.argv[2];
+    // Clean dest first
+    fs.rmSync(dest, { recursive: true, force: true });
+    fs.mkdirSync(dest, { recursive: true });
     const entries = fs.readdirSync(src);
-    console.log('sync-builtin: source entries: ' + entries.join(', '));
+    let copied = 0;
     for (const entry of entries) {
       const srcPath = path.join(src, entry);
       const destPath = path.join(dest, entry);
-      try {
-        fs.cpSync(srcPath, destPath, { recursive: true, force: true });
-        console.log('sync-builtin: copied ' + entry);
-      } catch (e) {
-        console.log('sync-builtin: FAILED to copy ' + entry + ': ' + e.message);
+      fs.cpSync(srcPath, destPath, { recursive: true, force: true });
+      copied++;
+    }
+    // Verify critical files
+    const checks = [
+      'package.json',
+      'sundayd/sundayd.mjs',
+      'sundayd/browserd.mjs',
+    ];
+    for (const f of checks) {
+      if (!fs.existsSync(path.join(dest, f))) {
+        console.error('sync-builtin: FATAL: missing ' + f + ' after copy');
+        console.error('sync-builtin: dest contents: ' + fs.readdirSync(dest).join(', '));
+        process.exit(1);
       }
     }
-    const destEntries = fs.readdirSync(dest);
-    console.log('sync-builtin: dest entries after copy: ' + destEntries.join(', '));
-  " "$src" "$LAYOUT" || {
-    echo "sync-builtin: node copy failed, trying cp fallback" >&2
-    cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/" || true
-  }
-  # Verify the copy worked
-  if [[ ! -d "$LAYOUT/sundayd" ]]; then
-    echo "sync-builtin: ERROR: sundayd/ not copied to $LAYOUT" >&2
-    ls -la "$LAYOUT/" >&2 || true
+    console.log('sync-builtin: copied ' + copied + ' entries, verified sundayd/');
+  " "$src" "$LAYOUT"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    die "stage_from_vsix_tree: node copy failed"
   fi
 }
 
