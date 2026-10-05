@@ -132,6 +132,11 @@ describe('background/run lifecycle', () => {
     const final = await waitForStatus(runId, store);
     expect(final).toBe('pr-created');
 
+    // Allow the best-effort notifyBackground event for the terminal phase
+    // to be delivered (setStatus saves before notifying; on slow CI the
+    // poll can observe the saved status before the event lands).
+    await new Promise((r) => setTimeout(r, 100));
+
     const state = await getBackgroundStatus(runId, store);
     expect(state.branch).toMatch(/^sunday\/bg\/[0-9a-f]{8}-add-a-health-check-endpoint$/);
     expect(state.prUrl).toBe('https://github.com/acme/repo/pull/42');
