@@ -123,10 +123,8 @@ async function connectClient(p: string): Promise<RpcClient> {
   return client;
 }
 
-// TODO(windows-socket): Same as daemon-connector.test.ts — Unix socket fixture
-// doesn't work on Windows named pipes yet. Skipped on win32.
-// Tracks: Build gate #1.
-const describeWin = process.platform === 'win32' ? describe.skip : describe;
+// Windows named-pipe support enabled 2026-10-05 (see daemon-connector.test.ts).
+const describeWin = describe;
 
 describeWin('RpcClient.fromSocket', () => {
   it('correlates concurrent requests over the socket', async () => {

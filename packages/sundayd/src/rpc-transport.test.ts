@@ -19,6 +19,10 @@ import { ErrorCode } from '@sunday/protocol';
 
 const tmpSockets: string[] = [];
 function socketPath(): string {
+  // Windows uses named pipes, not Unix sockets.
+  if (process.platform === 'win32') {
+    return `\\\\.\\pipe\\sunday-sock-test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
   const p = path.join(
     fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-sock-')),
     'test.sock',
@@ -134,9 +138,8 @@ describe('dispatchRequestLine', () => {
   });
 });
 
-// TODO(windows-socket): Unix socket tests don't work on Windows named pipes.
-// Skipped on win32. Tracks: Build gate #1.
-const describeWin = process.platform === 'win32' ? describe.skip : describe;
+// Windows named-pipe support enabled 2026-10-05 (see daemon-connector.test.ts).
+const describeWin = describe;
 
 describeWin('SocketServerTransport', () => {
   it('round-trips a request/response over a unix socket', async () => {
