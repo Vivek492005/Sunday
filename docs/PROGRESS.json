@@ -31,9 +31,9 @@
       "status": "done"
     },
     {
-      "detail": "CI: macOS/Ubuntu at packaging stage, Windows tests pending",
+      "detail": "windows-package GREEN, Linux IDE GREEN, 18 CI fixes, tech debt done (smoke/named-pipes/advisory), macOS/Windows IDE in progress",
       "name": "Fork Build (Full IDE)",
-      "percent": 85,
+      "percent": 95,
       "status": "active"
     },
     {
@@ -49,5 +49,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-05T07:46:46+00:00"
+  "updated": "2026-10-05T15:40:56+00:00"
 }
