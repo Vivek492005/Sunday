@@ -228,8 +228,9 @@ jobs:
           # Permanent guard: fail fast if the VSIX is incomplete.
           # sync-builtin.sh needs sundayd/sundayd.mjs; catch it here
           # with a clear error instead of a cryptic failure later.
-          vsix="dist-package/sunday-agent-$SUNDAY_VERSION.vsix"
-          if [ ! -f "$vsix" ]; then echo "VSIX not found: $vsix"; exit 1; fi
+          # NOTE: SUNDAY_VERSION is read in a later step; glob instead.
+          vsix=$(ls dist-package/sunday-agent-*.vsix 2>/dev/null | head -1)
+          if [ -z "$vsix" ]; then echo "FATAL: no VSIX found in dist-package/"; ls -la dist-package/ || true; exit 1; fi
           tmpdir="$(mktemp -d)"
           unzip -q "$vsix" -d "$tmpdir"
           if [ ! -f "$tmpdir/extension/sundayd/sundayd.mjs" ]; then
