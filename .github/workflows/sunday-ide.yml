@@ -250,6 +250,14 @@ jobs:
         run: |
           mkdir -p vscode/.github vscode/.agents/skills
           touch vscode/.github/copilot-instructions.md
+      - name: Patch preinstall.ts (skip VS check on CI)
+        # preinstall.ts requires Visual Studio on Windows but the check
+        # fails on GitHub runners. Patch at workflow time (not committed).
+        # The actual native builds use prebuilt binaries; VS is not needed.
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then SED_I="sed -i ''"; else SED_I="sed -i"; fi
+          $SED_I 's|if (process.platform === .win32.) {|if (false \&\& process.platform === "win32") { // SUNDAY-CI: skip VS check|' vscode/build/npm/preinstall.ts
+          grep -q 'SUNDAY-CI: skip VS check' vscode/build/npm/preinstall.ts && echo 'preinstall.ts patched'
       - name: Install vscode dependencies (npm ci)
         working-directory: vscode
         env:
@@ -345,9 +353,15 @@ jobs:
       - name: Verify packaged client
         run: |
           client_dir="$GITHUB_WORKSPACE/VSCode-${{ matrix.platform }}-${{ matrix.arch }}"
-          test -f "$client_dir/resources/app/product.json"
-          app_name="$(node -p "require(process.argv[1]).applicationName" "$client_dir/resources/app/product.json")"
-          echo "packaged client OK: $client_dir (applicationName=$app_name)"
+          # macOS packages as .app bundle; others are flat dirs.
+          if [ "${{ matrix.platform }}" = "darwin" ]; then
+            app_dir="$client_dir/Sunday.app/Contents/Resources/app"
+          else
+            app_dir="$client_dir/resources/app"
+          fi
+          test -f "$app_dir/product.json"
+          app_name="$(node -p "require(process.argv[1]).applicationName" "$app_dir/product.json")"
+          echo "packaged client OK: $app_dir (applicationName=$app_name)"
 
       # ---- Windows: Inno Setup installers (system + user) ----
       # inno ISCC.exe comes from the `innosetup` npm package (installed via
