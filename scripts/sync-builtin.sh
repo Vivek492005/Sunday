@@ -134,8 +134,13 @@ verify_layout() { # verify_layout <dir>
   [[ -n "$name" ]] || die "staged layout invalid: $dir/package.json has no \"name\""
   main="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).main||"./dist/extension.cjs")' "$dir/package.json")"
   # sidecar.ts discovery: <ext>/sundayd/{sundayd.mjs,dist/cli.js,cli.js}
-  [[ -f "$dir/sundayd/sundayd.mjs" || -f "$dir/sundayd/dist/cli.js" || -f "$dir/sundayd/cli.js" ]] \
-    || die "staged layout invalid: no sundayd entrypoint (need sundayd/sundayd.mjs — see sidecar.ts)"
+  # SUNDAY-CI: list dir contents on failure for debugging (Windows cp issues)
+  if [[ ! -f "$dir/sundayd/sundayd.mjs" && ! -f "$dir/sundayd/dist/cli.js" && ! -f "$dir/sundayd/cli.js" ]]; then
+    echo "sync-builtin: DEBUG: sundayd not found in $dir" >&2
+    ls -la "$dir/" >&2 || true
+    ls -la "$dir/sundayd/" >&2 || true
+    die "staged layout invalid: no sundayd entrypoint (need sundayd/sundayd.mjs — see sidecar.ts)"
+  fi
   # browserd.ts discovery: <sundaydDir>/browserd.mjs or <ext>/browserd/dist/cli.js
   [[ -f "$dir/sundayd/browserd.mjs" || -f "$dir/browserd/dist/cli.js" ]] \
     || die "staged layout invalid: no browserd entrypoint (need sundayd/browserd.mjs — see browserd.ts)"

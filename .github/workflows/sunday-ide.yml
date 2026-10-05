@@ -422,6 +422,8 @@ jobs:
           VSCODE_ARCH: ${{ matrix.arch }}
         run: |
           set -o pipefail
+          # create-dmg.ts writes .dmg-settings.py to outDir; ensure it exists.
+          mkdir -p "$GITHUB_WORKSPACE/dmg-out"
           node build/darwin/create-dmg.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/dmg-out" 2>&1 | tee -a "$GITHUB_WORKSPACE/build-darwin-arm64.log"
           mv "$GITHUB_WORKSPACE/dmg-out/VSCode-darwin-arm64.dmg" \
              "$GITHUB_WORKSPACE/Sunday-darwin-arm64-$SUNDAY_VERSION.dmg"
