@@ -122,31 +122,36 @@ jobs:
   # docs/RELEASE_GATES.md.
   advisory-scan:
     runs-on: ubuntu-latest
-    # Report-only: never blocks the workflow. The job-level
-    # continue-on-error ensures the workflow continues, and the
-    # step-level continue-on-error keeps the job green in the UI.
+    # Report-only security scan: never blocks the workflow.
+    # Uses pnpm audit (built-in) instead of the OSV scanner action,
+    # which was failing at "Set up job" (GitHub infra issue).
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Scan lockfile with OSV-Scanner
-        uses: google/osv-scanner-action@v2
-        continue-on-error: true
+      - uses: pnpm/action-setup@v4
         with:
-          scan-args: |-
-            --lockfile=pnpm-lock.yaml
-            --format=sarif
-            --output=osv-results.sarif
-          # Fail on High/Critical once blocking (see TODO above).
-          # For now, report-only: the SARIF output is uploaded below.
+          version: 9
 
-      - name: Upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Scan dependencies with pnpm audit
+        continue-on-error: true
+        run: |
+          # Report-only: list vulnerabilities but never fail the job.
+          # pnpm audit exits non-zero when vulns are found; we capture
+          # the output and always exit 0.
+          pnpm audit --audit-level=moderate 2>&1 | tee audit-results.txt || true
+          echo "advisory scan complete (report-only)"
+          # Upload the results as an artifact for review
+          echo "See audit-results.txt artifact for details"
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
         if: always()
         continue-on-error: true
         with:
-          sarif_file: osv-results.sarif
-          category: osv-scanner
+          name: advisory-audit-results
+          path: audit-results.txt
+          retention-days: 30
 
   # Creates the GitHub release for `ide-v*` tags BEFORE the matrix starts, so
   # the three OS jobs can upload concurrently without racing `release create`.
