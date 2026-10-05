@@ -428,8 +428,10 @@ jobs:
         if: matrix.platform == 'darwin'
         working-directory: vscode
         env:
-          # create-dmg.ts requires VSCODE_ARCH; the matrix arch is arm64.
+          # create-dmg.ts requires VSCODE_ARCH and VSCODE_QUALITY.
+          # QUALITY determines the DMG background image (stable/insider/exploration).
           VSCODE_ARCH: ${{ matrix.arch }}
+          VSCODE_QUALITY: stable
         run: |
           set -o pipefail
           # create-dmg.ts writes .dmg-settings.py to outDir; ensure it exists.

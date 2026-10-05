@@ -158,7 +158,17 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
   local src="$1"
   need_dir "$src" "unpacked VSIX tree"
   need_file "$src/package.json" "extension manifest in unpacked VSIX tree"
-  cp -r "$src/." "$LAYOUT/"
+  # SUNDAY-CI: cp -r "$src/." fails on Windows Git Bash (only copies
+  # package.json, misses subdirs). Use explicit copy without trailing "/.".
+  cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/"
+  # Verify the copy worked; fail with clear message if not.
+  if [[ ! -d "$LAYOUT/sundayd" ]]; then
+    echo "sync-builtin: WARNING: cp -r did not copy sundayd/, trying alternative" >&2
+    # Fallback: copy each item individually
+    for item in "$src"/*; do
+      cp -r "$item" "$LAYOUT/" || true
+    done
+  fi
 }
 
 if [[ -n "$VSIX" ]]; then
