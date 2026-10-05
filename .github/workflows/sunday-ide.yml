@@ -286,16 +286,19 @@ jobs:
 
       - name: Ensure copilot SDK dir for packaging shim
         # prepareBuiltInCopilotRipgrepShim (run during `gulp vscode-*-min-ci`)
-        # requires extensions/copilot/node_modules/@github/copilot/sdk/ to
-        # exist in the PACKAGED app. The .moduleignore re-inclusion approach
-        # proved unreliable, so patch copilot.ts at workflow time (not
-        # committed): create the dir instead of throwing when missing.
+        # needs two things in the PACKAGED app that .moduleignore strips:
+        # (1) extensions/copilot/node_modules/@github/copilot/sdk/ dir,
+        # (2) a readable version in @github/copilot/package.json.
+        # Patch copilot.ts at workflow time (not committed).
         run: >
           sed -i
           's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Copilot SDK directory not found at ${copilotSdkBase}`);|fs.mkdirSync(copilotSdkBase, { recursive: true }); // SUNDAY-CI: create on demand|'
           vscode/build/lib/copilot.ts &&
-          grep -q 'SUNDAY-CI: create on demand' vscode/build/lib/copilot.ts &&
-          echo 'copilot.ts patched'
+          sed -i
+          's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Could not read a version from ${path.join(copilotBase, '"'"'package.json'"'"')}`);|return "0.0.0-sunday-ci"; // SUNDAY-CI: fallback version|'
+          vscode/build/lib/copilot.ts &&
+          grep -q 'SUNDAY-CI' vscode/build/lib/copilot.ts &&
+          echo 'copilot.ts patched (mkdir + version fallback)'
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
