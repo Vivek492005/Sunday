@@ -290,15 +290,12 @@ jobs:
         # (1) extensions/copilot/node_modules/@github/copilot/sdk/ dir,
         # (2) a readable version in @github/copilot/package.json.
         # Patch copilot.ts at workflow time (not committed).
-        run: >
-          sed -i
-          's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Copilot SDK directory not found at ${copilotSdkBase}`);|fs.mkdirSync(copilotSdkBase, { recursive: true }); // SUNDAY-CI: create on demand|'
-          vscode/build/lib/copilot.ts &&
-          sed -i
-          's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Could not read a version from ${path.join(copilotBase, '"'"'package.json'"'"')}`);|return "1.0.73"; // SUNDAY-CI: match lockfile pin|'
-          vscode/build/lib/copilot.ts &&
-          grep -q 'SUNDAY-CI' vscode/build/lib/copilot.ts &&
-          echo 'copilot.ts patched (mkdir + version fallback)'
+        # NOTE: macOS uses BSD sed (needs -i ''), Linux/Windows use GNU sed.
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then SED_I="sed -i ''"; else SED_I="sed -i"; fi
+          $SED_I 's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Copilot SDK directory not found at ${copilotSdkBase}`);|fs.mkdirSync(copilotSdkBase, { recursive: true }); // SUNDAY-CI: create on demand|' vscode/build/lib/copilot.ts
+          $SED_I 's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Could not read a version from ${path.join(copilotBase, '"'"'package.json'"'"')}`);|return "1.0.73"; // SUNDAY-CI: match lockfile pin|' vscode/build/lib/copilot.ts
+          grep -q 'SUNDAY-CI' vscode/build/lib/copilot.ts && echo 'copilot.ts patched (mkdir + version fallback)'
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
