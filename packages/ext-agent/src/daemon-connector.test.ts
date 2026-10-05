@@ -292,7 +292,7 @@ describeWin('DaemonConnector', () => {
   });
 });
 
-describe('DaemonConnector single-flight (Stage 2)', () => {
+describeWin('DaemonConnector single-flight (Stage 2)', () => {
   /** Hermetic per-user socket + lock pair (never touches the real ~/.sunday). */
   function sharedPaths(): { sock: string; lock: string } {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-sf-'));

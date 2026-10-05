@@ -297,6 +297,10 @@ jobs:
         run: |
           sdk_dir="vscode/extensions/copilot/node_modules/@github/copilot/sdk"
           mkdir -p "$sdk_dir"
+          # Placeholder file: packaging copy skips EMPTY dirs, so the sdk/
+          # dir needs at least one file to survive cleanNodeModules.
+          # The shim only checks existsSync(sdk_dir), content is irrelevant.
+          echo '{"sunday":"copilot-sdk-shim-placeholder"}' > "$sdk_dir/.sunday-shim.json"
           # Minimal package.json so the dir is a valid package root if probed.
           if [ ! -f "vscode/extensions/copilot/node_modules/@github/copilot/package.json" ]; then
             echo '{"name":"@github/copilot","version":"0.0.0-stub"}' > "vscode/extensions/copilot/node_modules/@github/copilot/package.json"
