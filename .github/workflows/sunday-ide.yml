@@ -290,23 +290,12 @@ jobs:
         # exist in the PACKAGED app. The .moduleignore re-inclusion approach
         # proved unreliable, so patch copilot.ts at workflow time (not
         # committed): create the dir instead of throwing when missing.
-        # The shim then materializes the real SDK files into it.
-        run: |
-          python3 - <<'EOF'
-          import re
-          p = 'vscode/build/lib/copilot.ts'
-          src = open(p).read()
-          old = """\tif (!fs.existsSync(copilotSdkBase)) {
-\t\tthrow new Error(`[prepareBuiltInCopilotRipgrepShim] Copilot SDK directory not found at ${copilotSdkBase}`);
-\t}"""
-          new = """\tif (!fs.existsSync(copilotSdkBase)) {
-\t\t// SUNDAY-CI: create the SDK dir on demand; the shim populates it.
-\t\tfs.mkdirSync(copilotSdkBase, { recursive: true });
-\t}"""
-          assert old in src, 'copilot.ts pattern not found'
-          open(p, 'w').write(src.replace(old, new))
-          print('copilot.ts patched: mkdir instead of throw')
-          EOF
+        run: >
+          sed -i
+          's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Copilot SDK directory not found at ${copilotSdkBase}`);|fs.mkdirSync(copilotSdkBase, { recursive: true }); // SUNDAY-CI: create on demand|'
+          vscode/build/lib/copilot.ts &&
+          grep -q 'SUNDAY-CI: create on demand' vscode/build/lib/copilot.ts &&
+          echo 'copilot.ts patched'
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the
