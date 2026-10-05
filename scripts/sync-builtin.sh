@@ -158,16 +158,23 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
   local src="$1"
   need_dir "$src" "unpacked VSIX tree"
   need_file "$src/package.json" "extension manifest in unpacked VSIX tree"
-  # SUNDAY-CI: cp -r "$src/." fails on Windows Git Bash (only copies
-  # package.json, misses subdirs). Use explicit copy without trailing "/.".
-  cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/"
-  # Verify the copy worked; fail with clear message if not.
+  # SUNDAY-CI: Use node for copying (cross-platform, reliable).
+  # cp -r fails on Windows Git Bash (only copies package.json, misses subdirs).
+  node -e "
+    const fs = require('fs');
+    const path = require('path');
+    const src = process.argv[1];
+    const dest = process.argv[2];
+    fs.cpSync(src, dest, { recursive: true, force: true });
+    console.log('sync-builtin: copied ' + src + ' -> ' + dest);
+  " "$src" "$LAYOUT" || {
+    echo "sync-builtin: node copy failed, trying cp fallback" >&2
+    cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/" || true
+  }
+  # Verify the copy worked
   if [[ ! -d "$LAYOUT/sundayd" ]]; then
-    echo "sync-builtin: WARNING: cp -r did not copy sundayd/, trying alternative" >&2
-    # Fallback: copy each item individually
-    for item in "$src"/*; do
-      cp -r "$item" "$LAYOUT/" || true
-    done
+    echo "sync-builtin: ERROR: sundayd/ not copied to $LAYOUT" >&2
+    ls -la "$LAYOUT/" >&2 || true
   fi
 }
 
