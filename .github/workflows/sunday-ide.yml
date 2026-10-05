@@ -259,7 +259,22 @@ jobs:
           # unauthenticated CI IPs get 403 rate limits. The automatic token
           # (1000 req/hr) avoids it — the script reads process.env.GITHUB_TOKEN.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm ci
+        # TODO(windows-npm-ci): npm ci intermittently fails on windows-latest
+        # with no log output. Retry up to 3x with verbose logging.
+        run: |
+          attempt=0
+          until [ $attempt -ge 3 ]; do
+            attempt=$((attempt+1))
+            echo "npm ci attempt $attempt"
+            if npm ci --loglevel verbose 2>&1 | tee "npm-ci-attempt-$attempt.log"; then
+              echo "npm ci succeeded"
+              break
+            fi
+            echo "npm ci failed (attempt $attempt)"
+            tail -50 "npm-ci-attempt-$attempt.log" || true
+            if [ $attempt -ge 3 ]; then echo "npm ci failed after 3 attempts"; exit 1; fi
+            sleep 30
+          done
 
       # Copies the built sunday-agent extension (dist + webviews + sidecars)
       # into vscode/extensions/ as a built-in extension. Depends on Worker 2's
