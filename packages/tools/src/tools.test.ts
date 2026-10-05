@@ -158,7 +158,7 @@ describe('run_terminal', () => {
     expect(res.isError).toBeFalsy();
     expect(res.output).toMatch(/hello-sunday/);
     expect(res.metadata).toMatchObject({ exitCode: 0 });
-  });
+  }, 30000); // Windows runners: terminal spawn can be slow
   it('reports non-zero exits with output', async () => {
     const r = createDefaultRegistry();
     const cmd = process.platform === 'win32' ? 'exit 3' : 'sh -c "echo oops >&2; exit 3"';

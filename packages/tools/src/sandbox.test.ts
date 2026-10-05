@@ -236,5 +236,5 @@ describe('run_terminal sandbox wiring', () => {
     expect(res.isError).toBeFalsy();
     expect(res.output).toMatch(/host-path-ok/);
     expect(res.metadata).not.toHaveProperty('sandbox');
-  });
+  }, 30000); // Windows runners: terminal spawn can be slow
 });
