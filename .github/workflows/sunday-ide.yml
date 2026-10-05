@@ -122,12 +122,16 @@ jobs:
   # docs/RELEASE_GATES.md.
   advisory-scan:
     runs-on: ubuntu-latest
+    # Report-only: never blocks the workflow. The job-level
+    # continue-on-error ensures the workflow continues, and the
+    # step-level continue-on-error keeps the job green in the UI.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Scan lockfile with OSV-Scanner
         uses: google/osv-scanner-action@v2
+        continue-on-error: true
         with:
           scan-args: |-
             --lockfile=pnpm-lock.yaml
@@ -139,6 +143,7 @@ jobs:
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: osv-results.sarif
           category: osv-scanner

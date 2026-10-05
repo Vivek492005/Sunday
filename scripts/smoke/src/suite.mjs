@@ -95,3 +95,29 @@ export async function run() {
     throw new Error(`${failed.length} smoke check(s) failed`);
   }
 }
+
+// SUNDAY-CI: Auto-run on load. This file is ONLY loaded by
+// @vscode/test-electron via extensionTestsPath inside the extension
+// host. Without an explicit invocation, runTests hangs forever
+// waiting for completion (the original hang bug).
+// We use a hard timeout as a safety net so the suite can never hang.
+const HARD_TIMEOUT_MS = 180_000;
+const hardTimeout = setTimeout(() => {
+  console.error('[smoke] HARD TIMEOUT: suite did not complete in 180s');
+  if (typeof process !== 'undefined' && process.exit) process.exit(2);
+}, HARD_TIMEOUT_MS);
+// Don't let the timeout itself keep the process alive
+if (hardTimeout.unref) hardTimeout.unref();
+
+run().then(
+  () => {
+    clearTimeout(hardTimeout);
+    console.log('[smoke] suite finished PASS, exiting 0');
+    if (typeof process !== 'undefined' && process.exit) process.exit(0);
+  },
+  (err) => {
+    clearTimeout(hardTimeout);
+    console.error(`[smoke] suite finished FAIL: ${err.message}`);
+    if (typeof process !== 'undefined' && process.exit) process.exit(1);
+  }
+);

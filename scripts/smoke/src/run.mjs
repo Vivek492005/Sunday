@@ -74,20 +74,29 @@ try {
 }
 
 console.log('[smoke] launching VS Code with smoke suite…');
+// SUNDAY-CI: Hard timeout so the suite can never hang the CI job forever.
+// The suite itself has a 180s hard timeout; this is the outer safety net.
+const SMOKE_TIMEOUT_MS = 240_000;
+const timeoutPromise = new Promise((_, reject) => {
+  setTimeout(() => reject(new Error('smoke test timed out after 240s')), SMOKE_TIMEOUT_MS);
+});
 try {
-  await runTests({
-    vscodeExecutablePath: executablePath,
-    extensionTestsPath: join(HERE, 'suite.mjs'),
-    launchArgs: [
-      workspaceDir,
-      '--no-sandbox',
-      '--disable-gpu',
-      '--disable-dev-shm-usage',
-      '--skip-welcome',
-      '--skip-release-notes',
-      '--disable-workspace-trust',
-    ],
-  });
+  await Promise.race([
+    runTests({
+      vscodeExecutablePath: executablePath,
+      extensionTestsPath: join(HERE, 'suite.mjs'),
+      launchArgs: [
+        workspaceDir,
+        '--no-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--skip-welcome',
+        '--skip-release-notes',
+        '--disable-workspace-trust',
+      ],
+    }),
+    timeoutPromise,
+  ]);
   console.log('[smoke] suite completed without throwing — see SMOKE RESULT above');
 } catch (err) {
   console.error(`[smoke] suite failed: ${err.message}`);

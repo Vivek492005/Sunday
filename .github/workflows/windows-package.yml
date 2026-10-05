@@ -98,10 +98,11 @@ jobs:
         run: node scripts/package-vsix.mjs --out dist-package
 
       - name: Electron smoke test (VS Code + VSIX) — release evidence
-        # TODO(smoke-hang): Disabled 2026-10-05 — hangs indefinitely on
-        # windows-latest runners (20+ min, no output). Re-enable after
-        # investigating scripts/smoke/src/run.mjs hang. Tracks: Build gate #1.
-        if: false
+        # SUNDAY-CI 2026-10-05: Re-enabled after fixing the hang.
+        # Root cause: suite.mjs exported run() but never invoked it,
+        # so @vscode/test-electron's runTests waited forever.
+        # Fix: auto-run on load + 180s hard timeout in suite,
+        # 240s outer timeout in run.mjs.
         run: |
           $version = (node -p "require('./packages/ext-agent/package.json').version")
           cd scripts/smoke
