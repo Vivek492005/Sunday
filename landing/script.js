@@ -387,4 +387,31 @@
     if (tip) layer.setAttribute('title', tip.replace(/&amp;/g, '&'));
   });
 
+  /* ---------- V2 PORT: cursor spotlight (fine pointer only) ---------- */
+  var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  var spot = document.getElementById('spotlight');
+  if (spot && finePointer && !reducedMotion) {
+    var sx = -600, sy = -600, tx = -600, ty = -600;
+    document.addEventListener('pointermove', function (e) { tx = e.clientX; ty = e.clientY; }, { passive: true });
+    (function spotLoop() {
+      sx += (tx - sx) * 0.1; sy += (ty - sy) * 0.1;
+      spot.style.left = sx + 'px'; spot.style.top = sy + 'px';
+      requestAnimationFrame(spotLoop);
+    })();
+  } else if (spot) { spot.style.display = 'none'; }
+
+  /* ---------- V2 PORT: magnetic primary buttons ---------- */
+  if (finePointer && !reducedMotion) {
+    document.querySelectorAll('.magnetic').forEach(function (btn) {
+      btn.addEventListener('pointermove', function (e) {
+        var r = btn.getBoundingClientRect();
+        var x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+        if (Math.hypot(x, y) < 80) {
+          btn.style.transform = 'translate(' + (x * 0.08).toFixed(1) + 'px,' + (y * 0.08).toFixed(1) + 'px)';
+        } else { btn.style.transform = ''; }
+      });
+      btn.addEventListener('pointerleave', function () { btn.style.transform = ''; });
+    });
+  }
+
 })();
