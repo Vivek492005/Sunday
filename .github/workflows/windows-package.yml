@@ -78,8 +78,10 @@ jobs:
       - name: Relay matrix (§24.3) — release evidence
         run: |
           cd packages/gateway
-          # NO_COLOR: vitest ANSI codes break the grep check below
-          NO_COLOR=1 npx vitest run src/relay-matrix.test.ts --reporter=verbose 2>&1 | tee relay-matrix-report.txt
+          # NO_COLOR: vitest ANSI codes break the grep check below.
+          # PowerShell syntax ($env:) — this workflow runs on Windows.
+          $env:NO_COLOR = "1"
+          npx vitest run src/relay-matrix.test.ts --reporter=verbose 2>&1 | tee relay-matrix-report.txt
           echo "--- relay matrix: all tests must pass ---"
           grep -q "Test Files  1 passed" relay-matrix-report.txt
 
