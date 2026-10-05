@@ -469,7 +469,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 function hasAuthenticodeSignature(filePath: string): Promise<boolean> {
 	return new Promise((resolve, reject) => {
 		const proc = cp.spawn('signtool.exe', ['verify', '/pa', filePath]);
-		proc.on('error', reject);
+		proc.on('error', () => resolve(false)); // SUNDAY-CI: signtool not on PATH in GH runners; treat as unsigned
 		proc.on('exit', code => resolve(code === 0));
 	});
 }
