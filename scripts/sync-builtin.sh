@@ -159,14 +159,17 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
   need_dir "$src" "unpacked VSIX tree"
   need_file "$src/package.json" "extension manifest in unpacked VSIX tree"
   # SUNDAY-CI: Use node for copying (cross-platform, reliable).
-  # cp -r fails on Windows Git Bash (only copies package.json, misses subdirs).
+  # cp -r fails on Windows Git Bash. NOTE: fs.cpSync(src, dest) copies
+  # src AS a subdirectory; we need the CONTENTS, so copy each entry.
   node -e "
     const fs = require('fs');
     const path = require('path');
     const src = process.argv[1];
     const dest = process.argv[2];
-    fs.cpSync(src, dest, { recursive: true, force: true });
-    console.log('sync-builtin: copied ' + src + ' -> ' + dest);
+    for (const entry of fs.readdirSync(src)) {
+      fs.cpSync(path.join(src, entry), path.join(dest, entry), { recursive: true, force: true });
+    }
+    console.log('sync-builtin: copied contents of ' + src + ' -> ' + dest);
   " "$src" "$LAYOUT" || {
     echo "sync-builtin: node copy failed, trying cp fallback" >&2
     cp -r "$src"/* "$LAYOUT/" 2>/dev/null || cp -r "$src/." "$LAYOUT/" || true
