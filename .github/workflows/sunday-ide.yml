@@ -86,6 +86,35 @@ defaults:
     shell: bash
 
 jobs:
+  # Code quality: lint and typecheck as named, badge-worthy jobs.
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint all packages
+        run: pnpm -r --workspace-concurrency=1 lint
+
+  typecheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck all packages
+        run: pnpm -r --workspace-concurrency=1 typecheck
+
   # Hardening: fail the workflow if anything looking like a real credential
   # was committed to the product tree. Same exclusions as windows-package.yml.
   secret-scan:
