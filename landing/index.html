@@ -3,278 +3,137 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sunday — The Agent-First Coding IDE</title>
-<meta name="description" content="Sunday is an open-source, agent-first coding IDE. Your AI pair programmer, built into your editor." />
+<title>Sunday — The open source AI code editor</title>
+<meta name="description" content="Sunday is the open source AI code editor. Your home for agent-driven development." />
 <link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-<!-- ============ NAV ============ -->
-<header class="nav" id="nav">
-  <div class="nav-inner">
-    <a href="#top" class="logo" aria-label="Sunday home">
-      <img class="logo-mark" src="sunday-logo.jpg" alt="Sunday logo" width="32" height="32" />
-      <span class="logo-word">Sunday</span>
+<!-- ============ TOP NAV ============ -->
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a href="#" class="vs-brand">
+      <img src="sunday-logo.jpg" alt="Sunday" width="28" height="28" />
+      <span>Sunday</span>
     </a>
-    <nav class="nav-links" aria-label="Primary">
-      <a href="#agents">Agents</a>
-      <a href="#editor">Editor</a>
-      <a href="#languages">Languages</a>
-      <a href="#customize">Customize</a>
-      <a href="#download">Download</a>
+    <nav class="vs-nav-links">
+      <a href="#agents">Features ▾</a>
+      <a href="#docs">Docs ▾</a>
+      <a href="#download">Release Notes</a>
+      <a href="#">Blog</a>
+      <a href="#">Learn</a>
+      <a href="#">Events ⧉</a>
+      <a href="#">Resources ▾</a>
     </nav>
-    <a class="btn btn-primary btn-sm" href="#download">Download</a>
+    <div class="vs-nav-right">
+      <div class="vs-search"><span>🔍</span> Search <kbd>Ctrl+Shift+P</kbd></div>
+      <button class="vs-theme-toggle" aria-label="Toggle theme">☀️</button>
+      <a href="#download" class="vs-download-btn">Download</a>
+    </div>
   </div>
 </header>
 
+<!-- ============ BANNER ============ -->
+<div class="vs-banner">
+  <a href="#">🎬 Watch The Story of Sunday! ⧉</a>
+  <button class="vs-banner-close" aria-label="Close">✕</button>
+</div>
+
 <!-- ============ HERO ============ -->
-<section class="hero" id="top">
-  <div class="hero-inner">
-    <p class="hero-kicker">Your home for agent-driven development</p>
-    <h1>The open source<br /><span class="accent">agent-first</span> code editor</h1>
-    <p class="hero-sub">Sunday is a VS Code-based IDE with a built-in autonomous coding agent — not a chatbot bolted on, but an agent-first development environment. Open source. Apache-2.0.</p>
-    <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="#download">Download for Windows</a>
-      <a class="btn btn-ghost btn-lg" href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">View on GitHub</a>
+<section class="vs-hero">
+  <div class="binary-bg" aria-hidden="true"></div>
+  <div class="vs-hero-inner">
+    <h1>The open source <span class="ai-accent">AI</span> code editor</h1>
+    <p class="vs-tagline">Your home for agent-driven development</p>
+
+    <div class="vs-dl-card">
+      <a href="https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/SundaySetup-x64-1.0.0-beta.1.exe" class="vs-dl-btn">
+        <span class="vs-win-icon">🪟</span> Download for Windows
+      </a>
+      <p class="vs-dl-alt"><a href="#">Web</a> ⧉, <a href="#">Insiders edition</a>, or <a href="#download">other platforms</a></p>
+      <p class="vs-dl-legal">By using Sunday, you agree to its <a href="#">license</a> and <a href="#">privacy statement</a> ⧉.</p>
     </div>
-    <p class="hero-note">Free. Open source. <a href="https://github.com/Vivek492005/Sunday/releases/tag/v1.0.0-beta.1">v1.0.0-beta.1</a> available now.</p>
   </div>
-  <div class="hero-shot">
-    <div class="shot-frame">
-      <div class="shot-bar"><span></span><span></span><span></span></div>
-      <div class="shot-body">
-        <div class="shot-sidebar">
-          <div class="shot-file active">✦ agent.ts</div>
-          <div class="shot-file">daemon.ts</div>
-          <div class="shot-file">tools.ts</div>
-          <div class="shot-file">session.ts</div>
+
+  <!-- Editor mockup -->
+  <div class="vs-editor-shot">
+    <div class="vs-editor-frame">
+      <div class="vs-editor-tabs">
+        <span class="vs-tab active">agent.ts ✕</span>
+        <span class="vs-tab">daemon.ts</span>
+        <span class="vs-tab">tools.ts</span>
+      </div>
+      <div class="vs-editor-body">
+        <div class="vs-editor-code">
+<pre><code><span class="tk-k">import</span> {
+  For,
+  Show,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} <span class="tk-k">from</span> <span class="tk-s">"solid-js"</span>;
+
+<span class="tk-k">const</span> <span class="tk-v">agent</span> = <span class="tk-k">await</span> <span class="tk-f">sunday.createAgent</span>({
+  task: <span class="tk-s">"Refactor the auth module"</span>,
+  parallel: <span class="tk-b">true</span>,
+});</code></pre>
         </div>
-        <div class="shot-code">
-<pre><code><span class="c-k">const</span> <span class="c-v">agent</span> = <span class="c-k">await</span> <span class="c-f">sunday.createAgent</span>({
-  task: <span class="c-s">"Refactor the auth module"</span>,
-  parallel: <span class="c-b">true</span>,
-});
-
-<span class="c-c">// ✦ Sunday plans, edits, and verifies</span>
-<span class="c-k">await</span> agent.<span class="c-f">run</span>(); <span class="c-c">// 3 parallel agents · 12 files · tests green ✓</span></code></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ AGENTS THAT BUILD FOR YOU ============ -->
-<section class="section" id="agents">
-  <div class="section-inner">
-    <h2>Agents that build for you</h2>
-    <p class="section-sub">Hand off tasks to AI agents that autonomously plan, make code changes, run commands, and iterate until the job is done.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon">🤖</div>
-        <h3>Parallel agents</h3>
-        <p>Spin up multiple agents on one task. Bounded pool, conflict detection, and a single final verifier — merge with confidence.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🧠</div>
-        <h3>Hierarchical orchestration</h3>
-        <p>Tasks decompose by context, not job titles. Each agent gets exactly what it needs — nothing more, nothing less.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🌐</div>
-        <h3>Browser agent</h3>
-        <p>An agent that sees the web. Live screencast, takeover mode, and recorded sessions with media artifacts.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ ANY PROVIDER, ANY MODEL ============ -->
-<section class="section alt" id="models">
-  <div class="section-inner split">
-    <div>
-      <h2>Any provider, any model</h2>
-      <p>Use the models that fit your workflow. Sunday routes across OpenRouter and Groq — dozens of open models, from fast completions to deep reasoning. Bring your own key; your code is never used for training.</p>
-      <ul class="ticks">
-        <li>OpenRouter + Groq out of the box</li>
-        <li>API-first — no model download on your PC</li>
-        <li>Local Ollama fallback on the roadmap</li>
-      </ul>
-    </div>
-    <div class="panel">
-      <div class="panel-row"><span class="dot ok"></span> openrouter · qwen3-coder <span class="tag">fast</span></div>
-      <div class="panel-row"><span class="dot ok"></span> groq · llama-3.3-70b <span class="tag">reasoning</span></div>
-      <div class="panel-row"><span class="dot ok"></span> openrouter · deepseek-v3 <span class="tag">code</span></div>
-      <div class="panel-row"><span class="dot dim"></span> ollama · local fallback <span class="tag soon">soon</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ ALL YOUR SESSIONS, ONE VIEW ============ -->
-<section class="section" id="sessions">
-  <div class="section-inner split reverse">
-    <div>
-      <h2>All your sessions, one view</h2>
-      <p>Stay productive while multiple agents work in parallel. Track every agent session from a single view — filter, monitor, or dive into an individual run without switching tools.</p>
-    </div>
-    <div class="panel">
-      <div class="panel-row"><span class="dot run"></span> Refactor auth module <span class="tag">3 agents</span></div>
-      <div class="panel-row"><span class="dot run"></span> Fix flaky CI on macOS <span class="tag">1 agent</span></div>
-      <div class="panel-row"><span class="dot ok"></span> Migrate to pnpm <span class="tag">done ✓</span></div>
-      <div class="panel-row"><span class="dot ok"></span> Add MCP server <span class="tag">done ✓</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ YOUR RULES, YOUR AGENTS ============ -->
-<section class="section alt" id="rules">
-  <div class="section-inner">
-    <h2>Your rules, your agents</h2>
-    <p class="section-sub">Ensure agents follow your practices. Define custom instructions, load skills and memory, and connect MCP servers — with approvals exactly where you want them.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon">📜</div>
-        <h3>Skills &amp; rules</h3>
-        <p>Project-scoped skills and memory with trust gating. Secrets are refused, always.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔌</div>
-        <h3>MCP servers</h3>
-        <p>Connect stdio + Streamable HTTP MCP servers with namespaced tools and per-server approvals.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔒</div>
-        <h3>Safety first</h3>
-        <p>Taint tracking on untrusted content, secret redaction, and a published STRIDE threat model.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ WORLD-CLASS EDITOR ============ -->
-<section class="section" id="editor">
-  <div class="section-inner split">
-    <div>
-      <h2>A world-class code editor at its core</h2>
-      <p>Sunday is built on VS Code 1.140 — the editor millions of developers trust. Ghost-text autocomplete, inline edits with diff review, code actions, and terminal intelligence come standard. Switch between agents and hands-on coding in the same window.</p>
-      <ul class="ticks">
-        <li>Ghost-text autocomplete (Tab to accept)</li>
-        <li>Inline edit with diff review</li>
-        <li>@-mentions: file, symbol, terminal, git-diff, web</li>
-        <li>Commit message generation</li>
-      </ul>
-    </div>
-    <div class="shot-frame small">
-      <div class="shot-bar"><span></span><span></span><span></span></div>
-      <div class="shot-body">
-        <div class="shot-code">
-<pre><code><span class="c-c">// Tab to accept →</span>
-<span class="c-k">function</span> <span class="c-f">debounce</span>(fn, ms) {
-  <span class="c-k">let</span> t; <span class="c-k">return</span> (...a) => {
-    <span class="c-f">clearTimeout</span>(t);
-    t = <span class="c-f">setTimeout</span>(() => <span class="c-f">fn</span>(...a), ms);
-  };
-}</code></pre>
+        <div class="vs-agent-panel">
+          <div class="vs-agent-header">REFACTOR AUTH MODULE</div>
+          <div class="vs-agent-msg">Extract each route in <code>auth.ts</code> into a standalone middleware. Preserve session state and the existing validation behavior.</div>
+          <div class="vs-sessions-header">SESSIONS</div>
+          <button class="vs-new-session">New Session</button>
+          <div class="vs-session active"><span class="vs-spin">◌</span><div><strong>Refactor auth module</strong><br /><span>Thinking…</span></div></div>
+          <div class="vs-session"><span class="vs-spin">◌</span><div><strong>Wire MCP server</strong><br /><span>Editing mcp.config.ts</span></div></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ EXTENSIONS ============ -->
-<section class="section alt" id="extensions">
-  <div class="section-inner center">
-    <h2>Code with extensions</h2>
-    <p class="section-sub">Extend your agents with tools from extensions and Model Context Protocol servers — or build your own extension for your team's unique scenarios.</p>
-    <a class="btn btn-primary" href="https://github.com/Vivek492005/Sunday">Explore the architecture</a>
+<!-- ============ AGENTS ============ -->
+<section class="vs-section" id="agents">
+  <h2>Agents that build for you</h2>
+  <p class="vs-section-sub">Hand off tasks to AI agents that autonomously plan, make code changes, run commands, and iterate until the job is done.</p>
+  <div class="vs-cards">
+    <div class="vs-card"><div class="vs-card-icon">🤖</div><h3>Parallel agents</h3><p>Multiple agents, one task. Bounded pool, conflict detection, single final verifier.</p></div>
+    <div class="vs-card"><div class="vs-card-icon">🧠</div><h3>Hierarchical orchestration</h3><p>Context-centric decomposition — each agent gets exactly what it needs.</p></div>
+    <div class="vs-card"><div class="vs-card-icon">🌐</div><h3>Browser agent</h3><p>Live screencast, takeover mode, recorded sessions with media.</p></div>
   </div>
 </section>
 
-<!-- ============ LANGUAGES ============ -->
-<section class="section" id="languages">
-  <div class="section-inner center">
-    <h2>Code in any language</h2>
-    <p class="section-sub">Sunday supports almost every major programming language. JavaScript, TypeScript, Python and more work out of the box.</p>
-    <div class="lang-grid">
-      <span class="lang">JavaScript</span><span class="lang">TypeScript</span><span class="lang">Python</span><span class="lang">Go</span><span class="lang">Rust</span><span class="lang">Java</span><span class="lang">C++</span><span class="lang">C#</span><span class="lang">PHP</span><span class="lang">Ruby</span><span class="lang">HTML</span><span class="lang">CSS</span>
-    </div>
-  </div>
-</section>
-
-<!-- ============ CUSTOMIZABLE ============ -->
-<section class="section alt" id="customize">
-  <div class="section-inner split">
-    <div>
-      <h2>Fully customizable</h2>
-      <p>Customize your Sunday UI and layout so it fits your coding style. Color themes, settings sync, and profiles — make it yours.</p>
-      <ul class="ticks">
-        <li>Sunrise theme family included</li>
-        <li>Settings sync across machines</li>
-        <li>Profiles for work, OSS, and play</li>
-      </ul>
-    </div>
-    <div class="panel theme-dots">
-      <div class="theme"><span class="sw" style="background:#0f172a"></span> Midnight <span class="tag">default</span></div>
-      <div class="theme"><span class="sw" style="background:#fff7ed"></span> Sunrise Light</div>
-      <div class="theme"><span class="sw" style="background:#1c1917"></span> Ember Dark</div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ CODE ANYWHERE ============ -->
-<section class="section" id="anywhere">
-  <div class="section-inner center">
-    <h2>Code anywhere</h2>
-    <p class="section-sub">Windows today — with Linux and macOS builds in the pipeline. Your agent, your daemon, your rules, on every machine you own.</p>
-    <div class="os-row">
-      <span class="os">🪟 Windows <em>available</em></span>
-      <span class="os">🐧 Linux <em>soon</em></span>
-      <span class="os">🍎 macOS <em>soon</em></span>
-    </div>
+<!-- ============ MODELS ============ -->
+<section class="vs-section">
+  <h2>Any provider, any model</h2>
+  <p class="vs-section-sub">OpenRouter + Groq out of the box. Dozens of open models — bring your own key.</p>
+  <div class="vs-terminal">
+    <div><span class="tk-g">$</span> sunday models</div>
+    <div><span class="tk-ok">✓</span> openrouter · qwen3-coder <span class="tk-dim">— fast</span></div>
+    <div><span class="tk-ok">✓</span> groq · llama-3.3-70b <span class="tk-dim">— reasoning</span></div>
+    <div><span class="tk-ok">✓</span> openrouter · deepseek-v3 <span class="tk-dim">— code</span></div>
   </div>
 </section>
 
 <!-- ============ DOWNLOAD ============ -->
-<section class="download" id="download">
-  <div class="section-inner center">
-    <img class="dl-logo" src="sunday-logo.jpg" alt="Sunday logo" width="72" height="72" />
-    <h2>Download Sunday</h2>
-    <p class="section-sub">Free. Open source (Apache-2.0). v1.0.0-beta.1</p>
-    <div class="dl-grid">
-      <a class="dl-card" href="https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/SundaySetup-x64-1.0.0-beta.1.exe">
-        <span class="dl-os">🪟 Windows</span>
-        <span class="dl-meta">64-bit · Installer</span>
-        <span class="btn btn-primary btn-sm">Download</span>
-      </a>
-      <div class="dl-card soon">
-        <span class="dl-os">🐧 Linux</span>
-        <span class="dl-meta">Coming soon</span>
-        <span class="btn btn-ghost btn-sm">Notify me</span>
-      </div>
-      <div class="dl-card soon">
-        <span class="dl-os">🍎 macOS</span>
-        <span class="dl-meta">Coming soon</span>
-        <span class="btn btn-ghost btn-sm">Notify me</span>
-      </div>
-    </div>
-    <p class="dl-note">Prefer the extension? Grab the <a href="https://github.com/Vivek492005/Sunday/releases/tag/v1.0.0-beta.1">.vsix</a> and install it in any VS Code-compatible editor.</p>
+<section class="vs-download" id="download">
+  <img src="sunday-logo.jpg" alt="Sunday" width="64" height="64" class="vs-dl-logo" />
+  <h2>Download Sunday</h2>
+  <p class="vs-section-sub">Free · Open source (Apache-2.0) · v1.0.0-beta.1</p>
+  <div class="vs-dl-grid">
+    <a class="vs-dl-option" href="https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/SundaySetup-x64-1.0.0-beta.1.exe">
+      <span>🪟</span><strong>Windows</strong><em>64-bit installer</em>
+    </a>
+    <div class="vs-dl-option soon"><span>🐧</span><strong>Linux</strong><em>Coming soon</em></div>
+    <div class="vs-dl-option soon"><span>🍎</span><strong>macOS</strong><em>Coming soon</em></div>
   </div>
 </section>
 
-<!-- ============ FOOTER ============ -->
-<footer class="footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <img src="sunday-logo.jpg" alt="Sunday logo" width="28" height="28" />
-      <span>Sunday</span>
-    </div>
-    <nav class="footer-links" aria-label="Footer">
-      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
-      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
-      <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">Architecture</a>
-      <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md">Security</a>
-    </nav>
-    <p class="footer-copy">© 2026 Sunday · Apache-2.0 · Built on VS Code (MIT)</p>
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav><a href="#">GitHub</a><a href="#">Releases</a><a href="#">Docs</a><a href="#">Security</a></nav>
   </div>
 </footer>
 

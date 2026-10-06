@@ -415,25 +415,3 @@
   }
 
 })();
-
-// Binary background for hero (VS Code style)
-(function() {
-  const bg = document.querySelector('.binary-bg');
-  if (!bg) return;
-  const words = ['HAPPY_CODING!', 'SUNDAY', 'AGENT', '010101'];
-  let html = '';
-  for (let r = 0; r < 28; r++) {
-    let line = '';
-    for (let c = 0; c < 120; c++) {
-      if (Math.random() < 0.04 && c < 100) {
-        const w = words[Math.floor(Math.random() * words.length)];
-        line += w;
-        c += w.length;
-      } else {
-        line += Math.random() < 0.5 ? '0' : '1';
-      }
-    }
-    html += line + '\n';
-  }
-  bg.textContent = html;
-})();

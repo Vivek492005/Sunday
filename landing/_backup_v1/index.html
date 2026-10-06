@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunday — Your editor, with an agent inside.</title>
+<meta name="description" content="Sunday is a VS Code-based IDE rebuilt around an autonomous coding agent. Describe the feature — it plans, codes, tests, and verifies. You review the diff. Free & open source.">
+<meta property="og:title" content="Sunday — Your editor, with an agent inside.">
+<meta property="og:description" content="An agent-first coding IDE. Describe the feature — it plans, codes, tests, and verifies. Free & open source (Apache-2.0).">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="icon" href="sunday-logo.jpg" type="image/jpeg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="logo" aria-label="Sunday home">
+      <img class="logo-mark" src="sunday-logo.jpg" alt="Sunday logo" width="32" height="32" />
+      <span class="logo-word">Sunday</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#docs">Docs</a>
+      <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub <span class="stars" id="star-count" aria-label="GitHub stars"></span></a>
+    </nav>
+    <a href="#download" class="btn btn-primary btn-sm magnetic">Get Sunday</a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" hidden>
+  <a href="#features">Features</a>
+  <a href="#how-it-works">How it works</a>
+  <a href="#docs">Docs</a>
+  <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub</a>
+  <a href="#download" class="btn btn-primary magnetic">Get Sunday</a>
+</div>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="hero">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+    <canvas id="particles" aria-hidden="true"></canvas>
+  </div>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <h1>Your editor,<br>with <span class="gradient-text">an agent</span> inside.</h1>
+      <p class="hero-sub">Sunday is a VS Code-based IDE rebuilt around an autonomous coding agent. Describe the feature — it plans, codes, tests, and verifies. You review the diff.</p>
+      <div class="hero-ctas">
+        <a href="#download" class="btn btn-primary btn-lg magnetic">Download for Windows</a>
+        <a href="#how-it-works" class="btn btn-ghost btn-lg">See how it works</a>
+      </div>
+      <p class="hero-micro">v1.0.0-beta.1 · Free &amp; open source (Apache-2.0)</p>
+      <div class="hero-typer" aria-live="polite">
+        <span class="prompt-symbol">$</span>
+        <span id="typer-text"></span><span class="cursor" aria-hidden="true">▍</span>
+      </div>
+    </div>
+    <div class="hero-visual tilt" id="hero-visual">
+      <div class="editor-frame">
+        <div class="editor-chrome" aria-hidden="true">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="editor-title">sunday — chat</span>
+        </div>
+        <div class="editor-body">
+          <div class="chat-msg user"><span class="avatar">you</span><p>Add JWT auth to the login route</p></div>
+          <div class="chat-msg agent"><span class="avatar sun">☀️</span><div><p class="dim">Planning… 3 steps</p><p>Reading <code>src/api/routes.ts</code></p><p>Editing <code>src/api/middleware.ts</code> <span class="ok">+84 −12</span></p><p><span class="ok">✓</span> Tests pass <span class="dim">(12/12)</span></p></div></div>
+          <div class="diff-mini" aria-hidden="true">
+            <div class="dl del">- const token = session.id;</div>
+            <div class="dl add">+ const token = jwt.sign({ sub: user.id }, SECRET);</div>
+            <div class="dl add">+ verifyToken(req, res, next);</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <a href="#stats" class="scroll-hint" aria-label="Scroll down"><span></span></a>
+</section>
+
+<!-- ============ STATS ============ -->
+<section class="stats" id="stats">
+  <div class="container stats-inner">
+    <span class="badge">Built on VS Code 1.140.0</span>
+    <div class="stat-grid">
+      <div class="stat"><span class="stat-num gradient-text" data-count="1013">0</span><span class="stat-label">tests passing</span></div>
+      <div class="stat"><span class="stat-num gradient-text" data-count="16">0</span><span class="stat-label">packages</span></div>
+      <div class="stat"><span class="stat-num gradient-text" data-count="14">0</span><span class="stat-label">task eval benchmark</span></div>
+      <div class="stat"><span class="stat-num">Apache-2.0</span><span class="stat-label">licensed</span></div>
+    </div>
+    <!-- Live GitHub stats -->
+    <div class="stat-grid github-stats" id="github-stats">
+      <div class="stat"><span class="stat-num gradient-text" id="gh-stars">—</span><span class="stat-label">⭐ stars</span></div>
+      <div class="stat"><span class="stat-num gradient-text" id="gh-forks">—</span><span class="stat-label">🍴 forks</span></div>
+      <div class="stat"><span class="stat-num gradient-text" id="gh-watchers">—</span><span class="stat-label">👁️ watchers</span></div>
+      <div class="stat"><span class="stat-num gradient-text" id="gh-issues">—</span><span class="stat-label">📝 open issues</span></div>
+    </div>
+    <p class="live-note"><span class="live-dot"></span> Live from GitHub API · updates every visit</p>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="section" id="features">
+  <div class="container">
+    <h2 class="section-title reveal">Everything an agent needs.<br><span class="dim">Nothing it doesn't.</span></h2>
+    <div class="feature-grid">
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <div class="card-icon" aria-hidden="true">🤖</div>
+        <h3>Autonomous Agent</h3>
+        <p>Describe the feature. The agent plans, reads your codebase, edits files, runs commands, and verifies — with hunk-level undo on everything.</p>
+      </a>
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <div class="card-icon" aria-hidden="true">🧠</div>
+        <h3>Editor Intelligence</h3>
+        <p>Ghost-text autocomplete, Ctrl+I inline edits, Fix/Explain/Tests actions, and <code>@file</code> <code>@symbol</code> <code>@terminal</code> mentions that actually understand context.</p>
+      </a>
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <div class="card-icon" aria-hidden="true">🌐</div>
+        <h3>Agent Browser</h3>
+        <p>Watch the agent browse in a live view. Take over mid-task, hand control back when done. Policy-gated: private IPs blocked, new origins need approval.</p>
+      </a>
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <div class="card-icon" aria-hidden="true">👥</div>
+        <h3>Parallel Agents</h3>
+        <p>Orchestrator splits work into parallel units → feature agents execute → verifier checks. Overlap detection, budgets, no conflicts.</p>
+      </a>
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md">
+        <div class="card-icon" aria-hidden="true">🔒</div>
+        <h3>Fail-closed Security</h3>
+        <p>Untrusted workspaces get restricted tools automatically. Secrets are redacted before they ever reach history or logs. Keys live in env vars, never config files.</p>
+      </a>
+      <a class="card tilt reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <div class="card-icon" aria-hidden="true">💻</div>
+        <h3>Your Workflow, Your Way</h3>
+        <p>VS Code extension, terminal CLI, JetBrains plugin, or a hosted OpenAI-compatible API. One daemon per user, shared across all of them.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section section-alt" id="how-it-works">
+  <div class="container">
+    <h2 class="section-title reveal">Three steps. <span class="dim">Zero boilerplate.</span></h2>
+    <div class="flow" id="flow">
+      <svg class="flow-line" viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" y1="20" x2="600" y2="20" class="flow-dash"/>
+      </svg>
+      <div class="flow-step reveal" data-step="0">
+        <div class="flow-node"><span class="flow-num">1</span></div>
+        <h3>Describe</h3>
+        <p>Type a task in chat, or speak it. <code>@</code>-mention the files that matter.</p>
+      </div>
+      <div class="flow-step reveal" data-step="1">
+        <div class="flow-node"><span class="flow-num">2</span></div>
+        <h3>Agent works</h3>
+        <p>It plans the change, reads code with semantic retrieval, edits with your approval, runs tests.</p>
+      </div>
+      <div class="flow-step reveal" data-step="2">
+        <div class="flow-node"><span class="flow-num">3</span></div>
+        <h3>Review &amp; merge</h3>
+        <p>Inspect the diff, undo any hunk, accept. Background agents deliver as GitHub PRs.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DEMO ============ -->
+<section class="section" id="demo">
+  <div class="container">
+    <h2 class="section-title reveal">Watch it work.</h2>
+    <p class="section-sub reveal">A scripted run — no install needed. This is the shape of a real Sunday session.</p>
+    <div class="demo-tabs reveal" role="tablist" aria-label="Demo views">
+      <button class="demo-tab active" data-tab="terminal" role="tab" aria-selected="true">Terminal</button>
+      <button class="demo-tab" data-tab="diff" role="tab" aria-selected="false">Diff view</button>
+      <button class="demo-tab" data-tab="chat" role="tab" aria-selected="false">Chat UI</button>
+    </div>
+    <div class="demo-window reveal">
+      <div class="demo-chrome" aria-hidden="true">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="demo-title" id="demo-title">terminal — sunday</span>
+        <button class="replay" id="replay" aria-label="Replay demo">↻ Replay</button>
+      </div>
+      <div class="demo-pane active" id="pane-terminal" role="tabpanel">
+        <pre class="terminal" id="terminal-output" aria-live="polite"></pre>
+      </div>
+      <div class="demo-pane" id="pane-diff" role="tabpanel">
+        <pre class="code-block"><code><span class="c-dim">--- a/src/api/middleware.ts
++++ b/src/api/middleware.ts</span>
+<span class="c-del">- import { session } from './session';</span>
+<span class="c-add">+ import jwt from 'jsonwebtoken';</span>
+<span class="c-add">+ import { rateLimit } from './rate-limit';</span>
+
+<span class="c-dim"> export function authMiddleware(req, res, next) {</span>
+<span class="c-del">-   const token = session.id;</span>
+<span class="c-add">+   const token = jwt.sign({ sub: req.user.id }, process.env.JWT_SECRET);</span>
+<span class="c-add">+   rateLimit(req, res); // 100 req/min per IP</span>
+<span class="c-dim">   next();</span>
+<span class="c-dim"> }</span></code></pre>
+      </div>
+      <div class="demo-pane" id="pane-chat" role="tabpanel">
+        <div class="chat-mock">
+          <div class="chat-msg user"><span class="avatar">you</span><p>add rate limiting to the API</p></div>
+          <div class="chat-msg agent"><span class="avatar sun">☀️</span><div><p>Added token-bucket rate limiting to <code>authMiddleware</code> — 100 req/min per IP, 429 with <code>Retry-After</code> on overflow.</p><p><span class="ok">✓</span> 12/12 tests pass · <button class="linklike">View diff</button></p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section class="section section-alt" id="architecture">
+  <div class="container">
+    <h2 class="section-title reveal">Real engineering, <span class="dim">not a wrapper.</span></h2>
+    <div class="arch reveal">
+      <div class="arch-layer" data-tip="VS Code extension + chat, manager &amp; browser views">
+        <span class="arch-name">Sunday IDE <span class="dim">/ VS Code extension</span></span>
+        <span class="arch-proto">JSON-RPC · NDJSON</span>
+      </div>
+      <div class="arch-conn" aria-hidden="true"><span class="packet"></span><span class="packet p2"></span></div>
+      <div class="arch-layer arch-heart" data-tip="Sessions · agent loop · policy gate · orchestrator · MCP hub · checkpoints">
+        <span class="arch-name">sundayd <span class="dim">daemon</span></span>
+        <span class="arch-proto">HTTPS</span>
+      </div>
+      <div class="arch-conn" aria-hidden="true"><span class="packet"></span><span class="packet p2"></span></div>
+      <div class="arch-layer" data-tip="Provider router with visible Relay fallback on 429/quota">
+        <span class="arch-name">Gateway <span class="dim">router</span></span>
+        <span class="arch-proto">OpenRouter · Groq</span>
+      </div>
+    </div>
+    <p class="arch-notes reveal">One daemon per OS user · Keys in env vars only · Fail-closed policy gate</p>
+    <p class="center reveal"><a class="text-link" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">Read the architecture doc →</a></p>
+  </div>
+</section>
+
+<!-- ============ CODE SHOWCASE ============ -->
+<section class="section" id="showcase">
+  <div class="container">
+    <h2 class="section-title reveal">See what the agent produces.</h2>
+    <p class="section-sub reveal">Output shape from the Sunday eval harness — 14 benchmark tasks, 100% tool-reliability target.</p>
+    <div class="showcase-grid reveal">
+      <div class="code-card">
+        <div class="code-head"><span>middleware.ts — diff</span><button class="copy-btn" data-copy="diff-code">Copy</button></div>
+        <pre class="code-block"><code id="diff-code"><span class="c-dim">--- a/src/api/middleware.ts
++++ b/src/api/middleware.ts</span>
+<span class="c-add">+ import jwt from 'jsonwebtoken';</span>
+<span class="c-add">+ import { rateLimit } from './rate-limit';</span>
+<span class="c-dim">  export function authMiddleware(req, res, next) {</span>
+<span class="c-del">-   const token = session.id;</span>
+<span class="c-add">+   const token = jwt.sign(</span>
+<span class="c-add">+     { sub: req.user.id },</span>
+<span class="c-add">+     process.env.JWT_SECRET,</span>
+<span class="c-add">+     { expiresIn: '15m' }</span>
+<span class="c-add">+   );</span>
+<span class="c-add">+   rateLimit(req, res);</span>
+<span class="c-dim">   next();</span>
+<span class="c-dim"> }</span></code></pre>
+      </div>
+      <div class="code-card">
+        <div class="code-head"><span>test run — output</span><button class="copy-btn" data-copy="test-code">Copy</button></div>
+        <pre class="code-block"><code id="test-code"><span class="c-dim">$ vitest run src/api/middleware.test.ts</span>
+
+ <span class="c-ok">✓</span> signs a token with the user id
+ <span class="c-ok">✓</span> rejects expired tokens
+ <span class="c-ok">✓</span> rate-limits at 100 req/min
+ <span class="c-ok">✓</span> returns 429 with Retry-After
+ <span class="c-ok">✓</span> passes through valid requests
+ <span class="c-dim">…</span>
+
+ <span class="c-ok">Test Files  1 passed (1)</span>
+ <span class="c-ok">     Tests  12 passed (12)</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ USE CASES ============ -->
+<section class="section section-alt" id="use-cases">
+  <div class="container">
+    <h2 class="section-title reveal">Built for how <span class="dim">you</span> build.</h2>
+    <div class="persona-grid">
+      <div class="card reveal">
+        <div class="card-icon" aria-hidden="true">👤</div>
+        <h3>Solo developer</h3>
+        <p>Ship the side project. Describe features in plain language; Sunday handles the boilerplate, tests, and refactors while you steer.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon" aria-hidden="true">👥</div>
+        <h3>Team</h3>
+        <p>Parallel agents split a feature into independent units with overlap detection and a verifier gate — like a tireless junior team with a senior reviewing.</p>
+      </div>
+      <div class="card reveal">
+        <div class="card-icon" aria-hidden="true">🎓</div>
+        <h3>Student / learner</h3>
+        <p>Free-tier friendly (OpenRouter + Groq free tiers). Ask "explain this function" on any selection; get Fix/Explain/Tests actions inline.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EDITIONS ============ -->
+<section class="section" id="editions">
+  <div class="container">
+    <div class="edition-card reveal">
+      <div class="edition-inner">
+        <h2>Sunday — Free &amp; Open Source</h2>
+        <div class="price"><span class="gradient-text">$0</span></div>
+        <p>Apache-2.0. Every feature, every package. Bring your own API keys — OpenRouter and Groq both have free tiers.</p>
+        <a href="#download" class="btn btn-primary btn-lg magnetic">Download free →</a>
+        <p class="edition-note">Optional: self-host the OpenAI-compatible gateway (abuse controls included) if you don't have provider keys. The code is in the repo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="section section-alt" id="download">
+  <div class="container">
+    <h2 class="section-title reveal">Get Sunday.</h2>
+    <p class="section-sub reveal"><span class="badge">v1.0.0-beta.1</span></p>
+    <div class="dl-grid">
+      <a class="dl-card dl-primary reveal" data-os="windows" href="https://github.com/Vivek492005/Sunday/releases/tag/v1.0.0-beta.1">
+        <div class="card-icon" aria-hidden="true">🪟</div>
+        <h3>Windows installer</h3>
+        <p class="dl-file">Sunday IDE 1.0.0-beta.1</p>
+        <span class="dl-tag">Recommended</span>
+      </a>
+      <div class="dl-card reveal" data-os="other">
+        <div class="card-icon" aria-hidden="true">🧩</div>
+        <h3>VSIX</h3>
+        <p class="dl-file">sunday-agent-1.0.0-beta.1.vsix</p>
+        <div class="cmd"><code>code --install-extension sunday-agent-1.0.0-beta.1.vsix</code><button class="copy-btn" data-copy="vsix-cmd">Copy</button></div>
+        <a class="text-link" href="https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/sunday-agent-1.0.0-beta.1.vsix">Download .vsix →</a>
+        <span id="vsix-cmd" hidden>code --install-extension sunday-agent-1.0.0-beta.1.vsix</span>
+      </div>
+      <div class="dl-card reveal" data-os="other">
+        <div class="card-icon" aria-hidden="true">⌨️</div>
+        <h3>CLI / source</h3>
+        <p class="dl-file">Build it yourself</p>
+        <div class="cmd"><code>git clone https://github.com/Vivek492005/Sunday.git</code><button class="copy-btn" data-copy="clone-cmd">Copy</button></div>
+        <span id="clone-cmd" hidden>git clone https://github.com/Vivek492005/Sunday.git</span>
+      </div>
+    </div>
+    <div class="setup-steps reveal">
+      <h3>Then set your API keys</h3>
+      <ol>
+        <li><strong>Install</strong> — run the installer or the VSIX.</li>
+        <li><strong>Keys</strong> — <code>export OPENROUTER_API_KEY=…</code> (free tier at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a>) and/or <code>export GROQ_API_KEY=…</code> (<a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>).</li>
+        <li><strong>Open</strong> the Sunday Chat view in VS Code and describe your first task.</li>
+      </ol>
+      <p><a class="text-link" href="https://github.com/Vivek492005/Sunday/blob/main/docs/INSTALL.md">Full install guide →</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOCS ============ -->
+<section class="section" id="docs">
+  <div class="container">
+    <h2 class="section-title reveal">Go deeper.</h2>
+    <div class="docs-grid">
+      <a class="doc-card reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">
+        <span class="doc-glyph" aria-hidden="true">📄</span>
+        <div><h3>Architecture</h3><p>System design, data flow, component boundaries.</p></div>
+        <span class="doc-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="doc-card reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md">
+        <span class="doc-glyph" aria-hidden="true">📄</span>
+        <div><h3>Security</h3><p>Threat model, trust boundaries, secret handling.</p></div>
+        <span class="doc-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="doc-card reveal" href="https://github.com/Vivek492005/Sunday/blob/main/docs/PROJECT_BLUEPRINT.md">
+        <span class="doc-glyph" aria-hidden="true">📄</span>
+        <div><h3>Project blueprint</h3><p>Phase-by-phase history of the whole build.</p></div>
+        <span class="doc-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="doc-card reveal" href="https://github.com/Vivek492005/Sunday/blob/main/CONTRIBUTING.md">
+        <span class="doc-glyph" aria-hidden="true">📄</span>
+        <div><h3>Contributing</h3><p>Conventions, tests, and how to submit PRs.</p></div>
+        <span class="doc-arrow" aria-hidden="true">→</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/BETA_RELEASE_CHECKLIST.md">Roadmap</a>
+    </div>
+    <div class="footer-col">
+      <h4>Resources</h4>
+      <a href="#docs">Docs</a>
+      <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+      <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md">Security</a>
+      <a href="https://github.com/Vivek492005/Sunday/blob/main/CHANGELOG.md">Changelog</a>
+    </div>
+    <div class="footer-col">
+      <h4>Community</h4>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/issues">Issues</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <p>© 2026 Sunday · Apache-2.0 · Built on VS Code 1.140.0 (MIT)</p>
+    <p class="tagline">☀️ Build at the speed of thought.</p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<div class="grain" aria-hidden="true"></div>
+<div class="spotlight" id="spotlight" aria-hidden="true"></div>
+</body>
+</html>
