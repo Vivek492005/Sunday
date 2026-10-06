@@ -1,0 +1,3 @@
+#!/bin/sh
+# Husky pre-commit hook — enforce conventional commits
+npx --no-install commitlint --edit "$1"
