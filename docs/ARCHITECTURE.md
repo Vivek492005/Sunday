@@ -274,3 +274,13 @@ keys; clients get an OpenAI-compatible text-chat API (`GET /health`,
   (content never logged), upstream timeout with client-disconnect abort.
 - Config: `SUNDAY_HOSTED_*` env vars; operator runbook in
   `packages/hosted-gateway/README.md`. Never expose without TLS in front.
+
+## Non-Goals
+
+What Sunday deliberately does *not* try to be:
+
+- **Not a general-purpose agent framework.** Sunday is a coding IDE, not LangChain. The orchestration, tools, and UI are opinionated for software development.
+- **Not every IDE.** The primary frontend is the VS Code fork + extension. JetBrains support exists but is explicitly secondary (see Path-to-10 §6).
+- **Not OS-level sandboxing in v1.** Tool execution is gated by approvals and (optionally) Docker/bubblewrap, but Sunday does not attempt full OS sandboxing.
+- **Not a model provider.** Sunday routes to OpenRouter/Groq; it does not train, host, or serve foundation models.
+- **Not offline-first in v1.** API-first means a network connection and provider keys are required (see ADR-004).

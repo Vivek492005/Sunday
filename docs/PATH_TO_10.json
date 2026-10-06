@@ -1,0 +1,124 @@
+{
+  "phases": [
+    {
+      "detail": "Close 3 remaining gates: human screen-reader pass, packet capture, soak test + live eval",
+      "name": "Production Readiness",
+      "percent": 60,
+      "status": "active",
+      "tasks": [
+        "Human screen-reader pass (NVDA/VoiceOver) with checklist",
+        "Packet capture verification (5-min idle)",
+        "1-hour soak test on release machine",
+        "Live-model eval baseline with real keys",
+        "Tag v1.0.0 when all 11 gates green"
+      ]
+    },
+    {
+      "detail": "Coverage, lint badges, dependabot, commit convention",
+      "name": "Code Quality Automation",
+      "percent": 100,
+      "status": "completed",
+      "tasks": [
+        "Add coverage reporting (c8/vitest) + badge + CI threshold",
+        "Split lint/typecheck into named CI jobs + badges",
+        "Add .github/dependabot.yml",
+        "Adopt Conventional Commits + commitlint + husky",
+        "Add PR/issue templates + CODEOWNERS"
+      ]
+    },
+    {
+      "detail": "ADRs, protocol versioning, SEC-09/SEC-10",
+      "name": "Architecture & Security",
+      "percent": 0,
+      "status": "pending",
+      "tasks": [
+        "Create docs/adr/ with 5 key decisions",
+        "Add docs/PROTOCOL_VERSIONING.md + CI check",
+        "Add Non-Goals to ARCHITECTURE.md",
+        "Convert diagrams to Mermaid",
+        "Add daemon crash recovery test",
+        "Implement SEC-09 (taint tracking)",
+        "Implement SEC-10 (secret gating)",
+        "Add fuzz tests for JSON-RPC parser",
+        "Generate SBOM per release",
+        "Add OpenSSF Scorecard badge"
+      ]
+    },
+    {
+      "detail": "Demo GIF, FAQ, glossary, repo metadata",
+      "name": "Documentation & Launch Prep",
+      "percent": 30,
+      "status": "pending",
+      "tasks": [
+        "Record 60-90s demo GIF for README",
+        "Add README table of contents",
+        "Create docs/GLOSSARY.md",
+        "Create docs/FAQ.md",
+        "Set repo description + topics + website (\u00a79)"
+      ]
+    },
+    {
+      "detail": "Open VSX, landing page, npm CLI",
+      "name": "Distribution",
+      "percent": 20,
+      "status": "pending",
+      "tasks": [
+        "Publish sunday-agent to Open VSX",
+        "Add install badge to README",
+        "Deploy landing page (already built)",
+        "Publish CLI to npm"
+      ]
+    },
+    {
+      "detail": "Show HN, Reddit, benchmark write-up",
+      "name": "Launch & Traction",
+      "percent": 0,
+      "status": "pending",
+      "tasks": [
+        "Run orchestration benchmark (on vs off)",
+        "Publish technical write-up (dev.to/blog)",
+        "Show HN post",
+        "r/programming + r/vscode posts",
+        "Submit to awesome lists",
+        "Set star target with date"
+      ]
+    },
+    {
+      "detail": "Falsifiable definitions, one frontend at a time",
+      "name": "Feature Completion",
+      "percent": 40,
+      "status": "pending",
+      "tasks": [
+        "Define 'done' for JetBrains plugin",
+        "Define 'done' for IDE fork",
+        "Pick ONE to finish first, pause the other",
+        "Ship minimal local-model support (Ollama autocomplete)"
+      ]
+    },
+    {
+      "detail": "Load tests, parallelism ceiling, scaling plan",
+      "name": "Scalability",
+      "percent": 0,
+      "status": "pending",
+      "tasks": [
+        "Load-test hosted-gateway (k6/autocannon)",
+        "Add orchestrator parallelism ceiling test",
+        "Write horizontal scaling plan"
+      ]
+    },
+    {
+      "detail": "Runbook, contributors, portfolio",
+      "name": "Sustainability",
+      "percent": 0,
+      "status": "pending",
+      "tasks": [
+        "Write docs/MAINTAINER_RUNBOOK.md",
+        "Route contributors to paused frontend",
+        "Update LinkedIn/GitHub with numbers",
+        "Present at showcase/demo"
+      ]
+    }
+  ],
+  "project": "Sunday \u2014 Path to 10/10",
+  "version": "1.0.0-beta.1 \u2192 v1.0.0"
+}
