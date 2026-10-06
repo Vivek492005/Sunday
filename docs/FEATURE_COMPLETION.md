@@ -30,7 +30,7 @@ No vibes — each has checkable gates.
 - [ ] Falls back to API providers when Ollama unavailable
 - [ ] Documented in PROVIDER_SETUP.md
 
-**Status**: NOT STARTED (roadmap)
+**Status**: NOT STARTED (roadmap) — design doc: `docs/LOCAL_MODEL_PLAN.md`
 
 ## Sequencing decision
 
