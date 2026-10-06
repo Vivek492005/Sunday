@@ -40,7 +40,7 @@ img { max-width: 100%; }
 
 /* ---------- Hero ---------- */
 .vs-hero { position: relative; overflow: hidden; padding: 70px 24px 0; text-align: center; }
-.binary-bg { position: absolute; inset: 0; opacity: .14; font-family: var(--mono); font-size: 13px; line-height: 1.9; color: #5a5a6a; white-space: pre; overflow: hidden; pointer-events: none; user-select: none; }
+.binary-rain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; pointer-events: none; }
 .vs-hero-inner { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
 .vs-hero h1 { font-size: clamp(42px, 6.5vw, 72px); font-weight: 700; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 18px; color: #fff; }
 .ai-accent { color: var(--sun); }

@@ -416,24 +416,62 @@
 
 })();
 
-// Binary background for hero (VS Code style)
+// Matrix-style binary rain (top → bottom flow)
 (function() {
-  const bg = document.querySelector('.binary-bg');
-  if (!bg) return;
-  const words = ['HAPPY_CODING!', 'SUNDAY', 'AGENT', '010101'];
-  let html = '';
-  for (let r = 0; r < 28; r++) {
-    let line = '';
-    for (let c = 0; c < 120; c++) {
-      if (Math.random() < 0.04 && c < 100) {
-        const w = words[Math.floor(Math.random() * words.length)];
-        line += w;
-        c += w.length;
-      } else {
-        line += Math.random() < 0.5 ? '0' : '1';
-      }
-    }
-    html += line + '\n';
+  const canvas = document.querySelector('.binary-rain');
+  if (!canvas) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const ctx = canvas.getContext('2d');
+  const hero = canvas.parentElement;
+  const FONT = 14;
+  const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
+  let cols = [], W = 0, H = 0, raf = null;
+
+  function resize() {
+    const r = hero.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.ceil(W / FONT);
+    cols = Array.from({ length: n }, () => ({
+      y: Math.random() * -H,
+      speed: 1 + Math.random() * 2.5,
+      word: Math.random() < 0.06 ? WORDS[Math.random() * WORDS.length | 0] : null,
+      wi: 0
+    }));
   }
-  bg.textContent = html;
+
+  function tick() {
+    ctx.fillStyle = 'rgba(10,10,15,0.12)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = FONT + 'px monospace';
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i], x = i * FONT;
+      let ch, color;
+      if (c.word) {
+        ch = c.word[c.wi % c.word.length];
+        color = '#f59e0b';
+        c.wi++;
+        if (c.wi >= c.word.length * 3) { c.word = null; c.wi = 0; }
+      } else {
+        ch = Math.random() < 0.5 ? '0' : '1';
+        color = 'rgba(120,120,140,0.55)';
+        if (Math.random() < 0.02) { c.word = WORDS[Math.random() * WORDS.length | 0]; c.wi = 0; }
+      }
+      ctx.fillStyle = color;
+      ctx.fillText(ch, x, c.y);
+      c.y += c.speed * FONT * 0.5;
+      if (c.y > H + FONT) { c.y = Math.random() * -100; c.word = null; c.wi = 0; }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function start() { if (!raf) { resize(); tick(); } }
+  function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+
+  document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+  window.addEventListener('resize', resize);
+  start();
 })();
