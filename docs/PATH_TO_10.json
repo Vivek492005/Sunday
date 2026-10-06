@@ -84,10 +84,10 @@
       ]
     },
     {
-      "detail": "Falsifiable definitions, one frontend at a time",
+      "detail": "Ollama autocomplete shipped; human acceptance gates (real Ollama + VS Code) pending",
       "name": "Feature Completion",
-      "percent": 85,
-      "status": "pending",
+      "percent": 95,
+      "status": "in_progress",
       "tasks": [
         "Define 'done' for JetBrains plugin",
         "Define 'done' for IDE fork",
