@@ -12,6 +12,22 @@
 
 ---
 
+## Contents
+
+- [What is Sunday?](#what-is-sunday)
+- [✨ Features](#-features)
+- [🚀 Quick Start](#-quick-start)
+- [⚙️ Configuration](#-configuration)
+- [📦 Package Layout](#-package-layout)
+- [🛠️ Develop](#️-develop)
+- [📚 Documentation](#-documentation)
+- [🗺️ Roadmap](#️-roadmap)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
+---
+
 ## What is Sunday?
 
 Sunday takes the editor you already know — VS Code — and rebuilds it around an **autonomous coding agent**. Instead of copying code from a chat window, you describe what you want and Sunday's agent:
