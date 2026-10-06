@@ -423,18 +423,23 @@
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ctx = canvas.getContext('2d');
-  const hero = canvas.parentElement;
   const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
   let W = 0, H = 0, raf = null, mode = 'binary';
   let cols = [], stars = [], nodes = [];
 
   function resize() {
-    const r = hero.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = r.width; H = r.height;
+    W = window.innerWidth; H = window.innerHeight;
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     initMode();
+  }
+
+  function isLight() {
+    return document.documentElement.getAttribute('data-theme') === 'light';
+  }
+  function fadeColor(alpha) {
+    return isLight() ? 'rgba(255,251,235,' + alpha + ')' : 'rgba(10,10,15,' + alpha + ')';
   }
 
   function initMode() {
@@ -460,7 +465,7 @@
 
   /* ---- binary rain frame ---- */
   function binaryFrame() {
-    ctx.fillStyle = 'rgba(10,10,15,0.12)';
+    ctx.fillStyle = fadeColor(0.12);
     ctx.fillRect(0, 0, W, H);
     ctx.font = '14px monospace';
     for (let i = 0; i < cols.length; i++) {
@@ -489,7 +494,7 @@
     };
   }
   function warpFrame() {
-    ctx.fillStyle = 'rgba(8,8,14,0.35)';
+    ctx.fillStyle = fadeColor(0.35);
     ctx.fillRect(0, 0, W, H);
     const cx = W / 2, cy = H / 2, speed = 14;
     for (const s of stars) {
@@ -509,7 +514,7 @@
 
   /* ---- neural network frame ---- */
   function neuralFrame() {
-    ctx.fillStyle = 'rgba(8,8,14,0.22)';
+    ctx.fillStyle = fadeColor(0.22);
     ctx.fillRect(0, 0, W, H);
     const LINK = 130;
     for (const n of nodes) {
