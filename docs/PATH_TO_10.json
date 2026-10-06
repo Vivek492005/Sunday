@@ -3,7 +3,7 @@
     {
       "detail": "Close 3 remaining gates: human screen-reader pass, packet capture, soak test + live eval",
       "name": "Production Readiness",
-      "percent": 60,
+      "percent": 75,
       "status": "active",
       "tasks": [
         "Human screen-reader pass (NVDA/VoiceOver) with checklist",
@@ -47,7 +47,7 @@
     {
       "detail": "Demo GIF, FAQ, glossary, repo metadata",
       "name": "Documentation & Launch Prep",
-      "percent": 30,
+      "percent": 80,
       "status": "pending",
       "tasks": [
         "Record 60-90s demo GIF for README",
@@ -60,7 +60,7 @@
     {
       "detail": "Open VSX, landing page, npm CLI",
       "name": "Distribution",
-      "percent": 20,
+      "percent": 60,
       "status": "pending",
       "tasks": [
         "Publish sunday-agent to Open VSX",
@@ -98,8 +98,8 @@
     {
       "detail": "Load tests, parallelism ceiling, scaling plan",
       "name": "Scalability",
-      "percent": 0,
-      "status": "pending",
+      "percent": 100,
+      "status": "completed",
       "tasks": [
         "Load-test hosted-gateway (k6/autocannon)",
         "Add orchestrator parallelism ceiling test",
@@ -109,8 +109,8 @@
     {
       "detail": "Runbook, contributors, portfolio",
       "name": "Sustainability",
-      "percent": 0,
-      "status": "pending",
+      "percent": 100,
+      "status": "completed",
       "tasks": [
         "Write docs/MAINTAINER_RUNBOOK.md",
         "Route contributors to paused frontend",
