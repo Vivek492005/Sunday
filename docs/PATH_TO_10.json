@@ -29,8 +29,8 @@
     {
       "detail": "ADRs, protocol versioning, SEC-09/SEC-10",
       "name": "Architecture & Security",
-      "percent": 60,
-      "status": "pending",
+      "percent": 100,
+      "status": "completed",
       "tasks": [
         "Create docs/adr/ with 5 key decisions",
         "Add docs/PROTOCOL_VERSIONING.md + CI check",
