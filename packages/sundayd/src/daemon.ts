@@ -110,6 +110,15 @@ export interface DaemonOptions {
    * gateway serves these via the prefix-only chat fallback).
    */
   completionModel?: string;
+  /**
+   * Local Model slice (autocomplete only): when true, the completion
+   * orchestrator tries the `ollama` provider first (3s timeout) and falls
+   * back to the API provider chain silently on any failure. Default false —
+   * stamped by the extension from `sunday.localModel.enabled` via
+   * SUNDAY_LOCAL_MODEL_ENABLED=1. An explicit option takes precedence over
+   * the env var (useful for tests).
+   */
+  localModelEnabled?: boolean;
   policy?: PolicyOptions;
   /**
    * Part A: a pre-built PolicyGate (from `createSundaydTools()`), sharing
@@ -184,6 +193,8 @@ export class SundayDaemon {
   private readonly defaultModel: string;
   /** Part B: model ref for inline completions (overridable per RPC). */
   private readonly completionModel: string;
+  /** Local Model slice: try Ollama first for completions (default off). */
+  private readonly localModelEnabled: boolean;
   /** Part B: lazy completion orchestrator (debounce/cache/coalescing). */
   private completionOrchestrator: CompletionOrchestrator | undefined;
   private readonly loop: AgentLoop;
@@ -232,6 +243,10 @@ export class SundayDaemon {
     this.router = new Router(this.providers, opts.defaultModel, routerPolicy);
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
     this.completionModel = opts.completionModel ?? DEFAULT_COMPLETION_MODEL;
+    // Local Model slice: explicit option wins; otherwise the extension
+    // stamps SUNDAY_LOCAL_MODEL_ENABLED=1 from sunday.localModel.enabled.
+    this.localModelEnabled =
+      opts.localModelEnabled ?? process.env.SUNDAY_LOCAL_MODEL_ENABLED === '1';
     const policy = opts.policyGate ?? new PolicyGate(opts.policy);
     this.policyGate = policy;
     this.userDir = opts.userDir ?? homedir();
@@ -532,11 +547,56 @@ export class SundayDaemon {
    * Part B: lazy singleton. The FIM call resolves the provider per request
    * so `completionModel` (or the RPC's `model`) picks the adapter; providers
    * without `complete` fail this RPC loudly instead of hanging a keystroke.
+   *
+   * Local Model slice: when `localModelEnabled`, the `ollama` provider is
+   * tried first with a 3s timeout. ANY Ollama failure (not installed, no
+   * model pulled, timeout) falls through SILENTLY to the API provider chain
+   * — no user-visible error. A `sunday.completion.provider` metric line is
+   * emitted on every attempt so the fallback rate is observable (same
+   * JSON-on-stderr convention as the orchestrator's latency metric).
    */
   private getCompletionOrchestrator(): CompletionOrchestrator {
     if (!this.completionOrchestrator) {
+      let ollama: Partial<FimProvider> | undefined;
+      try {
+        ollama = this.providers.get('ollama') as Partial<FimProvider>;
+      } catch {
+        ollama = undefined; // custom registries (tests) may not register it
+      }
       this.completionOrchestrator = new CompletionOrchestrator({
-        complete: (req: FimRequest) => {
+        complete: async (req: FimRequest) => {
+          if (
+            this.localModelEnabled &&
+            ollama &&
+            typeof ollama.complete === 'function'
+          ) {
+            // 3s budget for the local model; abort the in-flight request on
+            // timeout so a hung Ollama can't pile up sockets behind keystrokes.
+            const ctrl = new AbortController();
+            const onOuterAbort = () => ctrl.abort();
+            req.signal?.addEventListener('abort', onOuterAbort, { once: true });
+            const timer = setTimeout(() => ctrl.abort(), 3000);
+            timer.unref?.();
+            try {
+              const result = await ollama.complete({
+                ...req,
+                model: 'ollama:qwen2.5-coder:1.5b',
+                signal: ctrl.signal,
+              });
+              this.emitMetric('sunday.completion.provider', {
+                provider: 'ollama',
+              });
+              return result;
+            } catch (err) {
+              // The caller's abort is never papered over with a retry.
+              if (req.signal?.aborted) throw err;
+              // Ollama down/slow/model-missing — silent fallthrough.
+            } finally {
+              clearTimeout(timer);
+              req.signal?.removeEventListener('abort', onOuterAbort);
+            }
+          }
+          this.emitMetric('sunday.completion.provider', { provider: 'api' });
           const ref = req.model || this.completionModel;
           const { providerId } = parseModelRef(ref, this.completionModel);
           const provider = this.providers.get(providerId) as Partial<FimProvider>;
@@ -551,6 +611,17 @@ export class SundayDaemon {
       });
     }
     return this.completionOrchestrator;
+  }
+
+  /**
+   * Structured metric on the daemon's diagnostics channel (stderr) — the same
+   * JSON-line convention as CompletionOrchestrator's log sink; never parsed
+   * as RPC.
+   */
+  private emitMetric(metric: string, fields: Record<string, unknown>): void {
+    process.stderr.write(
+      JSON.stringify({ metric, ts: new Date().toISOString(), ...fields }) + '\n',
+    );
   }
 
   private async completionComplete(req: JsonRpcRequest): Promise<unknown> {

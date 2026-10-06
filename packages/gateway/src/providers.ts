@@ -174,3 +174,82 @@ export class GroqProvider extends OpenAICompatibleProvider {
     return DEFAULT_GROQ_MODELS;
   }
 }
+
+/**
+ * Local Model slice (autocomplete only): Ollama speaking its OpenAI-compatible
+ * API. No API key is required — the server runs on the user's own machine.
+ *
+ * Note on URLs: `OLLAMA_BASE_URL` names the Ollama server root (default
+ * `http://localhost:11434`); the OpenAI-compatible chat/completions endpoints
+ * live under `/v1`, so the provider base used by the shared HTTP core is
+ * `<root>/v1`. The health check hits the native Ollama API at `<root>/api/tags`.
+ */
+export const OLLAMA_DEFAULT_MODEL = 'ollama:qwen2.5-coder:1.5b';
+
+const OLLAMA_MODELS: ModelEntry[] = [
+  {
+    id: 'qwen2.5-coder:1.5b',
+    label: 'Qwen 2.5 Coder 1.5B (Ollama, local)',
+    contextWindow: 32768,
+    supportsTools: false,
+    // FIM-trained coder; Ollama serves it on the /v1/completions endpoint
+    // with `suffix` support.
+    supportsFim: true,
+  },
+];
+
+export class OllamaProvider extends OpenAICompatibleProvider {
+  readonly id = 'ollama';
+  readonly label = 'Ollama (local)';
+
+  /** Ollama server root — NOT the OpenAI-compat root (see note above). */
+  ollamaHost(): string {
+    return process.env.OLLAMA_BASE_URL?.trim() || 'http://localhost:11434';
+  }
+
+  protected baseUrl(): string {
+    return `${this.ollamaHost()}/v1`;
+  }
+
+  protected envVar(): string {
+    // Unused: requireApiKey() is a no-op below. Kept to satisfy the base class.
+    return 'OLLAMA_API_KEY';
+  }
+
+  /** No API key exists for a local daemon — never throw for a missing one. */
+  protected override requireApiKey(): string {
+    return '';
+  }
+
+  /** The default code model serves native FIM via Ollama's /v1/completions. */
+  protected override nativeFimModels(): ReadonlySet<string> {
+    return new Set(OLLAMA_MODELS.filter((m) => m.supportsFim).map((m) => m.id));
+  }
+
+  async listModels(): Promise<ModelEntry[]> {
+    return OLLAMA_MODELS;
+  }
+
+  /**
+   * Health check: GET <host>/api/tags with a 2s timeout. True only when the
+   * local Ollama server answers — used to decide whether local-first
+   * completion is worth attempting.
+   */
+  async isAvailable(): Promise<boolean> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2000);
+    // A health check must never keep the process alive on its own.
+    (timer as unknown as { unref?: () => void }).unref?.();
+    try {
+      const res = await fetch(`${this.ollamaHost()}/api/tags`, {
+        signal: ctrl.signal,
+      });
+      return res.ok;
+    } catch {
+      // Not installed / not running / connection refused — never throws.
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}

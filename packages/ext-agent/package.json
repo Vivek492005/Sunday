@@ -173,6 +173,11 @@
           "description": "Opt in to the agent browser (browserd). When off, browser_* tools return a disabled error.",
           "type": "boolean"
         },
+        "sunday.localModel.enabled": {
+          "default": false,
+          "description": "Use a local Ollama model (qwen2.5-coder:1.5b) for ghost-text completions when available. Completions silently fall back to API providers when Ollama is not running. Applies on the next sidecar (re)start.",
+          "type": "boolean"
+        },
         "sunday.sandbox.mode": {
           "default": "off",
           "description": "Sandbox for agent-run shell commands. off = run on the host (current behavior); docker = disposable container with networking disabled; bubblewrap = Linux bwrap with an unshared network namespace. Applies on the next sidecar restart.",

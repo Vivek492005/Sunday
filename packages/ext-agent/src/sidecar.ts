@@ -18,6 +18,14 @@ import { RpcClient } from './rpc.js';
 export const BROWSER_ENABLED_ENV = 'SUNDAY_BROWSER_ENABLED';
 
 /**
+ * Env var handed to the sundayd child to opt in to local-model (Ollama)
+ * completions. Set to '1' when the `sunday.localModel.enabled` setting is
+ * true; sundayd reads it in the Daemon constructor (same pattern as
+ * BROWSER_ENABLED_ENV). Applies on the next sidecar (re)start.
+ */
+export const LOCAL_MODEL_ENABLED_ENV = 'SUNDAY_LOCAL_MODEL_ENABLED';
+
+/**
  * Env vars handed to the sundayd child for sandbox execution of agent shell
  * commands. Stamped from the `sunday.sandbox.mode` / `sunday.sandbox.dockerImage`
  * settings in extension.ts extraEnv() (same pattern as BROWSER_ENABLED_ENV).

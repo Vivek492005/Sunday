@@ -47,9 +47,11 @@ describe('parseModelRef', () => {
 });
 
 describe('registry + router', () => {
-  it('registers the two default providers and namespaces model ids', async () => {
+  it('registers the three default providers and namespaces model ids', async () => {
     const r = createDefaultRegistry();
-    expect(r.ids().sort()).toEqual(['groq', 'openrouter']);
+    // Local Model slice: ollama registers unconditionally; selection is
+    // gated by sunday.localModel.enabled at the daemon layer.
+    expect(r.ids().sort()).toEqual(['groq', 'ollama', 'openrouter']);
     const models = await r.listModels();
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((m) => m.id.includes(':'))).toBe(true);

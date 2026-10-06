@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SidecarManager, BROWSER_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
+import { SidecarManager, BROWSER_ENABLED_ENV, LOCAL_MODEL_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
 import { ManagerViewProvider, ManagerPanelManager } from './managerView.js';
@@ -97,6 +97,12 @@ export async function activate(
       // browserd when this is '1'. Applies on the next sidecar (re)start.
       ...(vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)
         ? { [BROWSER_ENABLED_ENV]: '1' }
+        : {}),
+      // Local model (Ollama) for ghost-text completions: sundayd tries the
+      // `ollama` provider first (3s timeout) and silently falls back to the
+      // API provider chain on any failure. Applies on the next sidecar (re)start.
+      ...(vscode.workspace.getConfiguration('sunday').get<boolean>('localModel.enabled', false)
+        ? { [LOCAL_MODEL_ENABLED_ENV]: '1' }
         : {}),
       // Sandbox execution for agent shell commands (Hardening phase):
       // sundayd reads SUNDAY_SANDBOX_MODE/DOCKER_IMAGE via sandboxConfigFromEnv.

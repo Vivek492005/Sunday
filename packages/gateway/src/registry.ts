@@ -1,5 +1,5 @@
 import type { ModelInfo } from '@sunday/protocol';
-import { GroqProvider, OpenRouterProvider } from './providers.js';
+import { GroqProvider, OllamaProvider, OpenRouterProvider } from './providers.js';
 import type { ChatProvider } from './types.js';
 
 /** Provider + model registry (§10.2). Model ids are namespaced "provider:id"
@@ -43,5 +43,8 @@ export function createDefaultRegistry(): ProviderRegistry {
   const r = new ProviderRegistry();
   r.register(new OpenRouterProvider());
   r.register(new GroqProvider());
+  // Local Model slice: unconditional registration — *selection* is gated by
+  // sunday.localModel.enabled, so a missing Ollama install changes nothing.
+  r.register(new OllamaProvider());
   return r;
 }

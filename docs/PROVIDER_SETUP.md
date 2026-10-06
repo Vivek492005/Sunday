@@ -74,15 +74,51 @@ fails over to the next provider in order; when all are exhausted, the
 chat UI shows a visible **Relay** marker with auto-resume. This is normal
 on free tiers — it is not an error to report.
 
-## Ollama fallback
+## Local model for completions (Ollama)
 
-**Status: not implemented.** `docs/ARCHITECTURE.md` describes Ollama as an
-optional local fallback, but no Ollama provider adapter exists in
-`packages/gateway/src` today (only `openrouter` and `groq` ids). Tracked
-as a post-1.0-beta workstream. If you want local inference now, point a
-local OpenAI-compatible server at the OpenRouter adapter's base URL —
-but note the key env var is still required to be set (any non-empty value)
-by the current code path.
+**Status: implemented (autocomplete only).** When `sunday.localModel.enabled`
+is `true`, ghost-text completions try a local Ollama model first and fall
+back to the API provider chain silently on any failure. No API keys are
+needed for the local path — this is the rate-limit survival story: your
+highest-frequency model calls keep working even when providers 429 you.
+
+This is **autocomplete only** in this slice: the chat/agent loop still uses
+OpenRouter/Groq. Local chat is a follow-up slice (see
+`docs/LOCAL_MODEL_PLAN.md`).
+
+### Setup
+
+1. Install Ollama: <https://ollama.com> (Windows/macOS/Linux), then start it
+   (`ollama serve` on Linux; the desktop apps start it automatically).
+2. Pull the completion model (small, fast, FIM-trained coder):
+   ```sh
+   ollama pull qwen2.5-coder:1.5b
+   ```
+3. In VS Code: Settings → search `sunday.localModel.enabled` → check it
+   (default off).
+4. Restart the Sunday sidecar when prompted (the flag is stamped at spawn).
+
+Optional: point at a non-default server with the `OLLAMA_BASE_URL`
+environment variable (default `http://localhost:11434`); make it visible
+to VS Code the same way as provider keys above.
+
+### What happens when Ollama isn't running
+
+**Nothing user-visible.** The daemon tries the local model with a 3s
+timeout; on any failure (not installed, not running, model not pulled,
+timeout) it falls through to your configured API providers with no error
+shown. Ghost text just keeps working via the cloud.
+
+Every uncached completion emits a structured metric line on the daemon's
+diagnostics channel (stderr), so the fallback rate is observable:
+
+```json
+{"metric":"sunday.completion.provider","provider":"ollama"}
+{"metric":"sunday.completion.provider","provider":"api"}
+```
+
+Tail the sidecar output and count the ratio to see how often you're
+serving locally vs. falling back.
 
 ## Security notes for key handling
 
