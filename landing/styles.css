@@ -178,3 +178,10 @@ a.vs-dl-option:hover { border-color: var(--sun); }
   .vs-ext-grid { grid-template-columns: 1fr; }
   .vs-lang-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- Background FX switcher ---------- */
+.bg-fx-switcher { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 150; background: rgba(22,22,30,.75); border: 1px solid var(--line); border-radius: 14px; padding: 8px; backdrop-filter: blur(8px); }
+.bg-fx-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid transparent; background: transparent; font-size: 19px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.bg-fx-btn:hover { background: rgba(255,255,255,.08); transform: scale(1.08); }
+.bg-fx-btn.active { background: rgba(245,158,11,.18); border-color: var(--sun); }
+@media (max-width: 900px) { .bg-fx-switcher { right: 8px; padding: 6px; } .bg-fx-btn { width: 34px; height: 34px; font-size: 16px; } }

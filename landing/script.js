@@ -416,17 +416,17 @@
 
 })();
 
-// Matrix-style binary rain (top → bottom flow)
+/* ============ Hero background FX: binary rain / 3D warp / neural net ============ */
 (function() {
   const canvas = document.querySelector('.binary-rain');
   if (!canvas) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ctx = canvas.getContext('2d');
   const hero = canvas.parentElement;
-  const FONT = 14;
   const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
-  let cols = [], W = 0, H = 0, raf = null;
+  let W = 0, H = 0, raf = null, mode = 'binary';
+  let cols = [], stars = [], nodes = [];
 
   function resize() {
     const r = hero.getBoundingClientRect();
@@ -434,46 +434,147 @@
     W = r.width; H = r.height;
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.ceil(W / FONT);
-    cols = Array.from({ length: n }, () => ({
-      y: Math.random() * -H,
-      speed: 1 + Math.random() * 2.5,
-      word: Math.random() < 0.06 ? WORDS[Math.random() * WORDS.length | 0] : null,
-      wi: 0
-    }));
+    initMode();
   }
 
-  function tick() {
+  function initMode() {
+    if (mode === 'binary') {
+      const FONT = 14, n = Math.ceil(W / FONT);
+      cols = Array.from({ length: n }, () => ({
+        y: Math.random() * -H, speed: 1 + Math.random() * 2.5,
+        word: Math.random() < 0.06 ? WORDS[Math.random() * WORDS.length | 0] : null, wi: 0
+      }));
+    } else if (mode === 'warp') {
+      const n = Math.min(260, Math.floor(W * H / 9000));
+      stars = Array.from({ length: n }, () => spawnStar(true));
+    } else if (mode === 'neural') {
+      const n = Math.min(80, Math.floor(W * H / 16000));
+      nodes = Array.from({ length: n }, () => ({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - .5) * .4, vy: (Math.random() - .5) * .4,
+        depth: Math.random(), r: 1 + Math.random() * 2.2,
+        hot: Math.random() < 0.12
+      }));
+    }
+  }
+
+  /* ---- binary rain frame ---- */
+  function binaryFrame() {
     ctx.fillStyle = 'rgba(10,10,15,0.12)';
     ctx.fillRect(0, 0, W, H);
-    ctx.font = FONT + 'px monospace';
+    ctx.font = '14px monospace';
     for (let i = 0; i < cols.length; i++) {
-      const c = cols[i], x = i * FONT;
+      const c = cols[i], x = i * 14;
       let ch, color;
       if (c.word) {
-        ch = c.word[c.wi % c.word.length];
-        color = '#f59e0b';
-        c.wi++;
+        ch = c.word[c.wi % c.word.length]; color = '#f59e0b'; c.wi++;
         if (c.wi >= c.word.length * 3) { c.word = null; c.wi = 0; }
       } else {
-        ch = Math.random() < 0.5 ? '0' : '1';
-        color = 'rgba(120,120,140,0.55)';
+        ch = Math.random() < 0.5 ? '0' : '1'; color = 'rgba(120,120,140,0.55)';
         if (Math.random() < 0.02) { c.word = WORDS[Math.random() * WORDS.length | 0]; c.wi = 0; }
       }
       ctx.fillStyle = color;
       ctx.fillText(ch, x, c.y);
-      c.y += c.speed * FONT * 0.5;
-      if (c.y > H + FONT) { c.y = Math.random() * -100; c.word = null; c.wi = 0; }
+      c.y += c.speed * 7;
+      if (c.y > H + 14) { c.y = Math.random() * -100; c.word = null; c.wi = 0; }
     }
+  }
+
+  /* ---- 3D starfield warp frame ---- */
+  function spawnStar(anywhere) {
+    return {
+      x: (Math.random() - .5) * W * 2, y: (Math.random() - .5) * H * 2,
+      z: anywhere ? Math.random() * W : W,
+      px: 0, py: 0, hot: Math.random() < 0.18
+    };
+  }
+  function warpFrame() {
+    ctx.fillStyle = 'rgba(8,8,14,0.35)';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2, speed = 14;
+    for (const s of stars) {
+      const pz = s.z;
+      s.z -= speed;
+      if (s.z <= 1) Object.assign(s, spawnStar(false));
+      const sx = cx + (s.x / s.z) * cx, sy = cy + (s.y / s.z) * cy;
+      const px = cx + (s.x / pz) * cx, py = cy + (s.y / pz) * cy;
+      const bright = 1 - s.z / W;
+      ctx.strokeStyle = s.hot
+        ? 'rgba(245,158,11,' + (0.25 + bright * 0.75) + ')'
+        : 'rgba(160,160,190,' + (0.15 + bright * 0.7) + ')';
+      ctx.lineWidth = 1 + bright * 2;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(sx, sy); ctx.stroke();
+    }
+  }
+
+  /* ---- neural network frame ---- */
+  function neuralFrame() {
+    ctx.fillStyle = 'rgba(8,8,14,0.22)';
+    ctx.fillRect(0, 0, W, H);
+    const LINK = 130;
+    for (const n of nodes) {
+      n.x += n.vx * (0.4 + n.depth); n.y += n.vy * (0.4 + n.depth);
+      if (n.x < -20) n.x = W + 20; if (n.x > W + 20) n.x = -20;
+      if (n.y < -20) n.y = H + 20; if (n.y > H + 20) n.y = -20;
+    }
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy);
+        if (d < LINK) {
+          ctx.strokeStyle = 'rgba(245,158,11,' + ((1 - d / LINK) * 0.28) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+      }
+    }
+    for (const n of nodes) {
+      ctx.fillStyle = n.hot ? 'rgba(245,158,11,0.9)' : 'rgba(140,140,170,' + (0.3 + n.depth * 0.5) + ')';
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r * (0.6 + n.depth), 0, 7); ctx.fill();
+    }
+  }
+
+  function tick() {
+    if (mode === 'binary') binaryFrame();
+    else if (mode === 'warp') warpFrame();
+    else neuralFrame();
     raf = requestAnimationFrame(tick);
+  }
+
+  function setMode(m) {
+    mode = m;
+    try { localStorage.setItem('sunday-bg-fx', m); } catch (e) {}
+    document.querySelectorAll('.bg-fx-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.fx === m);
+    });
+    initMode();
   }
 
   function start() { if (!raf) { resize(); tick(); } }
   function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
 
+  /* ---- side switcher UI ---- */
+  const switcher = document.createElement('div');
+  switcher.className = 'bg-fx-switcher';
+  switcher.setAttribute('role', 'group');
+  switcher.setAttribute('aria-label', 'Background animation');
+  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['neural', '🕸️', 'Neural network']]
+    .forEach(function ([m, icon, label]) {
+      const b = document.createElement('button');
+      b.className = 'bg-fx-btn'; b.dataset.fx = m;
+      b.textContent = icon; b.title = label; b.setAttribute('aria-label', label);
+      b.addEventListener('click', function () { setMode(m); });
+      switcher.appendChild(b);
+    });
+  document.body.appendChild(switcher);
+
+  try { mode = localStorage.getItem('sunday-bg-fx') || 'binary'; } catch (e) {}
+  if (!['binary', 'warp', 'neural'].includes(mode)) mode = 'binary';
+
   document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
   window.addEventListener('resize', resize);
-  start();
+  if (!reduced) { setMode(mode); start(); }
+  else { resize(); binaryFrame(); } // static first frame for reduced motion
 })();
 
 // Story video modal
