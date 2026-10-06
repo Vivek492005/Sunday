@@ -89,7 +89,7 @@ jobs:
   # Hardening: fail the workflow if anything looking like a real credential
   # was committed to the product tree. Same exclusions as windows-package.yml.
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -121,7 +121,7 @@ jobs:
   # one green run confirms no false positives — see gate #5 in
   # docs/RELEASE_GATES.md.
   advisory-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Report-only security scan: never blocks the workflow.
     # Uses pnpm audit (built-in) instead of the OSV scanner action,
     # which was failing at "Set up job" (GitHub infra issue).
@@ -158,7 +158,7 @@ jobs:
   # No-op on workflow_dispatch runs (the job itself never skips, so `needs`
   # stays satisfied).
   prepare-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -188,7 +188,7 @@ jobs:
             platform: win32
             arch: x64
             gulp_client: vscode-win32-x64-min-ci
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux
             arch: x64
             gulp_client: vscode-linux-x64-min-ci
