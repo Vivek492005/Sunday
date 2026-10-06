@@ -119,9 +119,14 @@ legs upload concurrently).
 
 Before compiling the fork, CI runs `scripts/sync-builtin.sh`, which stages
 the prebuilt extension into `vscode/extensions/sunday-agent/`. The fork
-build then compiles it as a **built-in extension**, so it ships inside every
-IDE installer — no separate install step. (The staged dir is ephemeral:
+build then compiles it as a **built-in extension**, so it ships inside the
+Linux and macOS IDE installers — no separate install step. (The staged dir is ephemeral:
 `vscode/extensions/sunday-agent/` is git-ignored and never committed.)
+
+> **Windows note:** `sync-builtin.sh` is non-blocking on Windows CI (Git Bash
+> path issues with VSIX extraction). The Windows IDE ships **without** the
+> pre-installed extension — install `sunday-agent-1.0.0-beta.1.vsix` manually
+> after installing the IDE.
 
 ```sh
 # after: pnpm install && pnpm -r --workspace-concurrency=1 build

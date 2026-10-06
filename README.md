@@ -296,7 +296,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Benchmarks, soak test methodology |
 | [docs/EVAL.md](docs/EVAL.md) | Eval harness, pass targets |
 | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) | A11y audit + human test checklist |
-| [docs/DAEMON.md](docs/DAEMON.md) | Daemon lifecycle, autostart, idle shutdown |
+| [docs/PHASE8_DAEMON_PLAN.md](docs/PHASE8_DAEMON_PLAN.md) | Daemon lifecycle, autostart, idle shutdown |
 | [docs/RELEASE_GATES.md](docs/RELEASE_GATES.md) | 1.0-beta release gate tracking |
 | [docs/BETA_RELEASE_CHECKLIST.md](docs/BETA_RELEASE_CHECKLIST.md) | Beta release procedure |
 | [docs/UPGRADE.md](docs/UPGRADE.md) | Upstream VS Code upgrade runbook |

@@ -21,7 +21,9 @@ SUNDAY is an autonomous coding-agent IDE — a full VS Code fork with a built-in
 ## Installation
 
 ### Windows
-Download `Sunday-Setup-1.0.0-beta.1.exe` and run the installer.
+Download `SundaySetup-x64-1.0.0-beta.1.exe` (system) or `SundayUserSetup-x64-1.0.0-beta.1.exe` (user) and run the installer.
+
+> **Note:** The Windows IDE does not include the sunday-agent extension pre-installed. After installing the IDE, install `sunday-agent-1.0.0-beta.1.vsix` via `code --install-extension`.
 
 ### Linux
 Download the Linux build, extract, and run.
