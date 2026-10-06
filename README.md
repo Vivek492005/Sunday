@@ -292,6 +292,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 | Doc | Description |
 |-----|-------------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flow, component boundaries |
+| [docs/adr/](docs/adr/) | Architecture Decision Records — why each major choice was made |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | Project vocabulary defined in one place |
+| [docs/FAQ.md](docs/FAQ.md) | Common questions: privacy, local models, vs Copilot/Cursor |
 | [docs/PROJECT_BLUEPRINT.md](docs/PROJECT_BLUEPRINT.md) | Complete phase-by-phase project history |
 | [docs/PHASE8.md](docs/PHASE8.md) | Phase 8 features in detail |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, security practices |
