@@ -107,23 +107,33 @@ Sunday takes the editor you already know — VS Code — and rebuilds it around 
 
 ## 🚀 Quick Start
 
-### Option 1: VS Code Extension (recommended)
+### Option 1: Sunday IDE (recommended) — 1.0.0-beta.1
 
-1. Download `sunday-agent-0.1.0.vsix` from the [releases page](https://github.com/Vivek492005/Sunday/releases/tag/v0.1.0)
-2. Install: `code --install-extension sunday-agent-0.1.0.vsix`
-3. Set your API keys:
-   ```sh
-   # Get free keys from:
-   # - OpenRouter: https://openrouter.ai/keys
-   # - Groq: https://console.groq.com/keys
-   export OPENROUTER_API_KEY="sk-or-..."
-   export GROQ_API_KEY="gsk_..."
-   ```
+Download the full IDE from the [1.0.0-beta.1 release](https://github.com/Vivek492005/Sunday/releases/tag/v1.0.0-beta.1):
+
+| Platform | Download |
+|----------|----------|
+| Windows | `SundaySetup-x64-1.0.0-beta.1.exe` (system) or `SundayUserSetup-x64-1.0.0-beta.1.exe` (user) |
+| macOS (ARM64) | Sunday DMG installer |
+| Linux (x64) | Sunday tarball |
+
+Set your API keys:
+```sh
+# Get free keys from:
+# - OpenRouter: https://openrouter.ai/keys
+# - Groq: https://console.groq.com/keys
+export OPENROUTER_API_KEY="sk-or-..."
+export GROQ_API_KEY="gsk_..."
+```
+
+Open Sunday → Chat view → start building!
+
+### Option 2: VS Code Extension
+
+1. Download `sunday-agent-1.0.0-beta.1.vsix` from the [releases page](https://github.com/Vivek492005/Sunday/releases/tag/v1.0.0-beta.1)
+2. Install: `code --install-extension sunday-agent-1.0.0-beta.1.vsix`
+3. Set your API keys (see above)
 4. Open VS Code → Sunday Chat view → start building!
-
-### Option 2: Windows Installer
-
-Download `Sunday-Agent-Setup-0.1.0.exe` from [releases](https://github.com/Vivek492005/Sunday/releases/tag/v0.1.0) and run it.
 
 ### Option 3: CLI Only
 
@@ -296,10 +306,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ## 🗺️ Roadmap
 
-### 1.0-beta (in progress)
+### 1.0.0-beta.1 (shipped ✅)
 - [x] 8/11 release gates with concrete evidence
-- [ ] Build gate — CI green on 3 platforms
-- [ ] Accessibility gate — human screen-reader sign-off
+- [x] Build gate — CI green on 3 platforms (Linux, macOS, Windows)
+- [x] Full IDE installers (Windows/macOS/Linux)
+- [ ] Accessibility gate — human screen-reader sign-off (pending)
 - [ ] Human verification steps (pcap, soak, live eval, QA ritual)
 
 ### 1.0 (planned)
