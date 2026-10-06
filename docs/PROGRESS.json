@@ -31,10 +31,10 @@
       "status": "done"
     },
     {
-      "detail": "windows-package GREEN, Linux IDE GREEN, 18 CI fixes, tech debt done (smoke/named-pipes/advisory), macOS/Windows IDE in progress",
+      "detail": "3/3 CI green (Linux/macOS/Windows), 1.0.0-beta.1 released",
       "name": "Fork Build (Full IDE)",
-      "percent": 95,
-      "status": "active"
+      "percent": 100,
+      "status": "done"
     },
     {
       "detail": "All 7 items done: P-030, daemon (3 stages), next-edit, background agents, voice, CLI, hosted gateway",
@@ -49,5 +49,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-05T15:40:56+00:00"
+  "updated": "2026-10-06T07:33:31+00:00"
 }
