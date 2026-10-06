@@ -4,7 +4,8 @@
 
 | Version | Status |
 |---|---|
-| `sunday-agent` 0.1.x (extension-first dev preview) | Supported — security fixes backported while 0.1.x is the latest release line |
+| `sunday-agent` 1.0.0-beta.1 (full IDE beta) | Supported — latest release line |
+| `sunday-agent` 0.1.x (extension-first dev preview) | Supported — security fixes backported |
 | Pre-0.1.0 / unreleased main | Not supported — upgrade to the latest release |
 
 Security fixes land in a patch release on `main`, then a tagged rebuild

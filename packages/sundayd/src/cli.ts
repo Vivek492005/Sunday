@@ -427,4 +427,7 @@ async function main(): Promise<void> {
   });
 }
 
-void main();
+main().catch((e) => {
+  console.error(`sundayd failed to start: ${(e as Error).message}`);
+  process.exit(1);
+});

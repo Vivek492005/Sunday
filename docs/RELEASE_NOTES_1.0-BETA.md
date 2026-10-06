@@ -1,7 +1,6 @@
 # Sunday 1.0-beta — Release Notes (DRAFT)
 
-> **Status:** Draft. Do not publish until the release checklist
-> (`docs/BETA_RELEASE_CHECKLIST.md`) is fully green.
+> **Status:** SUPERSEDED by [RELEASE_NOTES_1.0.0-beta.1.md](RELEASE_NOTES_1.0.0-beta.1.md) — 1.0.0-beta.1 shipped 2026-10-06.
 
 ## What's new
 

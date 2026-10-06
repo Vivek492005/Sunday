@@ -1,8 +1,8 @@
 # 1.0-beta Release Checklist
 
 **Target version:** `1.0-beta` (from `0.1.0`)
-**Status:** PREPARATION — do not execute until all gates are green.
-**Last updated:** 2026-10-04
+**Status:** SHIPPED — 1.0.0-beta.1 released 2026-10-06.
+**Last updated:** 2026-10-06
 
 This checklist is the single source of truth for cutting the 1.0-beta
 release. Work through it top to bottom. Nothing ships until every

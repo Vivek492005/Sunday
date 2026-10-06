@@ -2,6 +2,17 @@
 
 All notable changes to Sunday. Versions follow semver.
 
+## 1.0.0-beta.1 — 2026-10-06
+
+First public beta — full IDE.
+
+**Full IDE**
+- Sunday IDE (VS Code fork) for Windows x64, Linux x64, macOS arm64
+- 3/3 CI green (run 37340699360)
+- Windows/macOS/Linux installers
+
+**Note:** Windows IDE ships without pre-installed sunday-agent (manual VSIX install required).
+
 ## 0.1.0 — 2026-10-01
 
 First public dev preview.
