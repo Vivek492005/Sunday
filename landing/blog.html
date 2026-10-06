@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blog — Sunday</title>
+<link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+.blog-list { max-width: 760px; margin: 0 auto; padding: 60px 24px; }
+.blog-list h1 { font-size: 40px; color: #fff; margin-bottom: 8px; }
+.blog-list .sub { color: var(--muted); margin-bottom: 40px; }
+.post { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+.post h2 { font-size: 22px; margin-bottom: 8px; }
+.post h2 a { color: #fff !important; text-decoration: none !important; }
+.post h2 a:hover { color: var(--sun-h) !important; }
+.post .meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.post p { color: var(--muted); }
+.back { display: inline-block; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a href="index.html" class="vs-brand">
+      <img src="sunday-logo.jpg" alt="Sunday" width="28" height="28" />
+      <span>Sunday</span>
+    </a>
+    <div class="vs-nav-right">
+      <a href="index.html#download" class="vs-download-btn">Download</a>
+    </div>
+  </div>
+</header>
+
+<main class="blog-list">
+  <a href="index.html" class="back">← Back to home</a>
+  <h1>Blog</h1>
+  <p class="sub">Notes on building the agent-first IDE.</p>
+
+  <article class="post">
+    <h2><a href="#">Sunday v1.0.0-beta.1 is here</a></h2>
+    <div class="meta">October 6, 2026 · 3 min read</div>
+    <p>Our first public beta: Windows, Linux, and macOS installers, parallel agents, MCP support, and a published threat model. Download it free and tell us what breaks.</p>
+  </article>
+
+  <article class="post">
+    <h2><a href="#">Why hierarchical orchestration?</a></h2>
+    <div class="meta">October 4, 2026 · 6 min read</div>
+    <p>Single-agent loops lose coherence on multi-file tasks. We decompose by context, not job titles — each Feature Agent gets exactly what it needs, and a single verifier merges with confidence.</p>
+  </article>
+
+  <article class="post">
+    <h2><a href="#">Taint tracking: stopping prompt injection</a></h2>
+    <div class="meta">October 2, 2026 · 5 min read</div>
+    <p>Any tool result from an untrusted source is marked tainted. State-changing calls proposed in the same turn escalate to manual approval — even if autonomy settings would auto-run them.</p>
+  </article>
+</main>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav><a href="https://github.com/Vivek492005/Sunday">GitHub</a><a href="index.html">Home</a></nav>
+  </div>
+</footer>
+</body>
+</html>

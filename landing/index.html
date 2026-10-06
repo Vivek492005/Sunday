@@ -18,13 +18,46 @@
       <span>Sunday</span>
     </a>
     <nav class="vs-nav-links">
-      <a href="#agents">Features ▾</a>
-      <a href="#docs">Docs ▾</a>
-      <a href="#download">Release Notes</a>
-      <a href="#">Blog</a>
-      <a href="#">Learn</a>
-      <a href="#">Events ⧉</a>
-      <a href="#">Resources ▾</a>
+      <div class="vs-dropdown">
+        <a href="#agents" class="vs-drop-btn">Features ▾</a>
+        <div class="vs-drop-menu">
+          <a href="#agents">🤖 Parallel agents</a>
+          <a href="#models">🧠 Any provider, any model</a>
+          <a href="#sessions">📊 All sessions, one view</a>
+          <a href="#rules">🔒 Your rules, your agents</a>
+          <a href="#editor">⌨️ World-class editor</a>
+        </div>
+      </div>
+      <div class="vs-dropdown">
+        <a href="https://github.com/Vivek492005/Sunday/tree/main/docs" target="_blank" rel="noopener" class="vs-drop-btn">Docs ▾</a>
+        <div class="vs-drop-menu">
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">🏗️ Architecture</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md" target="_blank" rel="noopener">🛡️ Security</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/FAQ.md" target="_blank" rel="noopener">❓ FAQ</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/GLOSSARY.md" target="_blank" rel="noopener">📖 Glossary</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/PROVIDER_SETUP.md" target="_blank" rel="noopener">🔑 Provider setup</a>
+        </div>
+      </div>
+      <a href="https://github.com/Vivek492005/Sunday/releases" target="_blank" rel="noopener">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <div class="vs-dropdown">
+        <a href="https://github.com/Vivek492005/Sunday/tree/main/docs" target="_blank" rel="noopener" class="vs-drop-btn">Learn ▾</a>
+        <div class="vs-drop-menu">
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/FAQ.md" target="_blank" rel="noopener">❓ FAQ</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/docs/GLOSSARY.md" target="_blank" rel="noopener">📖 Glossary</a>
+          <a href="https://github.com/Vivek492005/Sunday/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">🤝 Contributing</a>
+        </div>
+      </div>
+      <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">Events ⧉</a>
+      <div class="vs-dropdown">
+        <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener" class="vs-drop-btn">Resources ▾</a>
+        <div class="vs-drop-menu">
+          <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">⭐ GitHub repo</a>
+          <a href="https://github.com/Vivek492005/Sunday/releases" target="_blank" rel="noopener">📦 Releases</a>
+          <a href="github.html">📄 GitHub UI demo</a>
+          <a href="blog.html">✍️ Blog</a>
+        </div>
+      </div>
     </nav>
     <div class="vs-nav-right">
       <div class="vs-search"><span>🔍</span> Search <kbd>Ctrl+Shift+P</kbd></div>
@@ -36,8 +69,18 @@
 
 <!-- ============ BANNER ============ -->
 <div class="vs-banner">
-  <a href="#">🎬 Watch The Story of Sunday! ⧉</a>
+  <a href="#" id="story-link">🎬 Watch The Story of Sunday! ⧉</a>
   <button class="vs-banner-close" aria-label="Close">✕</button>
+</div>
+
+<!-- Video modal -->
+<div class="vs-modal" id="story-modal" role="dialog" aria-label="The Story of Sunday">
+  <button class="vs-modal-close" aria-label="Close video">✕</button>
+  <div class="vs-modal-box">
+    <video id="story-video" controls preload="none" poster="sunday-logo.jpg">
+      <source src="sunday-story.mp4" type="video/mp4" />
+    </video>
+  </div>
 </div>
 
 <!-- ============ HERO ============ -->

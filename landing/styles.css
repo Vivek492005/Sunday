@@ -26,6 +26,19 @@ img { max-width: 100%; }
 .vs-nav-links { display: flex; gap: 4px; }
 .vs-nav-links a { color: #ccc !important; text-decoration: none !important; font-size: 14.5px; padding: 8px 12px; border-radius: 6px; }
 .vs-nav-links a:hover { background: rgba(255,255,255,.08); color: #fff !important; }
+/* Dropdowns */
+.vs-dropdown { position: relative; }
+.vs-drop-btn { color: #ccc !important; text-decoration: none !important; font-size: 14.5px; padding: 8px 12px; border-radius: 6px; display: inline-block; }
+.vs-drop-menu { display: none; position: absolute; top: 100%; left: 0; background: #16161e; border: 1px solid var(--line); border-radius: 10px; min-width: 240px; padding: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.5); z-index: 100; }
+.vs-dropdown:hover .vs-drop-menu { display: block; }
+.vs-drop-menu a { display: block; padding: 10px 14px; border-radius: 6px; font-size: 14px; }
+.vs-drop-menu a:hover { background: rgba(245,158,11,.12); color: var(--sun-h) !important; }
+/* Video modal */
+.vs-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 200; align-items: center; justify-content: center; padding: 24px; }
+.vs-modal.open { display: flex; }
+.vs-modal-box { max-width: 860px; width: 100%; background: #000; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.vs-modal-box video { width: 100%; display: block; }
+.vs-modal-close { position: absolute; top: 20px; right: 28px; background: none; border: none; color: #fff; font-size: 28px; cursor: pointer; }
 .vs-nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .vs-search { display: flex; align-items: center; gap: 10px; background: #1a1a22; border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px; color: var(--muted); font-size: 14px; cursor: pointer; min-width: 220px; }
 .vs-search kbd { margin-left: auto; background: #2a2a35; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: var(--font); }

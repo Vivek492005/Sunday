@@ -475,3 +475,31 @@
   window.addEventListener('resize', resize);
   start();
 })();
+
+// Story video modal
+(function() {
+  const link = document.getElementById('story-link');
+  const modal = document.getElementById('story-modal');
+  const video = document.getElementById('story-video');
+  const closeBtn = modal ? modal.querySelector('.vs-modal-close') : null;
+  if (!link || !modal) return;
+  function open(e) {
+    e.preventDefault();
+    modal.classList.add('open');
+    video.play().catch(function(){});
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    modal.classList.remove('open');
+    video.pause();
+    document.body.style.overflow = '';
+  }
+  link.addEventListener('click', open);
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
+  // Banner close button
+  const bannerClose = document.querySelector('.vs-banner-close');
+  const banner = document.querySelector('.vs-banner');
+  if (bannerClose && banner) bannerClose.addEventListener('click', function() { banner.style.display = 'none'; });
+})();
