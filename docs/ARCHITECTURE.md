@@ -23,6 +23,32 @@
 └────────────────────────────────────────┘
 ```
 
+```mermaid
+graph TB
+    subgraph VSCode["VS Code"]
+        EXT["sunday-agent<br/>(built-in extension)"]
+        CHAT["chat webview"]
+        MGR["manager webview"]
+        MCP["MCP panel webview"]
+        EXT --> CHAT
+        EXT --> MGR
+        EXT --> MCP
+    end
+    subgraph DAEMON["sundayd (sidecar)"]
+        SES["sessions"]
+        LOOP["agent loop"]
+        POL["policy gate"]
+        CHK["checkpoints"]
+        ORCH["orchestration host"]
+    end
+    subgraph BROWSER["browserd (child)"]
+        DRV["FakeDriver / Playwright"]
+    end
+    EXT <-->|stdio JSON-RPC| DAEMON
+    DAEMON -->|spawns| BROWSER
+```
+
+
 ## JSON-RPC surface (`@sunday/protocol`)
 
 Versioned with zod schemas; every method lives in the central `METHODS`
