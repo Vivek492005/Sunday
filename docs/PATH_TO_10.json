@@ -47,7 +47,7 @@
     {
       "detail": "Demo GIF, FAQ, glossary, repo metadata",
       "name": "Documentation & Launch Prep",
-      "percent": 80,
+      "percent": 90,
       "status": "pending",
       "tasks": [
         "Record 60-90s demo GIF for README",
@@ -60,7 +60,7 @@
     {
       "detail": "Open VSX, landing page, npm CLI",
       "name": "Distribution",
-      "percent": 60,
+      "percent": 80,
       "status": "pending",
       "tasks": [
         "Publish sunday-agent to Open VSX",
@@ -86,7 +86,7 @@
     {
       "detail": "Falsifiable definitions, one frontend at a time",
       "name": "Feature Completion",
-      "percent": 70,
+      "percent": 85,
       "status": "pending",
       "tasks": [
         "Define 'done' for JetBrains plugin",
