@@ -1,0 +1,76 @@
+# Publish sunday-agent to Open VSX
+#
+# SETUP (one-time, maintainer only):
+#   1. Create an account at https://open-vsx.org and claim the `sunday` namespace
+#      (must match the `publisher` field in packages/ext-agent/package.json).
+#   2. Generate a personal access token at https://open-vsx.org/user-settings/tokens
+#   3. Add it as a repository secret named OPENVSX_TOKEN
+#      (Settings → Secrets and variables → Actions → New repository secret).
+#   4. Uncomment the `release` trigger below (or run manually via workflow_dispatch).
+#
+# Until OPENVSX_TOKEN exists, the publish step is skipped automatically —
+# the workflow will NOT fail on repos without the secret configured.
+
+name: publish-openvsx
+
+on:
+  # Uncomment after completing the one-time setup above:
+  # release:
+  #   types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate the VSIX without publishing"
+        required: false
+        default: "true"
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install product dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all product packages (sequential — keeps TS memory low)
+        run: pnpm -r --workspace-concurrency=1 build
+
+      - name: Install vsce and ovsx
+        run: npm i -g @vscode/vsce ovsx
+
+      - name: Package sunday-agent VSIX + sidecar bundles
+        run: |
+          node scripts/package-vsix.mjs --out dist-package
+          vsix=$(ls dist-package/sunday-agent-*.vsix 2>/dev/null | head -1)
+          if [ -z "$vsix" ]; then echo "FATAL: no VSIX found in dist-package/"; exit 1; fi
+          echo "VSIX_PATH=$vsix" >> "$GITHUB_ENV"
+          echo "Built: $vsix"
+
+      - name: Verify VSIX metadata (publisher must match Open VSX namespace)
+        run: |
+          tmpdir="$(mktemp -d)"
+          unzip -q "$VSIX_PATH" -d "$tmpdir"
+          node -e "
+            const m = require('$tmpdir/extension/package.json');
+            console.log('publisher:', m.publisher, '| name:', m.name, '| version:', m.version);
+            if (m.publisher !== 'sunday') { console.error('FATAL: publisher mismatch'); process.exit(1); }
+          "
+          rm -rf "$tmpdir"
+
+      - name: Publish to Open VSX
+        if: ${{ secrets.OPENVSX_TOKEN != '' && github.event.inputs.dry_run != 'true' }}
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSX_TOKEN }}
+        run: ovsx publish "$VSIX_PATH" -p "$OVSX_PAT"
+
+      - name: No token configured — skipped publish
+        if: ${{ secrets.OPENVSX_TOKEN == '' }}
+        run: echo "OPENVSX_TOKEN secret not set — skipping publish. See workflow header for setup steps."
