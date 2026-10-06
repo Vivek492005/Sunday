@@ -119,7 +119,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; color: var(--neon); }
 }
 .nav.scrolled .nav-inner { padding: 12px 24px; }
 .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--text-1); }
-.logo-mark { font-size: 1.5rem; transition: filter 0.2s; }
+.logo-mark { width: 32px; height: 32px; border-radius: 8px; transition: filter 0.2s; }
 .logo:hover .logo-mark { filter: drop-shadow(0 0 8px rgba(247, 197, 72, 0.8)); }
 .nav-links { display: flex; gap: 28px; margin-left: auto; }
 .nav-links a { font-size: 0.95rem; color: var(--text-2); }

@@ -1,4 +1,8 @@
-# ☀️ Sunday — The Agent-First Coding IDE
+<p align="center">
+  <img src="branding/sunday-logo.webp" alt="Sunday logo" width="128" />
+</p>
+
+# Sunday — The Agent-First Coding IDE
 
 > **Your AI pair programmer, built into your editor.** Sunday is a VS Code-based IDE with a built-in autonomous coding agent — not a chatbot bolted on, but an agent-first development environment.
 
