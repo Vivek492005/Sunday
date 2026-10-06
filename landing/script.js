@@ -503,3 +503,26 @@
   const banner = document.querySelector('.vs-banner');
   if (bannerClose && banner) bannerClose.addEventListener('click', function() { banner.style.display = 'none'; });
 })();
+
+// Theme toggle (dark <-> light), persisted
+(function() {
+  const btn = document.querySelector('.vs-theme-toggle');
+  if (!btn) return;
+  const root = document.documentElement;
+  function apply(theme) {
+    if (theme === 'light') root.setAttribute('data-theme', 'light');
+    else root.removeAttribute('data-theme');
+    btn.textContent = theme === 'light' ? '🌙' : '☀️';
+    btn.setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+    try { localStorage.setItem('sunday-theme', theme); } catch (e) {}
+  }
+  let initial = 'dark';
+  try {
+    initial = localStorage.getItem('sunday-theme')
+      || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  } catch (e) {}
+  apply(initial);
+  btn.addEventListener('click', function() {
+    apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  });
+})();
