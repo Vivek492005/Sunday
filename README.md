@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/sunday-logo.webp" alt="Sunday logo" width="128" />
+  <img src="branding/sunday-logo.jpg" alt="Sunday logo" width="128" />
 </p>
 
 # Sunday — The Agent-First Coding IDE
