@@ -86,7 +86,7 @@
     {
       "detail": "Falsifiable definitions, one frontend at a time",
       "name": "Feature Completion",
-      "percent": 40,
+      "percent": 70,
       "status": "pending",
       "tasks": [
         "Define 'done' for JetBrains plugin",
