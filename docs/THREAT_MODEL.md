@@ -67,8 +67,8 @@ in workspaces the user may not fully trust.
 | STRIDE | Threat | Mitigation / status |
 |---|---|---|
 | Tampering | Symlink escape: a symlinked path passes lexical confinement checks and the agent reads/writes outside the workspace. | **Fixed (SEC-05):** `resolveWithinRoot` now canonicalizes via `realpath` on the nearest existing ancestor (design §15.2); symlink file/dir escapes are rejected, inner symlinks still work. |
-| Tampering | Destructive shell commands (`rm -rf`, etc.). | Terminal is a dangerous tool: requires approval per autonomy level; process-tree kill on timeout. A sandbox execution mode exists (`SandboxConfig` on the tool context; `run_terminal` is the single decision point). |
-| Info disclosure | `.env` / key files read into context and echoed to the provider. | **Partially fixed (SEC-03):** all tool output is secret-redacted before it reaches the model. Ask-gating on credential-file reads (design §15.2, class R+) is **open** (SEC-10). |
+| Tampering | Destructive shell commands (`rm -rf`, etc.). | **Fixed (S1+S5):** `run_terminal` carries `dangerous: true` on its ToolDefinition → PolicyGate risk class M, always requires explicit approval; taint escalation denies it after untrusted content ingestion. Process-tree kill on timeout. A sandbox execution mode exists (`SandboxConfig` on the tool context; `run_terminal` is the single decision point). |
+| Info disclosure | `.env` / key files read into context and echoed to the provider. | **Fixed (S5, SEC-10):** credential gate in `loop.ts executeCall` — reading `.env`/`*.pem`/`id_rsa`/etc. is denied pending manual approval — on top of SEC-03 output redaction. |
 | Repudiation | Destructive commands not attributable. | Terminal output + commands are recorded in the session transcript (now 0600, SEC-12). |
 
 ## Findings register

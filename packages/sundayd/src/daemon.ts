@@ -20,6 +20,8 @@ import {
   type RouterPolicyConfig,
 } from '@sunday/gateway';
 import { homedir } from 'node:os';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 import { ToolRegistry, createDefaultRegistry as createDefaultTools, type SandboxConfig } from '@sunday/tools';
 import { RpcError, StdioTransport, type ServerTransport } from './transport.js';
 import { sandboxConfigFromEnv } from './sandbox.js';
@@ -129,6 +131,12 @@ export interface DaemonOptions {
   /** Home dir for user skills/rules/memory in the system prompt. Defaults to os.homedir(). */
   userDir?: string;
   maxIterations?: number;
+  /**
+   * S3: per-boot token for sensitive RPCs. Defaults to the
+   * SUNDAY_DAEMON_BOOT_TOKEN env var (stamped by the spawning extension),
+   * else a fresh randomUUID per boot. Tests may inject a fixed value.
+   */
+  bootToken?: string;
   /** Dependency injection (tests / embedding). */
   tools?: ToolRegistry;
   providers?: ProviderRegistry;
@@ -218,6 +226,12 @@ export class SundayDaemon {
   /** Phase 4: dynamically registered method handlers (manager methods).
    *  Wired via `registerManagerMethods(daemon)` in manager.ts. */
   private readonly extraHandlers = new Map<string, (params: unknown) => Promise<unknown>>();
+  /**
+   * S3: per-boot token guarding sensitive RPCs (`policy/approve`,
+   * `daemon/set-workspace-trust`, `mcp/secrets/provide`, `mcp/server/start`).
+   * Any local process on the socket without this token is rejected.
+   */
+  readonly bootToken: string;
   /** Persists currently being written — drained before exit so a shutdown can
    *  never truncate a session file. */
   private readonly pendingPersists = new Set<Promise<void>>();
@@ -290,6 +304,9 @@ export class SundayDaemon {
     this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
     });
+    // S3: per-boot token. The spawning extension stamps SUNDAY_DAEMON_BOOT_TOKEN;
+    // standalone/CLI boots get a fresh random token (fail-closed: unknown to callers).
+    this.bootToken = opts.bootToken ?? process.env[DAEMON_BOOT_TOKEN_ENV] ?? randomUUID();
   }
 
   async start(): Promise<void> {
@@ -402,6 +419,25 @@ export class SundayDaemon {
     }
   }
 
+  /**
+   * S3: reject sensitive RPCs without the per-boot token. Timing-safe
+   * compare; throws RpcError(PolicyDenied) on missing/mismatched token.
+   */
+  requireBootToken(params: unknown): void {
+    const token = (params as { bootToken?: unknown } | null)?.bootToken;
+    let ok = false;
+    if (typeof token === 'string' && token.length > 0) {
+      try {
+        ok = timingSafeEqual(Buffer.from(token), Buffer.from(this.bootToken));
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) {
+      throw new RpcError(ErrorCode.PolicyDenied, 'missing or invalid daemon boot token');
+    }
+  }
+
   /** Drain in-flight session writes, then hand off to onShutdown (process.exit
    *  by default). Idempotent — a second call while draining is a no-op. */
   private async gracefulExit(): Promise<void> {
@@ -471,6 +507,7 @@ export class SundayDaemon {
         return { ok: true as const };
       }
       case 'daemon/set-workspace-trust': {
+        this.requireBootToken(req.params); // S3
         const p = parseParams('daemon/set-workspace-trust', req.params);
         const root = canonicalizeWorkspaceRoot(p.workspaceRoot);
         setWorkspaceTrust(root, p.trusted);
@@ -487,6 +524,7 @@ export class SundayDaemon {
         };
       }
       case 'mcp/secrets/provide': {
+        this.requireBootToken(req.params); // S3
         const p = parseParams('mcp/secrets/provide', req.params);
         const count = workspaceSecrets.provide(p.workspaceRoot, p.secrets);
         return { ok: true as const, count };

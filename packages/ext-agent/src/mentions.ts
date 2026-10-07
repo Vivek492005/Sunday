@@ -18,6 +18,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import * as vscode from 'vscode';
 import type { ContentPart } from '@sunday/protocol';
+import { redactSecrets } from '@sunday/protocol';
 
 // -- mention kinds -----------------------------------------------------------
 
@@ -411,11 +412,13 @@ export async function composeChatMessage(
   opts?: ExpandOptions,
 ): Promise<ContentPart[]> {
   const parts: ContentPart[] = [];
-  if (text) parts.push({ type: 'text', text });
+  // S6: redact secret shapes from ALL outbound prompt content before it
+  // reaches the provider (user text + @-mention expansions).
+  if (text) parts.push({ type: 'text', text: redactSecrets(text) });
   const mentions = parseMentions(text);
   if (mentions.length > 0) {
     const blocks = await expandMentions(mentions, opts);
-    const ctx = blocks.map((b) => `--- context: ${b.label} ---\n${b.content}`).join('\n\n');
+    const ctx = blocks.map((b) => `--- context: ${b.label} ---\n${redactSecrets(b.content)}`).join('\n\n');
     parts.push({
       type: 'text',
       text: `The user's message references the following @-mentions (resolved below):\n${ctx}`,

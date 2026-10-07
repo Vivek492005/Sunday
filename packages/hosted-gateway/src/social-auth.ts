@@ -82,6 +82,14 @@ export class SocialVerifier {
   async verify(token: string, signal?: AbortSignal): Promise<SocialIdentity | null> {
     if (!token) return null;
 
+    // S8: hard timeout on the whole verification — a stalled OAuth provider
+    // must not hold handler connections open indefinitely (DoS).
+    const timeout = AbortSignal.timeout(8000);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    return this.verifyInner(token, combined);
+  }
+
+  private async verifyInner(token: string, signal: AbortSignal): Promise<SocialIdentity | null> {
     const cacheKey = token;
     const now = Date.now();
     const cached = this.cache.get(cacheKey);

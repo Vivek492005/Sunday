@@ -5,6 +5,8 @@ import type { SandboxConfig, ToolRegistry } from '@sunday/tools';
 import { redactSecrets } from '@sunday/skills';
 import { PolicyGate } from './policy.js';
 import { wrapUntrustedToolOutput } from './untrusted.js';
+import { markTainted, newTaintState, taintEscalationReason, type TaintState } from './taint.js';
+import { credentialGateReason } from './credential-gate.js';
 import type { StoredSession } from './sessions.js';
 
 export const DEFAULT_MODEL = 'sunday:meta-llama/llama-3.3-70b-instruct';
@@ -93,6 +95,9 @@ export class AgentLoop {
 
     const modelRef = opts.model ?? session.model ?? this.defaultModel;
     const cwd = session.cwd ?? process.cwd();
+    // S5: per-turn taint state — untrusted content (file reads, web, MCP)
+    // escalates state-changing tool calls to manual approval.
+    const taint = newTaintState();
 
     try {
       for (let i = 0; i < this.maxIterations; i++) {
@@ -141,7 +146,7 @@ export class AgentLoop {
 
         for (const { call, parseError } of calls) {
           throwIfAborted(opts.signal);
-          const result = await this.executeCall(call, parseError, cwd, opts.signal);
+          const result = await this.executeCall(call, parseError, cwd, opts.signal, taint);
           emit({ type: 'tool-result', result });
           session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });
         }
@@ -166,6 +171,7 @@ export class AgentLoop {
     parseError: string | undefined,
     cwd: string,
     signal: AbortSignal | undefined,
+    taint: TaintState,
   ): Promise<{ toolCallId: string; content: ContentPart[]; isError: boolean }> {
     if (parseError) {
       return {
@@ -182,6 +188,32 @@ export class AgentLoop {
         isError: true,
       };
     }
+    // S5: taint escalation — when untrusted content was ingested this turn,
+    // state-changing tools need manual approval even if policy allowed them.
+    const taintReason = taintEscalationReason(taint, call.name);
+    if (taintReason) {
+      return {
+        toolCallId: call.id,
+        content: [{ type: 'text', text: `Taint escalation: ${taintReason}` }],
+        isError: true,
+      };
+    }
+    // S5: credential gate — reading .env/*.pem/id_rsa etc. requires manual
+    // approval (SEC-10). The gate runs here (not in the tool) because the
+    // policy decision belongs to the loop, not the filesystem tool.
+    if (call.name === 'read_file' && !parseError) {
+      const readPath = (call.arguments as { path?: unknown } | null)?.path;
+      if (typeof readPath === 'string') {
+        const gateReason = credentialGateReason(readPath);
+        if (gateReason) {
+          return {
+            toolCallId: call.id,
+            content: [{ type: 'text', text: gateReason }],
+            isError: true,
+          };
+        }
+      }
+    }
     const r = await this.deps.tools.call(call.name, call.arguments, {
       cwd,
       signal,
@@ -189,6 +221,9 @@ export class AgentLoop {
       // only tool that reads it (single decision point in terminal.ts).
       sandbox: this.sandbox,
     });
+    // S5: file reads ingest untrusted content (the agent didn't write these
+    // files) — mark the turn tainted so later state-changing calls escalate.
+    if (call.name === 'read_file') markTainted(taint, 'file_read_untrusted');
     // §15.4: tool output is untrusted data — redact secret shapes before it
     // can reach the provider, and wrap it in explicit delimiters so the
     // model cannot mistake it for instructions.

@@ -72,6 +72,7 @@ export function registerMcpMethods(
       };
     },
     'mcp/server/start': async (params) => {
+      daemon.requireBootToken(params); // S3: arbitrary command execution
       const { name, workspaceRoot } = parseParams('mcp/server/start', params);
       const resolved = hubs.resolve(workspaceRoot);
       try {
@@ -130,6 +131,7 @@ export function registerMcpMethods(
       return { calls: resolved.hub.getCallHistory(limit ?? 100) };
     },
     'policy/approve': async (params) => {
+      daemon.requireBootToken(params); // S3: approval grants dangerous-tool execution
       const { tool } = parseParams('policy/approve', params);
       policy.approve(tool);
       return { ok: true as const };

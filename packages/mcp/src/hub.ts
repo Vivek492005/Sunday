@@ -32,6 +32,32 @@ const MAX_HISTORY = 200;
 /** Truncation for the args summary stored in call history. */
 const ARGS_SUMMARY_LEN = 240;
 
+/**
+ * S2: minimal environment for stdio MCP children. Only locale/path basics —
+ * never secrets. Anything a server needs must come via its own `env` config
+ * (resolved through the secret resolver). Explicitly strips SUNDAY_MCP_SECRET_*
+ * so one server cannot read another server's credentials.
+ */
+const CHILD_ENV_ALLOWLIST = [
+  'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
+  'TMPDIR', 'TEMP', 'TMP', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR',
+  'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA',
+  'NODE_PATH', 'PYTHONPATH',
+] as const;
+
+export function minimalChildEnv(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of CHILD_ENV_ALLOWLIST) {
+    const v = process.env[k];
+    if (v !== undefined) out[k] = v;
+  }
+  // Belt-and-braces: never leak MCP secrets even if allowlisted by accident.
+  for (const k of Object.keys(out)) {
+    if (k.startsWith('SUNDAY_MCP_SECRET_')) delete out[k];
+  }
+  return out;
+}
+
 export interface McpHubOptions {
   userConfigPath?: string;
   workspaceConfigPath?: string;
@@ -391,7 +417,10 @@ export class McpHub {
         command: command[0],
         args: command.slice(1),
         cwd: cfg.cwd,
-        env: { ...process.env as Record<string, string>, ...resolvedEnv },
+        // S2 hardening: stdio children get a MINIMAL env, never the full
+        // process.env. This prevents one MCP server from reading another
+        // server's secrets (SUNDAY_MCP_SECRET_*) or the operator's keys.
+        env: { ...minimalChildEnv(), ...resolvedEnv },
       });
     }
     const headers: Record<string, string> = {};

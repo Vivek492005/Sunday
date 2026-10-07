@@ -39,16 +39,17 @@ export class ProviderRegistry {
   }
 }
 
-export function createDefaultRegistry(): ProviderRegistry {
+export function createDefaultRegistry(only?: Array<'sunday' | 'openrouter' | 'groq' | 'ollama'>): ProviderRegistry {
   const r = new ProviderRegistry();
+  const want = (id: 'sunday' | 'openrouter' | 'groq' | 'ollama') => !only || only.includes(id);
   // Sunday hosted first: zero-config for signed-in users (GitHub OAuth).
   // BYOK providers (OpenRouter/Groq) remain for power users with keys.
-  r.register(new SundayHostedProvider());
-  r.register(new OpenRouterProvider());
-  r.register(new GroqProvider());
+  if (want('sunday')) r.register(new SundayHostedProvider());
+  if (want('openrouter')) r.register(new OpenRouterProvider());
+  if (want('groq')) r.register(new GroqProvider());
   // Local Model slice: unconditional registration — *selection* is gated by
   // sunday.localModel.enabled, so a missing Ollama install changes nothing.
-  r.register(new OllamaProvider());
+  if (want('ollama')) r.register(new OllamaProvider());
   return r;
 }
 

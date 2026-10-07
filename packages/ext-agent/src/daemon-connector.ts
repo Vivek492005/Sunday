@@ -104,6 +104,8 @@ export interface DaemonConnectorOptions {
    */
   singleFlight?: SingleFlightOptions;
   log?: (msg: string) => void;
+  /** S3: per-boot daemon token, included in sensitive RPC params. */
+  bootToken?: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -237,7 +239,8 @@ export class DaemonConnector {
     if (opts.mcpSecrets && Object.keys(opts.mcpSecrets).length > 0) {
       await rpc.request(
         'mcp/secrets/provide',
-        { workspaceRoot: opts.workspaceRoot, secrets: opts.mcpSecrets },
+        // S3: shipping secrets requires the per-boot daemon token.
+        { workspaceRoot: opts.workspaceRoot, secrets: opts.mcpSecrets, bootToken: this.opts.bootToken },
         { timeoutMs: this.opts.handshakeTimeoutMs ?? 15000 },
       );
     }

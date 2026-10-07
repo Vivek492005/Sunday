@@ -11,6 +11,7 @@
 // extractRelevantCode, truncateCode.
 import * as vscode from 'vscode';
 import { AgentSender, type AgentSendDeps } from './agentSend.js';
+import { redactSecrets } from '@sunday/protocol'; // S6: redact secrets from outbound prompts
 
 /** Plain-data view of a vscode.Diagnostic (keeps prompt builders vscode-free). */
 export interface DiagnosticSummary {
@@ -49,7 +50,7 @@ export function buildFixPrompt(
   opts: { filePath?: string; languageId?: string } = {},
 ): string {
   const lines = diagnostics.map(
-    (d) => `- [${d.severity}] line ${d.line}${d.code ? ` (${d.code})` : ''}: ${d.message}`,
+    (d) => `- [${d.severity}] line ${d.line}${d.code ? ` (${d.code})` : ''}: ${redactSecrets(d.message)}`,
   );
   const where = opts.filePath ? ` in ${opts.filePath}` : '';
   return [
@@ -60,7 +61,7 @@ export function buildFixPrompt(
     '',
     'Code:',
     '```' + (opts.languageId ?? ''),
-    truncateCode(code),
+    redactSecrets(truncateCode(code)),
     '```',
     '',
     'After fixing, reply briefly with what you changed.',
@@ -74,7 +75,7 @@ export function buildExplainPrompt(code: string, languageId: string): string {
     `Explain what the following ${lang} code does. Be concise: its purpose, the key logic, and any notable edge cases or risks.`,
     '',
     '```' + lang,
-    truncateCode(code),
+    redactSecrets(truncateCode(code)),
     '```',
   ].join('\n');
 }
@@ -86,7 +87,7 @@ export function buildTestsPrompt(code: string, languageId: string): string {
     `Write vitest unit tests for the following ${lang} code. Cover the main paths and edge cases; keep the tests self-contained and runnable with \`vitest run\`.`,
     '',
     '```' + lang,
-    truncateCode(code),
+    redactSecrets(truncateCode(code)),
     '```',
   ].join('\n');
 }

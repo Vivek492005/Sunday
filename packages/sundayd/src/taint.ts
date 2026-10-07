@@ -18,10 +18,11 @@ export const UNTRUSTED_SOURCES = new Set([
 
 /** Tool calls that change state and therefore need escalation when tainted. */
 export const STATE_CHANGING_TOOLS = new Set([
-  'shell_exec',
-  'file_write',
-  'file_delete',
-  'file_move',
+  // S5: use the REAL tool names (WRITE_TOOLS in @sunday/tools) — the old
+  // names (shell_exec/file_write/file_delete) never matched anything.
+  'run_terminal',
+  'write_file',
+  'edit_file',
   'git_commit',
   'git_push',
   'browser_navigate', // navigates to attacker-controlled URLs

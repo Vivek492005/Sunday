@@ -31,6 +31,8 @@ import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
 import { registerOrchestrationCommands } from './orchestrationCommands.js';
+import { randomUUID } from 'node:crypto';
+import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 
 const EXT_ID = 'sunday.sunday-agent';
 
@@ -50,6 +52,10 @@ export async function activate(
 
   // -- workspace trust + MCP secrets (Part A) --------------------------------------
   const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // S3: per-boot daemon token. Generated here, stamped into sundayd's env at
+  // spawn, and included in sensitive RPC params. Any other local process on
+  // the socket without this token cannot approve tools or start servers.
+  const daemonBootToken = randomUUID();
   // Set by "Sunday: Trust Workspace"; overrides vscode.workspace.isTrusted for this session.
   let workspaceTrustOverride: boolean | undefined;
   const isTrusted = () => workspaceTrustOverride ?? vscode.workspace.isTrusted;
@@ -93,6 +99,8 @@ export async function activate(
     extraEnv: () => ({
       ...(wsRoot ? { [WORKSPACE_ENV]: wsRoot } : {}),
       [WORKSPACE_TRUSTED_ENV]: isTrusted() ? '1' : '0',
+      // S3: per-boot token for sensitive daemon RPCs.
+      [DAEMON_BOOT_TOKEN_ENV]: daemonBootToken,
       // Agent browser opt-in (Browser Agent UI phase): sundayd only enables
       // browserd when this is '1'. Applies on the next sidecar (re)start.
       ...(vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)
@@ -180,7 +188,7 @@ export async function activate(
   const refreshBridge = () => {
     const rpc = manager.getRpc();
     if (rpc && !bridge) {
-      bridge = new HostBridge(rpc);
+      bridge = new HostBridge(rpc, 30000, { bootToken: daemonBootToken });
       log('HostBridge attached to sundayd');
     } else if (!rpc && bridge) {
       bridge.dispose();
@@ -257,7 +265,7 @@ export async function activate(
   const ensureBridge = async (): Promise<HostBridge> => {
     const rpc = await manager.ensureReady();
     if (!bridge) {
-      bridge = new HostBridge(rpc);
+      bridge = new HostBridge(rpc, 30000, { bootToken: daemonBootToken });
       log('HostBridge attached to sundayd');
       chatProvider?.notifyBridgeChanged();
       managerProvider?.notifyBridgeChanged();

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { bootTokenParam } from './policy.js';
 
 /**
  * @sunday/protocol — per-user daemon configuration surface (Phase 8 Stage 3).
@@ -37,6 +38,8 @@ export type DaemonConfigureParams = z.infer<typeof daemonConfigureParamsSchema>;
 export const setWorkspaceTrustParamsSchema = z.object({
   workspaceRoot: z.string().min(1),
   trusted: z.boolean(),
+  // S3: changing trust verdicts requires the per-boot daemon token.
+  ...bootTokenParam,
 });
 export type SetWorkspaceTrustParams = z.infer<typeof setWorkspaceTrustParamsSchema>;
 
@@ -51,6 +54,8 @@ export const provideSecretsParamsSchema = z.object({
   /** Secret key → value. Keys use the same normalization as
    *  `mcpSecretEnvName` (dots/dashes → underscores). */
   secrets: z.record(z.string(), z.string()),
+  // S3: shipping secrets requires the per-boot daemon token.
+  ...bootTokenParam,
 });
 export type ProvideSecretsParams = z.infer<typeof provideSecretsParamsSchema>;
 

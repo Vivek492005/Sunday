@@ -20,6 +20,7 @@
 // truncateTerminalOutput, readExecutionOutput.
 import * as vscode from 'vscode';
 import { AgentSender, type AgentSendDeps } from './agentSend.js';
+import { redactSecrets } from '@sunday/protocol'; // S6: redact secrets from outbound prompts
 
 /** Cap on terminal output embedded in a prompt (keeps the tail — errors land at the end). */
 export const TERMINAL_OUTPUT_MAX_CHARS = 6000;
@@ -58,12 +59,12 @@ export function buildTerminalErrorPrompt(f: {
   const { output, truncated } = truncateTerminalOutput(f.output);
   return [
     'My terminal command failed. Explain the error and suggest a concrete fix.',
-    `Command: ${f.command}`,
+    `Command: ${redactSecrets(f.command)}`,
     f.exitCode !== undefined ? `Exit code: ${f.exitCode}` : '',
     truncated ? '(Note: output was truncated to the last lines.)' : '',
     '',
     '```',
-    output,
+    redactSecrets(output),
     '```',
   ]
     .filter((l) => l !== '')

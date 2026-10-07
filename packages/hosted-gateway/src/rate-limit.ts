@@ -128,3 +128,46 @@ export class KeyRateLimiter {
 export function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
 }
+
+/**
+ * S8: per-IP request bucket — a backstop against sock-puppet farms.
+ * Per-key limits alone let N fake accounts multiply the effective limit
+ * N× from one IP. This caps aggregate requests per IP regardless of key.
+ */
+export class IpRateLimiter {
+  private readonly buckets = new Map<string, BucketState>();
+  private readonly spec: BucketSpec;
+  private readonly now: () => number;
+
+  constructor(opts: { requestsPerMinute: number; now?: () => number }) {
+    this.spec = {
+      capacity: opts.requestsPerMinute,
+      refillPerMs: opts.requestsPerMinute / 60_000,
+    };
+    this.now = opts.now ?? Date.now;
+  }
+
+  /** Returns true when the IP may proceed (debited 1 request). */
+  tryAdmit(ip: string): boolean {
+    const now = this.now();
+    for (const [id, s] of this.buckets) {
+      if (id !== ip && now - s.lastSeenMs > EVICT_AFTER_MS) this.buckets.delete(id);
+    }
+    let s = this.buckets.get(ip);
+    if (!s) {
+      s = { tokens: this.spec.capacity, lastRefillMs: now, lastSeenMs: now };
+      this.buckets.set(ip, s);
+    }
+    const elapsed = now - s.lastRefillMs;
+    if (elapsed > 0) {
+      s.tokens = Math.min(this.spec.capacity, s.tokens + elapsed * this.spec.refillPerMs);
+      s.lastRefillMs = now;
+    }
+    s.lastSeenMs = now;
+    if (s.tokens >= 1) {
+      s.tokens -= 1;
+      return true;
+    }
+    return false;
+  }
+}

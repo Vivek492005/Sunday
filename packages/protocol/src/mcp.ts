@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { bootTokenParam } from './policy.js';
 
 /** MCP server state surfaced to the extension (Part A: Editor Intelligence).
  *  Mirrors @sunday/mcp's McpServerStatus plus the config scope the server
@@ -60,7 +61,8 @@ export const MCP_METHODS = {
     }),
   },
   'mcp/server/start': {
-    params: z.object({ name: z.string().min(1), ...workspaceRootParam }),
+    // S3: starting a server (arbitrary command execution) requires the boot token.
+    params: z.object({ name: z.string().min(1), ...workspaceRootParam, ...bootTokenParam }),
     result: z.object({ status: mcpServerStatusSchema }),
   },
   'mcp/server/stop': {

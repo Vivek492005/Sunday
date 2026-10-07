@@ -7,6 +7,7 @@
 // lives on the Daemon and serves the `completion/complete` RPC.
 
 import { createHash } from 'node:crypto';
+import { redactSecrets } from '@sunday/skills';
 import type {
   CompletionParams,
   CompletionResult,
@@ -161,8 +162,9 @@ export class CompletionOrchestrator {
     try {
       const fim = await this.completeFn({
         model: params.model ?? '',
-        prefix: params.prefix,
-        suffix: params.suffix,
+        // S6: ghost-text prefix/suffix go to the provider — redact secrets first.
+        prefix: redactSecrets(params.prefix),
+        suffix: params.suffix ? redactSecrets(params.suffix) : params.suffix,
         maxTokens: params.maxTokens,
         signal: controller.signal,
       });

@@ -25,6 +25,7 @@
 
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
+import { redactSecrets } from '@sunday/protocol';
 
 export interface InlineEditDeps {
   /** Current bridge, if the sidecar is up. */
@@ -45,6 +46,10 @@ const COMMAND_ID = 'sunday.inlineEdit';
  * has a predictable reply shape.
  */
 export function buildEditPrompt(instruction: string, code: string, languageId: string): string {
+  // S6: redact secret shapes from the instruction + code before the prompt
+  // reaches the provider.
+  const safeInstruction = redactSecrets(instruction.trim());
+  const safeCode = redactSecrets(code);
   return [
     'You are a code rewriting assistant. Rewrite ONLY the provided code block according to the instruction below.',
     '',
@@ -55,10 +60,10 @@ export function buildEditPrompt(instruction: string, code: string, languageId: s
     '- If the instruction cannot be applied, return the original block unchanged.',
     '',
     'INSTRUCTION:',
-    instruction.trim(),
+    safeInstruction,
     '',
     `CODE (${languageId}):`,
-    code,
+    safeCode,
   ].join('\n');
 }
 

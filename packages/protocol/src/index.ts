@@ -22,6 +22,7 @@ export * from './mcp.js';
 export * from './policy.js';
 export * from './daemon-paths.js';
 export * from './daemon.js';
+export * from './secrets.js';
 
 import { HANDSHAKE_METHODS } from './handshake.js';
 import { SESSION_METHODS } from './session.js';

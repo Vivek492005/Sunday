@@ -132,3 +132,13 @@ export function isPidAlive(pid: number): boolean {
     return (e as NodeJS.ErrnoException)?.code === 'EPERM';
   }
 }
+
+/**
+ * S3: per-boot daemon token. The spawning extension generates a random
+ * token, passes it to sundayd via this env var, and includes it in
+ * sensitive RPC params (`policy/approve`, `daemon/set-workspace-trust`,
+ * `mcp/secrets/provide`, `mcp/server/start`). Any other local process on
+ * the socket without the token is rejected. After the S2 env scrub, MCP
+ * stdio children can no longer inherit it.
+ */
+export const DAEMON_BOOT_TOKEN_ENV = 'SUNDAY_DAEMON_BOOT_TOKEN';

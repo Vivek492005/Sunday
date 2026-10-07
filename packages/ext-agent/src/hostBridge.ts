@@ -31,6 +31,7 @@ export class HostBridge {
   constructor(
     private readonly rpc: RpcClient,
     private readonly defaultTimeoutMs = 30000,
+    private readonly opts: { bootToken?: string } = {},
   ) {
     this.disposeChatEvent = rpc.onNotification('chat/event', (params) => this.dispatchChatEvent(params));
     this.disposeOrchestrateEvent = rpc.onNotification('orchestrate/event', (params) =>
@@ -186,7 +187,8 @@ export class HostBridge {
   }
 
   mcpServerStart(name: string): Promise<MethodResult<'mcp/server/start'>> {
-    return this.call('mcp/server/start', { name }, 60000);
+    // S3: starting a server executes arbitrary commands — boot token required.
+    return this.call('mcp/server/start', { name, bootToken: this.opts.bootToken }, 60000);
   }
 
   mcpServerStop(name: string): Promise<MethodResult<'mcp/server/stop'>> {
@@ -208,7 +210,8 @@ export class HostBridge {
   // -- policy approvals (Part A: risk class M) -----------------------------------
 
   policyApprove(tool: string): Promise<MethodResult<'policy/approve'>> {
-    return this.call('policy/approve', { tool });
+    // S3: approval grants dangerous-tool execution — boot token required.
+    return this.call('policy/approve', { tool, bootToken: this.opts.bootToken });
   }
 
   policyRevoke(tool: string): Promise<MethodResult<'policy/revoke'>> {

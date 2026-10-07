@@ -68,6 +68,16 @@ const SNAPSHOT_SCRIPT = `() => {
     const style = getComputedStyle(el);
     return style.visibility !== 'hidden' && style.display !== 'none';
   }
+  function isSensitiveField(el) {
+    // S7: never snapshot credential values — passwords, card numbers, etc.
+    const type = (el.getAttribute('type') || '').toLowerCase();
+    if (type === 'password') return true;
+    const ac = (el.getAttribute('autocomplete') || '').toLowerCase();
+    if (['current-password', 'new-password', 'cc-number', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'cc-csc', 'cc-cvv'].includes(ac)) return true;
+    const name = (el.getAttribute('name') || '').toLowerCase();
+    if (/passw|passwd|secret|ssn/.test(name)) return true;
+    return false;
+  }
   function walk(el, parent) {
     if (el.nodeType !== 1 || SKIP.has(el.tagName)) return;
     const role = roleOf(el);
@@ -83,7 +93,10 @@ const SNAPSHOT_SCRIPT = `() => {
     const node = { ref, role, visible: visible(el) };
     const name = nameOf(el, role);
     if (name) node.name = name;
-    if ((role === 'textbox' || role === 'combobox') && 'value' in el) node.value = String(el.value).slice(0, 500);
+    if ((role === 'textbox' || role === 'combobox') && 'value' in el) {
+      // S7: sensitive field values are never snapshotted.
+      node.value = isSensitiveField(el) ? '[REDACTED]' : String(el.value).slice(0, 500);
+    }
     if (role === 'checkbox' || role === 'radio') node.checked = !!el.checked;
     if (el.disabled) node.disabled = true;
     if (kids.length) node.children = kids;

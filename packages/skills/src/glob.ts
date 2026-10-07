@@ -3,7 +3,7 @@
  *
  * Supported syntax:
  *   - `*`  — any run of characters except `/`
- *   - `**` — any run of characters, including `/` (also handles `/**/` and trailing `/**`)
+ *   - `**` — any run of characters, including `/` (also handles slash-star-slash and trailing slash-star-star)
  *   - `?`  — exactly one character except `/`
  *
  * Matching is against the workspace-relative path with `/` separators.

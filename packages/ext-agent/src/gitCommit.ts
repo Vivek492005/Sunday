@@ -18,6 +18,7 @@ import * as vscode from 'vscode';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { AgentSender, type AgentSendDeps } from './agentSend.js';
+import { redactSecrets } from '@sunday/protocol'; // S6: redact secrets from outbound prompts
 
 /** Staged diffs are capped so the prompt stays bounded. */
 export const STAGED_DIFF_MAX_CHARS = 8000;
@@ -48,7 +49,7 @@ export function buildCommitPrompt(diff: string, truncated: boolean): string {
     truncated ? '(Note: the diff was truncated to fit; base the message on what is shown.)' : '',
     '',
     '```diff',
-    diff,
+    redactSecrets(diff),
     '```',
   ]
     .filter((l) => l !== '')

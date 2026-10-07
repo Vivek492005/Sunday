@@ -24,7 +24,7 @@ import {
 } from '@sunday/gateway';
 import type { HostedGatewayConfig } from './config.js';
 import { KeyStore, keyFingerprint } from './auth.js';
-import { KeyRateLimiter } from './rate-limit.js';
+import { IpRateLimiter, KeyRateLimiter } from './rate-limit.js';
 import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
 import { SocialVerifier, type SocialIdentity } from './social-auth.js';
@@ -48,6 +48,8 @@ export interface ServerDeps {
 export class HostedGatewayServer {
   private readonly keys: KeyStore;
   private readonly limiter: KeyRateLimiter;
+  /** S8: per-IP backstop against sock-puppet farms (per-key limits multiply). */
+  private readonly ipLimiter: IpRateLimiter;
   private readonly audit: AuditLog;
   private readonly router: Router;
   private readonly registry: ProviderRegistry;
@@ -64,8 +66,12 @@ export class HostedGatewayServer {
       requestsPerMinute: config.requestsPerMinute,
       tokensPerMinute: config.tokensPerMinute,
     });
+    this.ipLimiter = new IpRateLimiter({ requestsPerMinute: 300 });
     this.audit = new AuditLog(config.auditLog);
-    this.registry = deps.registry ?? createDefaultRegistry();
+    // S8: restrict the server registry to paid upstream providers only.
+    // The default registry includes `sunday:` (self-loop burning quota) and
+    // `ollama:` (connection-refused on Render) — neither makes sense here.
+    this.registry = deps.registry ?? createDefaultRegistry(['openrouter', 'groq']);
     this.router = deps.router ?? new Router(this.registry, 'openrouter:meta-llama/llama-3.3-70b-instruct');
     this.social = new SocialVerifier(this.config.oauthProviders);
     this.quota = new DailyQuota(config.dailyQuota);
@@ -83,6 +89,11 @@ export class HostedGatewayServer {
         }
       });
     });
+    // S8: HTTP server hardening — slowloris protection on a small instance.
+    this.server.maxConnections = 2000;
+    this.server.requestTimeout = 30_000;
+    this.server.headersTimeout = 10_000;
+    this.server.keepAliveTimeout = 5_000;
     await new Promise<void>((resolve, reject) => {
       this.server!.once('error', reject);
       this.server!.listen(this.config.port, this.config.host, () => resolve());
@@ -167,6 +178,14 @@ export class HostedGatewayServer {
         throw new ApiError(403, 'ip_not_allowed', 'client IP is not allowlisted');
       }
 
+      // S8: per-IP backstop (before auth — even unauthenticated floods count).
+      // Skipped for /health so load-balancer probes never trip it.
+      if (!(method === 'GET' && path === '/health') && !this.ipLimiter.tryAdmit(ip)) {
+        status = 429;
+        res.setHeader('Retry-After', '60');
+        throw new ApiError(429, 'ip_rate_limited', 'too many requests from this IP');
+      }
+
       // 2/3. Auth (skipped for /health) + body.
       // Two modes: GitHub OAuth token (per-user free tier) or static
       // gateway API key (operator/testing). GitHub mode is tried first
@@ -184,7 +203,9 @@ export class HostedGatewayServer {
         if (socialIdentity) {
           // Per-user identity: rate-limit key becomes the namespaced user id.
           key = { id: socialIdentity.key };
-          keyId = `${socialIdentity.key} (${socialIdentity.label})`;
+          // M2: log only the namespaced key, never the label (Google emails /
+          // Microsoft UPNs are PII and don't belong in log stores).
+          keyId = socialIdentity.key;
         } else {
           const found = this.keys.verify(secret);
           if (!found) {

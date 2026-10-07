@@ -8,12 +8,15 @@ import { SundayDaemon } from './daemon.js';
 import { workspaceTrust, isWorkspaceTrusted } from './trust.js';
 import { workspaceSecrets } from './workspace-secrets.js';
 
+const TEST_BOOT_TOKEN = 'test-boot-token';
+
 function makeDaemon(opts: { onWorkspaceTrustChanged?: (root: string) => void } = {}): SundayDaemon {
   // handleRequest() dispatches directly without starting the transport, so
   // the default stdio transport is never started (safe in tests).
   return new SundayDaemon({
     onShutdown: () => undefined,
     onWorkspaceTrustChanged: opts.onWorkspaceTrustChanged,
+    bootToken: TEST_BOOT_TOKEN,
   });
 }
 
@@ -42,7 +45,7 @@ describe('daemon/configure + daemon/set-workspace-trust + daemon/status', () => 
     const daemon = makeDaemon({ onWorkspaceTrustChanged: (r) => seen.push(r) });
     const ws = mkdtempSync(join(tmpdir(), 'ws-d-'));
     const res = (await daemon.handleRequest(
-      createRequest('1', 'daemon/set-workspace-trust', { workspaceRoot: ws, trusted: false }),
+      createRequest('1', 'daemon/set-workspace-trust', { workspaceRoot: ws, trusted: false, bootToken: TEST_BOOT_TOKEN }),
     )) as { ok: boolean; workspaceRoot: string };
     expect(res.ok).toBe(true);
     expect(isWorkspaceTrusted(ws)).toBe(false);
@@ -97,6 +100,7 @@ describe('mcp/secrets/provide', () => {
       createRequest('1', 'mcp/secrets/provide', {
         workspaceRoot: wsA,
         secrets: { API_KEY: 'aaa' },
+        bootToken: TEST_BOOT_TOKEN,
       }),
     )) as { ok: boolean; count: number };
     expect(res.ok).toBe(true);

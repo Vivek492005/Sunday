@@ -35,6 +35,9 @@ export const runTerminalTool: Tool = {
     name: 'run_terminal',
     description:
       'Run a shell command: PowerShell on Windows, sh elsewhere. Use for builds, tests, scripts. Prefer dedicated file tools for reading/writing files.',
+    // S1 hardening: shell execution always requires explicit user approval
+    // (risk class M) — routed through the PolicyGate, never allow-all.
+    dangerous: true,
     parameters: {
       type: 'object',
       required: ['command'],
