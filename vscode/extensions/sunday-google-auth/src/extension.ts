@@ -33,10 +33,13 @@ interface StoredSession {
   expiresAt: number;
 }
 
+const DEFAULT_CLIENT_ID = '759535868571-93cq3r0qh1i8pdddeol1buvnu41irtg2.apps.googleusercontent.com';
+
 function getClientId(): string {
   return (
     process.env.SUNDAY_GOOGLE_CLIENT_ID?.trim() ||
-    vscode.workspace.getConfiguration('sunday.google').get<string>('clientId', '').trim()
+    vscode.workspace.getConfiguration('sunday.google').get<string>('clientId', '').trim() ||
+    DEFAULT_CLIENT_ID
   );
 }
 
