@@ -84,10 +84,10 @@
       ]
     },
     {
-      "detail": "Ollama autocomplete shipped; human acceptance gates (real Ollama + VS Code) pending",
+      "detail": "Ollama autocomplete shipped + human-verified 2026-10-07",
       "name": "Feature Completion",
-      "percent": 95,
-      "status": "in_progress",
+      "percent": 100,
+      "status": "complete",
       "tasks": [
         "Define 'done' for JetBrains plugin",
         "Define 'done' for IDE fork",

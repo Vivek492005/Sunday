@@ -25,12 +25,12 @@ No vibes — each has checkable gates.
 
 ## Local Model Support → SHIPPED when:
 
-- [ ] Ollama-backed autocomplete works (minimal slice)
-- [ ] Config flag `sunday.localModel.enabled` exists
-- [ ] Falls back to API providers when Ollama unavailable
-- [ ] Documented in PROVIDER_SETUP.md
+- [x] Ollama-backed autocomplete works (minimal slice) — verified by founder 2026-10-07
+- [x] Config flag `sunday.localModel.enabled` exists
+- [x] Falls back to API providers when Ollama unavailable — verified by founder 2026-10-07
+- [x] Documented in PROVIDER_SETUP.md
 
-**Status**: NOT STARTED (roadmap) — design doc: `docs/LOCAL_MODEL_PLAN.md`
+**Status**: SHIPPED 2026-10-07 — design doc: `docs/LOCAL_MODEL_PLAN.md`
 
 ## Sequencing decision
 
