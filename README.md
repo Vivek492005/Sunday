@@ -12,6 +12,8 @@
 
 🎬 **Watch:** [Sunday Promo Video (2 min)](https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/sunday-promo-2min.mp4)
 
+![Sunday demo](https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/sunday-demo.gif)
+
 ---
 
 ## Contents

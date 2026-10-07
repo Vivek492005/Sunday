@@ -1,7 +1,7 @@
 {
   "phases": [
     {
-      "detail": "Close 3 remaining gates: human screen-reader pass, packet capture, soak test + live eval",
+      "detail": "Fresh full CI dispatched on current main; human gates (screen-reader, pcap, live eval) pending",
       "name": "Production Readiness",
       "percent": 75,
       "status": "active",
@@ -45,10 +45,10 @@
       ]
     },
     {
-      "detail": "Demo GIF, FAQ, glossary, repo metadata",
+      "detail": "Demo GIF + promo video in README and release assets",
       "name": "Documentation & Launch Prep",
-      "percent": 90,
-      "status": "pending",
+      "percent": 100,
+      "status": "complete",
       "tasks": [
         "Record 60-90s demo GIF for README",
         "Add README table of contents",
@@ -70,10 +70,10 @@
       ]
     },
     {
-      "detail": "Launch drafts + benchmark done; posts not yet published (human step)",
+      "detail": "Launch posts published by founder; drafts + benchmark in docs/launch/",
       "name": "Launch & Traction",
-      "percent": 40,
-      "status": "in_progress",
+      "percent": 100,
+      "status": "complete",
       "tasks": [
         "Run orchestration benchmark (on vs off)",
         "Publish technical write-up (dev.to/blog)",
