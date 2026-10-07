@@ -126,6 +126,36 @@ export async function activate(
   let managerPanel: ManagerPanelManager | undefined;
   let mcpProvider: McpViewProvider | undefined;
   let browserProvider: BrowserViewProvider | undefined;
+
+  // -- Sunday hosted gateway (zero-config AI) ---------------------------------------
+  // When the user is signed in with GitHub in the IDE, pass their OAuth token
+  // to sundayd so the `sunday` (hosted) provider works without API keys.
+  // Silent: never prompts — if there's no session, BYOK providers remain.
+  const configureSundayHosted = async (): Promise<void> => {
+    try {
+      const session = await vscode.authentication.getSession('github', ['read:user'], {
+        createIfNone: false,
+        silent: true,
+      });
+      if (!session?.accessToken) return;
+      const rpc = await manager.ensureReady();
+      await rpc.request(
+        'daemon/configure',
+        {
+          workspaceRoot: wsRoot ?? process.cwd(),
+          sundayApiToken: session.accessToken,
+        },
+        { timeoutMs: 15000 },
+      );
+      log('Sunday hosted gateway configured (GitHub sign-in)');
+    } catch (e) {
+      // Non-fatal: hosted provider stays unconfigured, BYOK still works.
+      log(`Sunday hosted gateway not configured: ${(e as Error).message}`);
+    }
+  };
+  // Fire-and-forget: must not block activation.
+  void configureSundayHosted();
+
   const refreshBridge = () => {
     const rpc = manager.getRpc();
     if (rpc && !bridge) {

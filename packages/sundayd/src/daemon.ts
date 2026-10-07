@@ -459,6 +459,12 @@ export class SundayDaemon {
           setWorkspaceTrust(root, p.trusted);
           this.onWorkspaceTrustChanged?.(root);
         }
+        // Sunday hosted gateway token (GitHub OAuth from the IDE sign-in).
+        // Set as env so @sunday/gateway's SundayHostedProvider picks it up.
+        // Never logged — treated like any other credential.
+        if (p.sundayApiToken) {
+          process.env.SUNDAY_API_TOKEN = p.sundayApiToken;
+        }
         // browserEnabled / sandboxMode are accepted for forward-compat;
         // per-workspace enforcement of those lands with the browser +
         // sandbox Stage 3 follow-up (daemon-global behavior unchanged).

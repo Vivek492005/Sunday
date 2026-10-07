@@ -7,7 +7,7 @@ import { PolicyGate } from './policy.js';
 import { wrapUntrustedToolOutput } from './untrusted.js';
 import type { StoredSession } from './sessions.js';
 
-export const DEFAULT_MODEL = 'openrouter:meta-llama/llama-3.3-70b-instruct';
+export const DEFAULT_MODEL = 'sunday:meta-llama/llama-3.3-70b-instruct';
 export const DEFAULT_MAX_ITERATIONS = 25;
 
 export interface AgentLoopDeps {

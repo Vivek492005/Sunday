@@ -25,6 +25,12 @@ export const daemonConfigureParamsSchema = z.object({
   browserEnabled: z.boolean().optional(),
   /** Sandbox mode for `run_terminal` in this workspace. */
   sandboxMode: z.string().optional(),
+  /**
+   * Sunday hosted gateway token (GitHub OAuth token from the IDE sign-in).
+   * Lets the daemon's gateway use the zero-config hosted provider without
+   * the user copying API keys. Never logged.
+   */
+  sundayApiToken: z.string().min(1).optional(),
 });
 export type DaemonConfigureParams = z.infer<typeof daemonConfigureParamsSchema>;
 

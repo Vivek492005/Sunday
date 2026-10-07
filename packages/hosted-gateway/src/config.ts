@@ -48,6 +48,15 @@ export interface HostedGatewayConfig {
   auditLog: string;
   /** Upstream provider call timeout (ms). */
   upstreamTimeoutMs: number;
+  /**
+   * GitHub OAuth identity mode. When true, clients authenticate with a
+   * GitHub OAuth token (from the IDE's GitHub sign-in) instead of a
+   * static gateway API key. Quota is enforced per GitHub user id.
+   * Env: SUNDAY_HOSTED_GITHUB_AUTH=1
+   */
+  githubAuth: boolean;
+  /** Free-tier requests per GitHub user per UTC day. Env: SUNDAY_HOSTED_DAILY_QUOTA */
+  dailyQuota: number;
 }
 
 interface FileConfig {
@@ -97,9 +106,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
 
   const envKeys = list(env.SUNDAY_HOSTED_KEYS).map((e, i) => parseKeyEntry(e, i));
   const keys = [...envKeys, ...fileKeys].filter((k) => k.secret.length > 0);
-  if (keys.length === 0) {
+  const githubAuth = env.SUNDAY_HOSTED_GITHUB_AUTH?.trim() === '1';
+  if (keys.length === 0 && !githubAuth) {
     throw new Error(
-      'no API keys configured: set SUNDAY_HOSTED_KEYS (comma-separated id:secret) or SUNDAY_HOSTED_CONFIG',
+      'no API keys configured: set SUNDAY_HOSTED_KEYS (comma-separated id:secret), SUNDAY_HOSTED_CONFIG, or enable SUNDAY_HOSTED_GITHUB_AUTH=1',
     );
   }
 
@@ -117,5 +127,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     ipAllowlist: list(env.SUNDAY_HOSTED_ALLOWLIST),
     auditLog: env.SUNDAY_HOSTED_AUDIT_LOG?.trim() || 'stdout',
     upstreamTimeoutMs: num(env.SUNDAY_HOSTED_UPSTREAM_TIMEOUT_MS, 120_000),
+    githubAuth,
+    dailyQuota: num(env.SUNDAY_HOSTED_DAILY_QUOTA, 200),
   };
 }

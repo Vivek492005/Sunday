@@ -1,5 +1,5 @@
 import type { ModelInfo } from '@sunday/protocol';
-import { GroqProvider, OllamaProvider, OpenRouterProvider } from './providers.js';
+import { GroqProvider, OllamaProvider, OpenRouterProvider, SundayHostedProvider } from './providers.js';
 import type { ChatProvider } from './types.js';
 
 /** Provider + model registry (§10.2). Model ids are namespaced "provider:id"
@@ -41,6 +41,9 @@ export class ProviderRegistry {
 
 export function createDefaultRegistry(): ProviderRegistry {
   const r = new ProviderRegistry();
+  // Sunday hosted first: zero-config for signed-in users (GitHub OAuth).
+  // BYOK providers (OpenRouter/Groq) remain for power users with keys.
+  r.register(new SundayHostedProvider());
   r.register(new OpenRouterProvider());
   r.register(new GroqProvider());
   // Local Model slice: unconditional registration — *selection* is gated by
@@ -48,3 +51,7 @@ export function createDefaultRegistry(): ProviderRegistry {
   r.register(new OllamaProvider());
   return r;
 }
+
+/** Default model: Sunday hosted (zero-config). Falls back to OpenRouter
+ *  only when the caller explicitly opts out of the hosted default. */
+export const DEFAULT_MODEL = 'sunday:meta-llama/llama-3.3-70b-instruct';

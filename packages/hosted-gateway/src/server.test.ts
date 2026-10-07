@@ -25,6 +25,8 @@ function baseConfig(overrides: Partial<HostedGatewayConfig> = {}): HostedGateway
     ipAllowlist: [],
     auditLog: '/dev/null',
     upstreamTimeoutMs: 10_000,
+    githubAuth: false,
+    dailyQuota: 200,
     ...overrides,
   };
 }

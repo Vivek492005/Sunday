@@ -219,6 +219,8 @@ export class DaemonConnector {
     browserEnabled?: boolean;
     sandboxMode?: string;
     mcpSecrets?: Record<string, string>;
+    /** Sunday hosted gateway token (GitHub OAuth from IDE sign-in). */
+    sundayApiToken?: string;
   }): Promise<void> {
     const rpc = this.rpc;
     if (!rpc || rpc.isClosed) {
@@ -228,6 +230,7 @@ export class DaemonConnector {
     if (opts.trusted !== undefined) params.trusted = opts.trusted;
     if (opts.browserEnabled !== undefined) params.browserEnabled = opts.browserEnabled;
     if (opts.sandboxMode !== undefined) params.sandboxMode = opts.sandboxMode;
+    if (opts.sundayApiToken) params.sundayApiToken = opts.sundayApiToken;
     await rpc.request('daemon/configure', params, {
       timeoutMs: this.opts.handshakeTimeoutMs ?? 15000,
     });

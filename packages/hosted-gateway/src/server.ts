@@ -27,6 +27,8 @@ import { KeyStore, keyFingerprint } from './auth.js';
 import { KeyRateLimiter } from './rate-limit.js';
 import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
+import { GitHubVerifier, type GitHubIdentity } from './github-auth.js';
+import { DailyQuota } from './quota.js';
 import {
   ApiError,
   chatCompletionObject,
@@ -49,6 +51,8 @@ export class HostedGatewayServer {
   private readonly audit: AuditLog;
   private readonly router: Router;
   private readonly registry: ProviderRegistry;
+  private readonly github: GitHubVerifier;
+  private readonly quota: DailyQuota;
   private server: Server | undefined;
 
   constructor(
@@ -63,6 +67,8 @@ export class HostedGatewayServer {
     this.audit = new AuditLog(config.auditLog);
     this.registry = deps.registry ?? createDefaultRegistry();
     this.router = deps.router ?? new Router(this.registry, 'openrouter:meta-llama/llama-3.3-70b-instruct');
+    this.github = new GitHubVerifier();
+    this.quota = new DailyQuota(config.dailyQuota);
   }
 
   async listen(): Promise<void> {
@@ -162,19 +168,40 @@ export class HostedGatewayServer {
       }
 
       // 2/3. Auth (skipped for /health) + body.
+      // Two modes: GitHub OAuth token (per-user free tier) or static
+      // gateway API key (operator/testing). GitHub mode is tried first
+      // when enabled; a valid GitHub token always wins.
       const isHealth = method === 'GET' && path === '/health';
       let key: { id: string } | undefined;
+      let ghIdentity: GitHubIdentity | undefined;
       if (!isHealth) {
         const secret = KeyStore.extractBearer(req.headers.authorization);
-        const found = this.keys.verify(secret);
-        if (!found) {
-          status = 401;
-          keyId = secret ? 'invalid' : 'none';
-          res.setHeader('WWW-Authenticate', 'Bearer');
-          throw new ApiError(401, 'unauthorized', 'valid Bearer API key required');
+
+        if (this.config.githubAuth && secret) {
+          ghIdentity = (await this.github.verify(secret)) ?? undefined;
         }
-        key = found;
-        keyId = keyFingerprint(found.secret);
+
+        if (ghIdentity) {
+          // Per-user identity: rate-limit key becomes the GitHub user id.
+          key = { id: `gh:${ghIdentity.id}` };
+          keyId = `gh:${ghIdentity.id} (${ghIdentity.login})`;
+        } else {
+          const found = this.keys.verify(secret);
+          if (!found) {
+            status = 401;
+            keyId = secret ? 'invalid' : 'none';
+            res.setHeader('WWW-Authenticate', 'Bearer');
+            throw new ApiError(
+              401,
+              'unauthorized',
+              this.config.githubAuth
+                ? 'valid GitHub token or gateway API key required'
+                : 'valid Bearer API key required',
+            );
+          }
+          key = found;
+          keyId = keyFingerprint(found.secret);
+        }
       }
 
       if (method === 'GET' && path === '/health') {
@@ -210,6 +237,23 @@ export class HostedGatewayServer {
         });
         model = chatReq.model;
         promptTokensEst = chatReq.promptTokensEst;
+
+        // 4b. Daily free-tier quota (GitHub-identified users only).
+        if (ghIdentity) {
+          const q = this.quota.tryConsume(ghIdentity.id);
+          res.setHeader('X-Quota-Limit', String(q.limit));
+          res.setHeader('X-Quota-Remaining', String(q.remaining));
+          if (!q.allowed) {
+            status = 429;
+            const retrySec = Math.max(1, Math.ceil(q.resetAfterMs / 1000));
+            res.setHeader('Retry-After', String(retrySec));
+            throw new ApiError(
+              429,
+              'quota_exceeded',
+              `daily free-tier quota exhausted (${q.limit}/day), resets in ${Math.ceil(retrySec / 60)}m`,
+            );
+          }
+        }
 
         // 5. Rate limit (admitted only when both buckets have capacity).
         const decision = this.limiter.tryAdmit(key!.id, promptTokensEst);

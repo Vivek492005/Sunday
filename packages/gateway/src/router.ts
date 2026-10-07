@@ -55,7 +55,7 @@ export class Router {
 
   constructor(
     private registry: ProviderRegistry,
-    private defaultModel = 'openrouter:meta-llama/llama-3.3-70b-instruct',
+    private defaultModel = 'sunday:meta-llama/llama-3.3-70b-instruct',
     private policy?: RouterPolicyConfig,
     limiter?: RateLimiter,
     scheduler?: MultiAgentScheduler,

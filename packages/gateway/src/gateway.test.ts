@@ -6,6 +6,7 @@ import {
   parseModelRef,
   OpenRouterProvider,
   GroqProvider,
+  SundayHostedProvider,
   ProviderHttpError,
   parseSseStream,
   MockChatProvider,
@@ -47,11 +48,13 @@ describe('parseModelRef', () => {
 });
 
 describe('registry + router', () => {
-  it('registers the three default providers and namespaces model ids', async () => {
+  it('registers the four default providers and namespaces model ids', async () => {
     const r = createDefaultRegistry();
     // Local Model slice: ollama registers unconditionally; selection is
     // gated by sunday.localModel.enabled at the daemon layer.
-    expect(r.ids().sort()).toEqual(['groq', 'ollama', 'openrouter']);
+    // Sunday hosted is first: zero-config for GitHub-signed-in users.
+    expect(r.ids().sort()).toEqual(['groq', 'ollama', 'openrouter', 'sunday']);
+    expect(r.ids()[0]).toBe('sunday'); // hosted default is registered first
     const models = await r.listModels();
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((m) => m.id.includes(':'))).toBe(true);
@@ -65,7 +68,7 @@ describe('registry + router', () => {
     expect(a.provider.id).toBe('groq');
     expect(a.model).toBe('llama-3.3-70b-versatile');
     const b = router.route();
-    expect(b.provider.id).toBe('openrouter');
+    expect(b.provider.id).toBe('sunday'); // zero-config hosted default
     expect(() => router.route({ model: 'nope:x' })).toThrow(/unknown provider/);
   });
 });
@@ -142,6 +145,41 @@ describe('SSE parsing', () => {
     );
     const tc = chunks.find((c: any) => c.type === 'tool-call') as any;
     expect(tc.call.argumentsParseError).toContain('{oops');
+  });
+});
+
+describe('Sunday hosted provider', () => {
+  it('is unconfigured without a token', () => {
+    delete process.env.SUNDAY_API_TOKEN;
+    expect(new SundayHostedProvider().isConfigured()).toBe(false);
+  });
+
+  it('is configured with a token', () => {
+    process.env.SUNDAY_API_TOKEN = 'gh-test-token';
+    try {
+      expect(new SundayHostedProvider().isConfigured()).toBe(true);
+    } finally {
+      delete process.env.SUNDAY_API_TOKEN;
+    }
+  });
+
+  it('uses the default API URL unless overridden', () => {
+    delete process.env.SUNDAY_API_URL;
+    expect(new SundayHostedProvider().apiUrl()).toBe('https://api.sunday.dev');
+    process.env.SUNDAY_API_URL = 'https://example.test/';
+    try {
+      expect(new SundayHostedProvider().apiUrl()).toBe('https://example.test');
+    } finally {
+      delete process.env.SUNDAY_API_URL;
+    }
+  });
+
+  it('refuses to run without a token', async () => {
+    delete process.env.SUNDAY_API_TOKEN;
+    const p = new SundayHostedProvider();
+    await expect(
+      drain(p.chat({ model: 'x', messages: [{ role: 'user', content: 'hi' }] })),
+    ).rejects.toThrow(/SUNDAY_API_TOKEN/);
   });
 });
 

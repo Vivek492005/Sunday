@@ -253,3 +253,91 @@ export class OllamaProvider extends OpenAICompatibleProvider {
     }
   }
 }
+
+/**
+ * Sunday hosted gateway — zero-config AI for Sunday IDE users.
+ *
+ * Users sign in with GitHub in the IDE; the IDE passes the GitHub OAuth
+ * token as SUNDAY_API_TOKEN. No API keys to copy, no provider accounts.
+ * The gateway enforces a per-user daily free-tier quota server-side.
+ *
+ * Env:
+ *   SUNDAY_API_URL   — gateway base URL (default https://api.sunday.dev)
+ *   SUNDAY_API_TOKEN — GitHub OAuth token from the IDE sign-in
+ *
+ * Power users can still set OPENROUTER_API_KEY / GROQ_API_KEY for
+ * bring-your-own-key unlimited usage — the router prefers BYOK providers
+ * when their keys are present (see registry ordering).
+ */
+export const SUNDAY_DEFAULT_API_URL = 'https://api.sunday.dev';
+
+const SUNDAY_DEFAULT_MODELS: ModelEntry[] = [
+  {
+    id: 'meta-llama/llama-3.3-70b-instruct',
+    label: 'Llama 3.3 70B (Sunday hosted)',
+    contextWindow: 128_000,
+    supportsTools: true,
+    supportsFim: false,
+  },
+];
+
+export class SundayHostedProvider extends OpenAICompatibleProvider {
+  readonly id = 'sunday';
+  readonly label = 'Sunday (hosted)';
+
+  /** Gateway base URL — operator override via SUNDAY_API_URL. */
+  apiUrl(): string {
+    return (process.env.SUNDAY_API_URL?.trim() || SUNDAY_DEFAULT_API_URL).replace(/\/$/, '');
+  }
+
+  protected baseUrl(): string {
+    return `${this.apiUrl()}/v1`;
+  }
+
+  protected envVar(): string {
+    return 'SUNDAY_API_TOKEN';
+  }
+
+  protected defaultHeaders(): Record<string, string> {
+    return { 'X-Title': 'Sunday' };
+  }
+
+  /** True when the user is signed in (token present) — no network call. */
+  isConfigured(): boolean {
+    return !!process.env[this.envVar()]?.trim();
+  }
+
+  async listModels(): Promise<ModelEntry[]> {
+    // Try the live model list; fall back to the baked-in default so the
+    // provider is usable even when the gateway is briefly unreachable.
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      (timer as unknown as { unref?: () => void }).unref?.();
+      try {
+        const res = await fetch(`${this.apiUrl()}/v1/models`, {
+          headers: { Authorization: `Bearer ${process.env[this.envVar()]?.trim() ?? ''}` },
+          signal: ctrl.signal,
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { data?: Array<{ id?: string }> };
+          const ids = (body.data ?? []).map((m) => m.id).filter((x): x is string => !!x);
+          if (ids.length > 0) {
+            return ids.map((id) => ({
+              id,
+              label: `${id} (Sunday hosted)`,
+              contextWindow: 128_000,
+              supportsTools: true,
+              supportsFim: false,
+            }));
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {
+      // fall through to default
+    }
+    return SUNDAY_DEFAULT_MODELS;
+  }
+}
