@@ -1,9 +1,9 @@
 {
   "phases": [
     {
-      "detail": "All human gates done (screen-reader, pcap, live eval, baselines, smoke); fresh CI running",
+      "detail": "CI 6/9 green (lint fixed); 3 IDE builds running; hosted gateway shipped",
       "name": "Production Readiness",
-      "percent": 75,
+      "percent": 85,
       "status": "active",
       "tasks": [
         "Human screen-reader pass (NVDA/VoiceOver) with checklist",
@@ -84,7 +84,7 @@
       ]
     },
     {
-      "detail": "Ollama autocomplete shipped + human-verified 2026-10-07",
+      "detail": "Ollama verified + zero-config hosted gateway shipped",
       "name": "Feature Completion",
       "percent": 100,
       "status": "complete",
