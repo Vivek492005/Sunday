@@ -127,12 +127,20 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
     const sessions = await this.loadSessions();
     const target = sessions.find((s) => s.id === id);
     if (target) {
-      // Best-effort revoke.
-      await fetch(GOOGLE_REVOKE_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ token: target.accessToken }),
-      }).catch(() => undefined);
+      // Best-effort revoke of BOTH tokens. Revoking only the access token
+      // leaves the long-lived refresh token valid (Privacy M3) — a "sign out"
+      // that doesn't actually sign out. Google's revoke endpoint accepts
+      // either token type.
+      const revoke = (token: string) =>
+        fetch(GOOGLE_REVOKE_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ token }),
+        }).catch(() => undefined);
+      await revoke(target.accessToken);
+      if (target.refreshToken) {
+        await revoke(target.refreshToken);
+      }
     }
     await this.saveSessions(sessions.filter((s) => s.id !== id));
   }
