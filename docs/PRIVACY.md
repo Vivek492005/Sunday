@@ -77,3 +77,64 @@ The only network surface in the daemon is `fetch` in
 `packages/gateway/src/openai-compatible.ts` (provider chat/completions),
 which fires exclusively from user-initiated model calls. If a future
 change adds any startup/telemetry/update-check fetch, this test fails.
+
+---
+
+## Data retention (P1-2)
+
+| Data | Location | Retention | Delete |
+|---|---|---|---|
+| Chat sessions | `~/.sunday/sessions/*.json` (0600) | 30 days | `session/delete` RPC |
+| Orchestration runs | `~/.sunday/orchestrations/*.json` (0600) | 30 days | Delete files |
+| Workspace checkpoints | `~/.sunday/workspaces/*/checkpoints.git` (0700) | Forever (manual) | Delete directory |
+| File index | `~/.sunday/index/*.json` (0600) | Until re-indexed | Delete files |
+| Browser recordings | `~/.sunday/browser-sessions/*/media/` (0700) | Forever (manual) | Delete directory |
+
+Set `SUNDAY_RETENTION_DAYS` to change the automatic purge window (default
+`30`; `0` = keep forever). The sweep runs on daemon start and uses file
+modification time.
+
+## Secret redaction
+
+All outbound prompt content passes through a secret redactor before
+reaching any AI provider. Patterns covered: `sk-or-v1-` (OpenRouter),
+`gsk_` (Groq), `sk-proj-` (OpenAI), JWT, `AKIA*` (AWS), GitHub tokens,
+high-entropy `KEY=value` pairs. Credential files (`.env`, `*.pem`,
+`id_rsa`, `*.key`) are never indexed and require approval to read.
+
+This is best-effort defense in depth — always review sensitive content
+before sharing it with any AI provider.
+
+## Hosted gateway (zero-config tier)
+
+When you sign in with GitHub/Google/Microsoft:
+
+- Your OAuth token is verified live against the provider (5-minute cache,
+  never persisted server-side).
+- Per-request audit log: timestamp, anonymized key (`gh:12345`), model,
+  token counts. **No prompts, responses, or file contents are logged.**
+- Daily quota: 200 requests, resets at UTC midnight.
+- Sign-out revokes **both** access and refresh tokens.
+
+## Relay transparency (P1-4)
+
+If a provider rate-limits (429) and Sunday automatically switches to
+another provider, this is:
+
+1. Logged server-side: `[sunday gateway] relay failover: X -> Y (reason)`.
+2. Surfaced in the response metadata (`relay: { from, to, reason }`).
+3. Never silent — there is no hidden provider switching.
+
+To opt out of automatic failover to specific providers:
+`SUNDAY_RELAY_FAILOVER_OPTOUT=groq,ollama` (comma-separated).
+
+## Known third-party connection: webview CDN (P1-5)
+
+`vscode/product.json` sets `webviewContentExternalBaseUrlTemplate` to
+Microsoft's `vscode-cdn.net`. Loading any webview makes a DNS+TLS
+connection to fetch the webview bootstrap scripts.
+
+**Why it's kept:** The bootstrap files are build artifacts of VS Code
+itself. Self-hosting requires CDN infrastructure not yet set up. The
+connection reveals that *a* webview loaded, not its content. A
+self-hosted alternative is planned.
