@@ -33,7 +33,7 @@ interface StoredSession {
   expiresAt: number;
 }
 
-const DEFAULT_CLIENT_ID = '759535868571-93cq3r0qh1i8pdddeol1buvnu41irtg2.apps.googleusercontent.com';
+const DEFAULT_CLIENT_ID = '110112861017-vceq10n514dajcj2hakr1mulk2feop6t.apps.googleusercontent.com';
 
 function getClientId(): string {
   return (
