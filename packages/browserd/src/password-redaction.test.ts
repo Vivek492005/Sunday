@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 // The SNAPSHOT_SCRIPT is a module-level const; extract and eval it in a
 // minimal DOM stub to verify redaction behavior.
 const src = fs.readFileSync(new URL('./playwright-driver.ts', import.meta.url), 'utf8');
-const scriptMatch = src.match(/const SNAPSHOT_SCRIPT = `\(\(\) => \{([\s\S]*?)\n\}`;`/);
+const scriptMatch = src.match(/const SNAPSHOT_SCRIPT = `\(\) => \{([\s\S]*?)\n\}`;/);
 if (!scriptMatch) throw new Error('SNAPSHOT_SCRIPT not found');
 
 function makeEl(tag: string, attrs: Record<string, string>, value?: string) {
