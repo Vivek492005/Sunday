@@ -19,6 +19,11 @@ export interface RouterPolicyConfig {
   failover: {
     enabled: boolean;
     on: FailoverTrigger[];
+    /** P1-4: provider ids the user refuses to fail over TO. Requests pinned
+     *  to an opted-out provider still work (explicit choice), but automatic
+     *  relay will skip these. Set via SUNDAY_RELAY_FAILOVER_OPTOUT
+     *  (comma-separated). */
+    optOut?: string[];
   };
 }
 
@@ -59,16 +64,21 @@ export function resolveCandidates(
     const models = policy.perProvider[id]?.models;
     return !models?.length || models.includes(bareModel);
   };
+  // P1-4: honor the failover opt-out list for automatic relay candidates.
+  // An explicitly requested provider is never filtered (user's choice).
+  const optedOut = new Set(policy.failover.optOut ?? []);
   if (requestedProviderId) {
     if (!knownIds.has(requestedProviderId)) {
       throw new Error(`unknown provider: ${requestedProviderId}`);
     }
     const rest = policy.failover.enabled
-      ? policy.order.filter((id) => id !== requestedProviderId && knownIds.has(id) && allowed(id))
+      ? policy.order.filter(
+          (id) => id !== requestedProviderId && knownIds.has(id) && allowed(id) && !optedOut.has(id),
+        )
       : [];
     return { primaryId: requestedProviderId, candidates: [requestedProviderId, ...rest] };
   }
-  const ordered = policy.order.filter((id) => knownIds.has(id) && allowed(id));
+  const ordered = policy.order.filter((id) => knownIds.has(id) && allowed(id) && !optedOut.has(id));
   if (ordered.length === 0) {
     throw new Error(
       `router: no provider in policy order can serve model '${bareModel}'`,

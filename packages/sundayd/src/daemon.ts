@@ -252,7 +252,16 @@ export class SundayDaemon {
     const routerPolicy: RouterPolicyConfig = opts.routerPolicy ?? {
       order: this.providers.ids(),
       perProvider: {},
-      failover: { enabled: true, on: ['rate-limit'] },
+      // P1-4: SUNDAY_RELAY_FAILOVER_OPTOUT="groq,ollama" skips those providers
+      // for automatic relay (explicit provider: pins still work).
+      failover: {
+        enabled: true,
+        on: ['rate-limit'],
+        optOut: (process.env.SUNDAY_RELAY_FAILOVER_OPTOUT ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      },
     };
     this.router = new Router(this.providers, opts.defaultModel, routerPolicy);
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;

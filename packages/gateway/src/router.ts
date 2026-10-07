@@ -153,6 +153,12 @@ export class Router {
             pid === primaryId
               ? undefined
               : { from: primaryId, to: pid, reason: relayReason ?? 'rate-limit' };
+          // P1-4: never silent — log every automatic provider switch.
+          if (relay) {
+            console.warn(
+              `[sunday gateway] relay failover: ${relay.from} -> ${relay.to} (reason: ${relay.reason})`,
+            );
+          }
           const out = releaseSlot ? trackRelease(prepend(first, it), releaseSlot) : prepend(first, it);
           return { provider, model: bareModel, stream: out, relay, attempts };
         } catch (err) {

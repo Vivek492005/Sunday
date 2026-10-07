@@ -331,3 +331,40 @@ describe('§24.3 chaos scenarios', () => {
     expect(r2.relay).toBeUndefined();
   });
 });
+
+describe('P1-4: failover opt-out', () => {
+  it('skips opted-out providers for automatic relay', async () => {
+    const primary = new MockChatProvider({ id: 'primary', force429: true, retryAfterSec: 30 });
+    const skipped = new MockChatProvider({ id: 'skipped', scripts: okScript('skipped') });
+    const fallback = new MockChatProvider({ id: 'fallback', scripts: okScript('fallback') });
+    const registry = new ProviderRegistry();
+    registry.register(primary);
+    registry.register(skipped);
+    registry.register(fallback);
+
+    const p: RouterPolicyConfig = {
+      order: ['primary', 'skipped', 'fallback'],
+      perProvider: {},
+      failover: { enabled: true, on: ['rate-limit'], optOut: ['skipped'] },
+    };
+    const router = new Router(registry, 'primary:mock-model', p);
+    const r = await router.chat({ model: 'primary:mock-model', messages: [] });
+    expect(r.provider.id).toBe('fallback');
+    expect(r.relay).toMatchObject({ from: 'primary', to: 'fallback', reason: 'rate-limit' });
+  });
+
+  it('explicit pin to opted-out provider still works', async () => {
+    const skipped = new MockChatProvider({ id: 'skipped', scripts: okScript('skipped-direct') });
+    const registry = new ProviderRegistry();
+    registry.register(skipped);
+    const p: RouterPolicyConfig = {
+      order: ['skipped'],
+      perProvider: {},
+      failover: { enabled: true, on: ['rate-limit'], optOut: ['skipped'] },
+    };
+    const router = new Router(registry, 'skipped:mock-model', p);
+    const r = await router.chat({ model: 'skipped:mock-model', messages: [] });
+    expect(r.provider.id).toBe('skipped');
+    expect(r.relay).toBeUndefined();
+  });
+});
