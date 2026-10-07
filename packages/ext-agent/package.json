@@ -209,6 +209,18 @@
         {
           "id": "sunday.mcpView",
           "name": "Sunday MCP"
+        },
+        {
+          "id": "sunday.memoryView",
+          "name": "Sunday Memory"
+        },
+        {
+          "id": "sunday.rulesView",
+          "name": "Sunday Rules"
+        },
+        {
+          "id": "sunday.swarmView",
+          "name": "Sunday Swarm"
         }
       ],
       "panel": [

@@ -31,6 +31,10 @@ import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
 import { registerOrchestrationCommands } from './orchestrationCommands.js';
+import { registerMemoryPanel } from './memoryPanel.js';
+import { registerRulesView } from './rulesView.js';
+import { registerSwarmWebview } from './swarmWebview.js';
+import { registerProactiveMode } from './proactiveMode.js';
 import { randomUUID } from 'node:crypto';
 import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 
@@ -556,6 +560,58 @@ export async function activate(
   }
 
   log(`sunday-agent v${version} activated`);
+
+  // -- new feature views (F1-F4) -------------------------------------------------
+  // Inline adapters read the same files the daemon-side stores use
+  // (~/.sunday/memory/memories.jsonl, ~/.sunday/rules.md) without pulling
+  // @sunday/skills / @sunday/sundayd into the extension bundle.
+  try {
+    const sundayDir = path.join(os.homedir(), '.sunday');
+    const memoryFile = path.join(sundayDir, 'memory', 'memories.jsonl');
+    const rulesFile = path.join(sundayDir, 'rules.md');
+    const memoryStore = {
+      list: async (opts?: { limit?: number }) => {
+        try {
+          const raw = await fs.promises.readFile(memoryFile, 'utf8');
+          const all = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+          return (opts?.limit ? all.slice(-opts.limit) : all).map((m: any): { id: string; text: string; timestamp: string; project: string; tags: string[]; source: 'auto' | 'manual' } => ({
+            id: String(m.id ?? ''),
+            text: String(m.text ?? m.content ?? ''),
+            timestamp: String(m.timestamp ?? m.createdAt ?? ''),
+            project: String(m.project ?? ''),
+            tags: Array.isArray(m.tags) ? m.tags.map((t: unknown) => String(t)) : [],
+            source: m.source === 'manual' ? 'manual' : 'auto',
+          }));
+        } catch { return []; }
+      },
+      delete: async (id: string) => {
+        try {
+          const raw = await fs.promises.readFile(memoryFile, 'utf8');
+          const kept = raw.split('\n').filter((l) => { try { return JSON.parse(l).id !== id; } catch { return true; } });
+          await fs.promises.writeFile(memoryFile, kept.join('\n'));
+          return true;
+        } catch { return false; }
+      },
+    };
+    const ruleStore = {
+      list: async () => {
+        try {
+          const raw = await fs.promises.readFile(rulesFile, 'utf8');
+          return raw.split('\n').filter((l) => l.trim().startsWith('- ')).map((l, i) => ({
+            id: `rule-${i}`, rule: l.trim().slice(2),
+          }));
+        } catch { return []; }
+      },
+      delete: async () => false,
+      refresh: async () => {},
+    };
+    context.subscriptions.push(registerMemoryPanel(context, memoryStore));
+    context.subscriptions.push(registerRulesView(context, ruleStore as any));
+  } catch (err) {
+    log(`feature views (memory/rules) skipped: ${(err as Error).message}`);
+  }
+  context.subscriptions.push(registerSwarmWebview(context));
+  context.subscriptions.push(registerProactiveMode(context));
 
   // -- smoke-test API ---------------------------------------------------------
   // Minimal hooks for the Electron smoke harness (scripts/smoke/). Not part of
