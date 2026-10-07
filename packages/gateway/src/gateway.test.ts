@@ -166,7 +166,7 @@ describe('Sunday hosted provider', () => {
 
   it('uses the default API URL unless overridden', () => {
     delete process.env.SUNDAY_API_URL;
-    expect(new SundayHostedProvider().apiUrl()).toBe('https://sunday-ide.onrender.com');
+    expect(new SundayHostedProvider().apiUrl()).toBe('https://sunday-final-ide.onrender.com');
     process.env.SUNDAY_API_URL = 'https://example.test/';
     try {
       expect(new SundayHostedProvider().apiUrl()).toBe('https://example.test');
@@ -176,7 +176,7 @@ describe('Sunday hosted provider', () => {
   });
 
   it('points at the production hosted gateway by default', () => {
-    expect(SUNDAY_DEFAULT_API_URL).toBe('https://sunday-ide.onrender.com');
+    expect(SUNDAY_DEFAULT_API_URL).toBe('https://sunday-final-ide.onrender.com');
   });
 
   it('maps network failures to a friendly unreachable message', async () => {

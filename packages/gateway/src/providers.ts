@@ -269,7 +269,7 @@ export class OllamaProvider extends OpenAICompatibleProvider {
  * bring-your-own-key unlimited usage — the router prefers BYOK providers
  * when their keys are present (see registry ordering).
  */
-export const SUNDAY_DEFAULT_API_URL = 'https://sunday-ide.onrender.com';
+export const SUNDAY_DEFAULT_API_URL = 'https://sunday-final-ide.onrender.com';
 
 const SUNDAY_UNREACHABLE_MESSAGE =
   'Sunday AI is unreachable. Check your internet connection, or set SUNDAY_API_URL to a self-hosted gateway.';
