@@ -88,12 +88,8 @@
     }
   ],
   "trustedExtensionAuthAccess": {
-    "github": [
-      "GitHub.copilot-chat"
-    ],
-    "github-enterprise": [
-      "GitHub.copilot-chat"
-    ],
+    "github": [],
+    "github-enterprise": [],
     "microsoft": [
       "vscode.github-authentication"
     ]
@@ -173,11 +169,9 @@
       "type": "light"
     }
   ],
-  "builtInExtensionsEnabledWithAutoUpdates": [
-    "GitHub.copilot-chat"
-  ],
+  "builtInExtensionsEnabledWithAutoUpdates": [],
   "sessionsWindowAllowedExtensions": [],
-  "voiceWsUrl": "wss://falcon-caas.mai.microsoft.com/voice-code/api/v1/realtime/voice",
+  "voiceWsUrl": "",
   "extensionsGallery": {
     "serviceUrl": "https://open-vsx.org/vscode/gallery",
     "itemUrl": "https://open-vsx.org/vscode/item",
