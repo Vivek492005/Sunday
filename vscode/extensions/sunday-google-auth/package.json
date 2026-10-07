@@ -1,0 +1,39 @@
+{
+  "name": "sunday-google-auth",
+  "displayName": "Google Authentication",
+  "description": "Google authentication provider for Sunday IDE",
+  "version": "1.0.0",
+  "publisher": "sunday",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "authentication": [
+      {
+        "label": "Google",
+        "id": "google"
+      }
+    ],
+    "configuration": {
+      "title": "Google Authentication",
+      "properties": {
+        "sunday.google.clientId": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Google OAuth client ID for Sunday IDE sign-in. Create one at https://console.cloud.google.com/apis/credentials (Desktop app type)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.js --external:vscode"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.140.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.21.0"
+  }
+}

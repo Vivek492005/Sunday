@@ -123,7 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
   }
 
   return {
-    port: num(env.SUNDAY_HOSTED_PORT, 8080),
+    port: num(env.SUNDAY_HOSTED_PORT, num(env.PORT, 8080)),
     host: env.SUNDAY_HOSTED_HOST?.trim() || '127.0.0.1',
     keys,
     requestsPerMinute: num(env.SUNDAY_HOSTED_RPM, 60),

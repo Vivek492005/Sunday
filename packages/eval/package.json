@@ -21,7 +21,8 @@
     "eval": "node dist/cli.js run",
     "eval:live-baseline": "node dist/live-baseline.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src"
   },
   "type": "module",
   "types": "dist/index.d.ts",

@@ -178,7 +178,7 @@ describe('Sunday hosted provider', () => {
     delete process.env.SUNDAY_API_TOKEN;
     const p = new SundayHostedProvider();
     await expect(
-      drain(p.chat({ model: 'x', messages: [{ role: 'user', content: 'hi' }] })),
+      drain(p.chat({ model: 'x', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] })),
     ).rejects.toThrow(/SUNDAY_API_TOKEN/);
   });
 });

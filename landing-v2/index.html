@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunday — Build at the speed of thought</title>
+<meta name="description" content="Sunday — the agent-first coding IDE. Plans, edits, runs, and verifies code autonomously, built into VS Code. Free and open source (Apache-2.0).">
+<meta property="og:title" content="Sunday — Build at the speed of thought">
+<meta property="og:description" content="Your AI pair programmer, built into your editor. Agent-first, not chatbot-first.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%98%80%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Sunday","applicationCategory":"DeveloperApplication","operatingSystem":["Windows","macOS","Linux"],"license":"https://www.apache.org/licenses/LICENSE-2.0","description":"The agent-first coding IDE. Plans, edits, runs, and verifies code autonomously, built into VS Code.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+</head>
+<body>
+<div class="mesh" aria-hidden="true">
+  <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+  <span class="blob b4"></span><span class="blob b5"></span>
+</div>
+<div class="grain" aria-hidden="true"></div>
+<div class="spotlight" id="spotlight" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="#top" aria-label="Sunday home"><span class="sun">☀️</span><span class="brand-name">Sunday</span></a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#frontends">Frontends</a>
+      <a href="#docs">Docs</a>
+      <a href="https://github.com/Vivek492005/Sunday/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn-ghost github-btn" href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener" aria-label="Sunday on GitHub">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span>GitHub</span><span class="stars">★ <span id="nav-stars">…</span></span>
+      </a>
+      <div class="dl-dropdown">
+        <a class="btn-primary btn-sm" href="#download" id="nav-download">Download</a>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+  </div>
+  <div class="mobile-menu" id="mobile-menu">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#frontends">Frontends</a>
+    <a href="#docs">Docs</a>
+    <a href="https://github.com/Vivek492005/Sunday/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+    <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub ★ <span id="nav-stars-m">…</span></a>
+    <a href="#download" class="btn-primary btn-sm">Download</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <h1 class="reveal">Build at the speed of <span class="grad-text">thought.</span></h1>
+      <p class="lede reveal">Your AI pair programmer, built into your editor.</p>
+      <p class="sub reveal">Sunday plans, edits, runs, and verifies code — autonomously, inside VS Code.</p>
+      <div class="cta-row reveal">
+        <a class="btn-primary btn-lg magnetic" id="hero-download" href="https://github.com/Vivek492005/Sunday/releases/download/v0.1.0/Sunday-Agent-Setup-0.1.0.exe">
+          <span aria-hidden="true">⬇</span>&nbsp;<span id="hero-download-label">Download for Windows</span>
+        </a>
+        <a class="btn-secondary btn-lg" href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <p class="hero-stats reveal">Apache-2.0&nbsp;&nbsp;·&nbsp;&nbsp;<span id="hero-tests">1,013</span> tests passing&nbsp;&nbsp;·&nbsp;&nbsp;v0.1.0</p>
+    </div>
+    <div class="hero-visual reveal" id="hero-visual" aria-hidden="true">
+      <div class="tilt" id="hero-tilt">
+        <div class="editor-pane">
+          <div class="ep-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ep-tab">agent-run.ts</span><span class="ep-live"><span class="pulse-dot"></span>agent working</span></div>
+          <div class="ep-code">
+            <div class="cl"><span class="ln">1</span><span class="kw">const</span> <span class="fn">task</span> = <span class="kw">await</span> <span class="vr">agent</span>.<span class="fn">plan</span>(<span class="st">"add dark mode"</span>);</div>
+            <div class="cl"><span class="ln">2</span><span class="kw">await</span> <span class="vr">agent</span>.<span class="fn">read</span>(<span class="st">"src/theme/**"</span>);</div>
+            <div class="cl"><span class="ln">3</span><span class="kw">const</span> <span class="vr">diff</span> = <span class="kw">await</span> <span class="vr">agent</span>.<span class="fn">edit</span>(<span class="vr">task</span>.<span class="vr">files</span>);</div>
+            <div class="cl"><span class="ln">4</span><span class="kw">await</span> <span class="vr">agent</span>.<span class="fn">run</span>(<span class="st">"pnpm test"</span>); <span class="cm">// ✓ 1,013 passed</span></div>
+            <div class="cl"><span class="ln">5</span><span class="kw">await</span> <span class="vr">agent</span>.<span class="fn">checkpoint</span>(<span class="vr">diff</span>); <span class="cm">// shadow-git</span></div>
+          </div>
+          <div class="ep-term"><span class="prompt">$</span> sunday agent run --verify<span class="caret"></span></div>
+        </div>
+        <div class="orbit o1"><span class="onode" data-label="plan"></span></div>
+        <div class="orbit o2"><span class="onode" data-label="edit"></span></div>
+        <div class="orbit o3"><span class="onode" data-label="run"></span></div>
+        <div class="orbit o4"><span class="onode" data-label="verify"></span></div>
+        <div class="orbit o5"><span class="onode" data-label="read"></span></div>
+      </div>
+    </div>
+  </div>
+  <a href="#stats" class="scroll-hint" aria-label="Scroll to stats"><span></span></a>
+</section>
+
+<!-- ============ STATS STRIP ============ -->
+<section class="stats-strip" id="stats">
+  <div class="container stats-inner">
+    <div class="stat"><span class="stat-num" data-count="1013" data-suffix="">0</span><span class="stat-label">tests passing</span></div>
+    <div class="stat"><span class="stat-num" data-count="5" data-suffix="">0</span><span class="stat-label">frontends</span></div>
+    <div class="stat"><span class="stat-num static">Apache-2.0</span><span class="stat-label">license</span></div>
+    <div class="stat"><span class="stat-num live">★ <span id="strip-stars">…</span></span><span class="stat-label">on GitHub <span class="live-tag"><span class="pulse-dot"></span>live</span></span></div>
+    <div class="stat"><span class="stat-num live">⑂ <span id="strip-forks">…</span></span><span class="stat-label">forks <span class="live-tag"><span class="pulse-dot"></span>live</span></span></div>
+    <div class="stat"><span class="stat-num static">Built in public</span><span class="stat-label">open roadmap</span></div>
+  </div>
+</section>
+
+<!-- ============ VALUE PROP ============ -->
+<section class="value" id="value">
+  <div class="container">
+    <p class="eyebrow reveal">Agent-first, not chatbot-first</p>
+    <h2 class="reveal">Most AI tools bolt a chat window onto an editor.<br>Sunday rebuilds the editor around an agent.</h2>
+    <div class="value-panels">
+      <div class="glass-panel slide-left reveal">
+        <h3>Not a chatbot bolted on</h3>
+        <p>Most AI tools give you a chat sidebar and leave the real work to you — copying code back and forth, applying edits by hand, running the tests yourself.</p>
+      </div>
+      <div class="glass-panel slide-right reveal">
+        <h3>A development environment</h3>
+        <p>Sunday's agent plans, reads, edits, runs, and verifies — with you reviewing every diff before it lands. The editor is the agent's workspace, not its waiting room.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section class="arch" id="architecture">
+  <div class="container">
+    <p class="eyebrow reveal">Under the hood</p>
+    <h2 class="reveal">How a Sunday request actually flows</h2>
+    <p class="section-sub reveal">This is the real architecture — simplified, animated. Hover any node.</p>
+    <div class="arch-wrap glass-panel reveal">
+      <svg class="arch-svg" viewBox="0 0 1040 370" role="img" aria-label="Sunday architecture: chat view to sunday-agent extension to sundayd daemon to gateway to LLM">
+        <defs>
+          <linearGradient id="connGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#36E2E0"/>
+          </linearGradient>
+        </defs>
+        <!-- connectors -->
+        <path id="ac1" class="conn" d="M166,170 H216"/>
+        <path id="ac2" class="conn" d="M396,170 H446"/>
+        <path id="ac3" class="conn" d="M636,170 H686"/>
+        <path id="ac4" class="conn" d="M836,170 H886"/>
+        <path id="ac5" class="conn" d="M541,262 V288"/>
+        <!-- pulses -->
+        <circle class="pulse" r="4" fill="#36E2E0"><animateMotion dur="1.6s" begin="0s" repeatCount="indefinite"><mpath href="#ac1"/></animateMotion></circle>
+        <circle class="pulse" r="4" fill="#36E2E0"><animateMotion dur="1.6s" begin="0.4s" repeatCount="indefinite"><mpath href="#ac2"/></animateMotion></circle>
+        <circle class="pulse" r="4" fill="#7C5CFF"><animateMotion dur="1.6s" begin="0.8s" repeatCount="indefinite"><mpath href="#ac3"/></animateMotion></circle>
+        <circle class="pulse" r="4" fill="#7C5CFF"><animateMotion dur="1.6s" begin="1.2s" repeatCount="indefinite"><mpath href="#ac4"/></animateMotion></circle>
+        <circle class="pulse" r="4" fill="#FFB84D"><animateMotion dur="1.6s" begin="0.2s" repeatCount="indefinite"><mpath href="#ac5"/></animateMotion></circle>
+        <!-- nodes -->
+        <g class="anode" data-tip="The React chat webview where you describe what you want built.">
+          <rect x="16" y="140" width="150" height="60" rx="14"/>
+          <text x="91" y="165">Chat View</text><text class="t-sub" x="91" y="186">ui-chat</text>
+        </g>
+        <g class="anode" data-tip="The built-in VS Code extension. Manages the sidecar lifecycle, commands, and panels.">
+          <rect x="216" y="140" width="180" height="60" rx="14"/>
+          <text x="306" y="165">sunday-agent</text><text class="t-sub" x="306" y="186">extension</text>
+        </g>
+        <g class="anode" data-tip="Per-user daemon: sessions, agent loop, policy gate, orchestration host, tools, context, MCP.">
+          <rect x="446" y="80" width="190" height="182" rx="16"/>
+          <text x="541" y="110">sundayd</text>
+          <text class="t-sub" x="541" y="134">Sessions · Agent Loop</text>
+          <text class="t-sub" x="541" y="156">Policy Gate · Tools</text>
+          <text class="t-sub" x="541" y="178">Orchestrator · MCP</text>
+          <text class="t-sub" x="541" y="200">Context · Artifacts</text>
+          <text class="t-sub dim" x="541" y="238">per-user daemon</text>
+        </g>
+        <g class="anode" data-tip="Provider router — OpenRouter + Groq with a visible Relay fallback on 429/quota, then auto-resume.">
+          <rect x="686" y="140" width="150" height="60" rx="14"/>
+          <text x="761" y="165">gateway</text><text class="t-sub" x="761" y="186">router + Relay</text>
+        </g>
+        <g class="anode" data-tip="Open models through OpenRouter and Groq free tiers. API-first — nothing loads on your machine.">
+          <rect x="886" y="140" width="138" height="60" rx="14"/>
+          <text x="955" y="165">LLM</text><text class="t-sub" x="955" y="186">OpenRouter · Groq</text>
+        </g>
+        <g class="anode" data-tip="Shadow-git checkpoints give hunk-level undo for every agent change.">
+          <rect x="446" y="288" width="190" height="56" rx="14"/>
+          <text x="541" y="311">Checkpoints</text><text class="t-sub" x="541" y="331">shadow-git</text>
+        </g>
+      </svg>
+      <div class="arch-tip" id="arch-tip" role="tooltip"></div>
+      <p class="jsonrpc-note">JSON-RPC over NDJSON · <span class="mono">~/.sunday/sundayd.sock</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="features" id="features">
+  <div class="container">
+    <p class="eyebrow reveal">Features</p>
+    <h2 class="reveal">Everything an agent needs.<br>Nothing it doesn't.</h2>
+    <div class="feat-grid">
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">🤖</div><h3>Autonomous Agent</h3>
+        <ul><li>Multi-step task execution from a single prompt</li><li>Shadow-git checkpoints with hunk-level undo</li><li>Detached background runs → GitHub PRs</li></ul>
+      </article>
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">🧠</div><h3>Editor Intelligence</h3>
+        <ul><li>Ghost-text autocomplete — Tab to accept</li><li>Inline edit (Ctrl+I) with diff review</li><li>Fix, Explain, Generate Tests code actions</li></ul>
+      </article>
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">🌐</div><h3>Agent Browser</h3>
+        <ul><li>Live screencast of the agent browsing</li><li>Take over mid-task, hand control back</li><li>Policy-gated: file:// and private IPs blocked</li></ul>
+      </article>
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">🗣️</div><h3>Voice <span class="chip">Experimental</span></h3>
+        <ul><li>Speak prompts via Web Speech API</li><li>Spoken responses, mic input</li><li>No audio ever touches Sunday servers</li></ul>
+      </article>
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">💻</div><h3>Multiple Frontends</h3>
+        <ul><li>VS Code extension, Sunday IDE, CLI</li><li>JetBrains plugin (in progress)</li><li>Hosted OpenAI-compatible gateway</li></ul>
+      </article>
+      <article class="glass-panel feat-card tilt-card reveal">
+        <div class="feat-icon">🔧</div><h3>Developer Tools</h3>
+        <ul><li>MCP servers: stdio + Streamable HTTP</li><li>Skills with trust gating</li><li>Terminal integration with error explain</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="how" id="how">
+  <div class="container">
+    <p class="eyebrow reveal">How it works</p>
+    <h2 class="reveal">The agent loop, step by step.</h2>
+    <p class="section-sub reveal">Scroll — the loop fills at your pace.</p>
+    <div class="how-wrap reveal">
+      <div class="how-line" aria-hidden="true"><div class="how-fill" id="how-fill"></div></div>
+      <div class="how-grid" id="how-grid">
+        <div class="glass-panel step"><span class="step-n">1</span><h3>Plan</h3><p>Plans the change, breaking it into steps.</p></div>
+        <div class="glass-panel step"><span class="step-n">2</span><h3>Read</h3><p>Reads your codebase with semantic context retrieval.</p></div>
+        <div class="glass-panel step"><span class="step-n">3</span><h3>Edit</h3><p>Edits files — you review the diff before anything lands.</p></div>
+        <div class="glass-panel step"><span class="step-n">4</span><h3>Run</h3><p>Runs terminal commands, with your approval.</p></div>
+        <div class="glass-panel step"><span class="step-n">5</span><h3>Verify</h3><p>Verifies the result with a built-in verifier agent.</p></div>
+        <div class="glass-panel step"><span class="step-n">6</span><h3>Checkpoint</h3><p>Checkpoints everything — shadow-git undoes any hunk.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ORCHESTRATION ============ -->
+<section class="orch" id="orchestration">
+  <div class="container">
+    <p class="eyebrow reveal">Parallel agents</p>
+    <h2 class="reveal">One goal. Many agents. <span class="grad-text">Zero chaos.</span></h2>
+    <p class="section-sub reveal">Hierarchical orchestration — the real shape, animated once.</p>
+    <div class="orch-wrap glass-panel reveal" id="orch-wrap">
+      <svg class="orch-svg" viewBox="0 0 800 430" role="img" aria-label="Orchestrator fans out to three feature agents, converging on a verifier">
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M400,72 C400,140 150,140 150,190" style="transition-delay:.35s"/></g>
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M400,72 V190" style="transition-delay:.45s"/></g>
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M400,72 C400,140 650,140 650,190" style="transition-delay:.55s"/></g>
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M150,246 C150,300 400,300 400,340" style="transition-delay:.9s"/></g>
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M400,246 V340" style="transition-delay:1s"/></g>
+        <g class="olink"><path class="conn o-draw" pathLength="1" d="M650,246 C650,300 400,300 400,340" style="transition-delay:1.1s"/></g>
+        <g class="onode" style="transition-delay:0s"><rect x="330" y="16" width="140" height="56" rx="14"/><text x="400" y="51">Orchestrator</text></g>
+        <g class="onode" style="transition-delay:.5s"><rect x="80" y="190" width="140" height="56" rx="14"/><text x="150" y="225">Feature Agent</text></g>
+        <g class="onode" style="transition-delay:.6s"><rect x="330" y="190" width="140" height="56" rx="14"/><text x="400" y="225">Feature Agent</text></g>
+        <g class="onode" style="transition-delay:.7s"><rect x="580" y="190" width="140" height="56" rx="14"/><text x="650" y="225">Feature Agent</text></g>
+        <g class="onode verifier" style="transition-delay:1.15s"><rect x="330" y="340" width="140" height="56" rx="14"/><text x="400" y="375">Verifier</text></g>
+      </svg>
+      <div class="constraint-chips">
+        <span class="constraint">Max 8 parallel units</span>
+        <span class="constraint">Overlap detection</span>
+        <span class="constraint">Budget-enforced</span>
+        <span class="constraint">Restart-safe</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FRONTENDS ============ -->
+<section class="frontends" id="frontends">
+  <div class="container">
+    <p class="eyebrow reveal">Frontends</p>
+    <h2 class="reveal">One daemon. <span class="grad-text">Five ways in.</span></h2>
+    <div class="fe-table reveal">
+      <div class="fe-row glass-panel"><span class="fe-name">VS Code extension</span><span class="pill stable">✅ Stable</span><span class="fe-desc">Full IDE experience</span></div>
+      <div class="fe-row glass-panel"><span class="fe-name">Sunday IDE <span class="fe-note">(fork)</span></span><span class="pill progress">🔄 In progress</span><span class="fe-desc">Branded, standalone app</span></div>
+      <div class="fe-row glass-panel"><span class="fe-name mono">sunday <span class="fe-note">CLI</span></span><span class="pill stable">✅ Stable</span><span class="fe-desc">Terminal-native workflow</span></div>
+      <div class="fe-row glass-panel"><span class="fe-name">JetBrains plugin</span><span class="pill progress">🔄 In progress</span><span class="fe-desc">IntelliJ Platform</span></div>
+      <div class="fe-row glass-panel"><span class="fe-name">Hosted gateway</span><span class="pill stable">✅ Stable</span><span class="fe-desc">OpenAI-compatible API server</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="download" id="download">
+  <div class="container">
+    <p class="eyebrow reveal">Download</p>
+    <h2 class="reveal">Get Sunday running in two minutes.</h2>
+    <div class="dl-panel reveal">
+      <p class="dl-detected">⬇ Detected: <strong id="dl-os">your OS</strong></p>
+      <a class="btn-primary btn-lg magnetic" id="dl-primary" href="https://github.com/Vivek492005/Sunday/releases/download/v0.1.0/Sunday-Agent-Setup-0.1.0.exe"><span id="dl-primary-label">Download for Windows</span></a>
+      <div class="code-block">
+        <div class="cb-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><button class="copy-btn" data-copy="dl-cmd">Copy</button></div>
+        <code id="dl-cmd">code --install-extension sunday-agent-0.1.0.vsix</code>
+      </div>
+      <p class="dl-alt-label">Prefer another platform?</p>
+      <div class="dl-alt">
+        <a class="btn-secondary btn-sm" id="dl-win" href="https://github.com/Vivek492005/Sunday/releases/download/v0.1.0/Sunday-Agent-Setup-0.1.0.exe">Windows installer</a>
+        <a class="btn-secondary btn-sm" id="dl-vsix" href="https://github.com/Vivek492005/Sunday/releases/download/v0.1.0/sunday-agent-0.1.0.vsix">VS Code .vsix</a>
+        <a class="btn-secondary btn-sm" href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">CLI via pnpm</a>
+        <a class="btn-secondary btn-sm" href="https://github.com/Vivek492005/Sunday/releases" target="_blank" rel="noopener">All releases ↗</a>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><button class="copy-btn" data-copy="dl-keys">Copy</button></div>
+        <code id="dl-keys">export OPENROUTER_API_KEY="sk-or-..."   <span class="cm"># free key, 1 minute</span>
+export GROQ_API_KEY="gsk_..."           <span class="cm"># free key, 1 minute</span></code>
+      </div>
+      <p class="dl-note">API-first — your keys stay in your environment. Never in config files.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOCS ============ -->
+<section class="docs" id="docs">
+  <div class="container">
+    <p class="eyebrow reveal">Documentation</p>
+    <h2 class="reveal">Proof, not promises.</h2>
+    <p class="section-sub reveal">Real engineering documents, straight from the repo.</p>
+    <div class="docs-grid reveal">
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/SECURITY.md" target="_blank" rel="noopener">Security</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/THREAT_MODEL.md" target="_blank" rel="noopener">Threat Model</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/PERFORMANCE.md" target="_blank" rel="noopener">Performance</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/EVAL.md" target="_blank" rel="noopener">Eval</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a class="doc-chip glass-panel" href="https://github.com/Vivek492005/Sunday/blob/main/docs/PROJECT_BLUEPRINT.md" target="_blank" rel="noopener">Project Blueprint</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="f-brand">
+      <a class="brand" href="#top"><span class="sun">☀️</span><span class="brand-name">Sunday</span></a>
+      <p>Build at the speed of thought.</p>
+      <p class="f-license">Apache-2.0 · © 2026 Sunday</p>
+    </div>
+    <nav aria-label="Product"><h4>Product</h4><a href="#features">Features</a><a href="#how">How it works</a><a href="#frontends">Frontends</a><a href="#download">Download</a></nav>
+    <nav aria-label="Resources"><h4>Resources</h4><a href="#docs">Docs</a><a href="https://github.com/Vivek492005/Sunday/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a><a href="https://github.com/Vivek492005/Sunday/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a><a href="https://github.com/Vivek492005/Sunday/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a></nav>
+    <nav aria-label="Community"><h4>Community</h4><a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub</a><a href="https://github.com/Vivek492005/Sunday/issues" target="_blank" rel="noopener">Issues</a><a href="https://github.com/Vivek492005/Sunday/discussions" target="_blank" rel="noopener">Discussions</a><a href="https://github.com/Vivek492005/Sunday/releases" target="_blank" rel="noopener">Releases</a></nav>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
