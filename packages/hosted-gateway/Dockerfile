@@ -20,7 +20,8 @@ WORKDIR /app
 COPY --from=build /deploy ./
 ENV NODE_ENV=production
 ENV SUNDAY_HOSTED_HOST=0.0.0.0
-ENV SUNDAY_HOSTED_PORT=8080
+# Do NOT pin SUNDAY_HOSTED_PORT here: config prefers it over PORT, and
+# Render/Railway inject PORT dynamically. Default 8080 comes from config.ts.
 EXPOSE 8080
 # The operator provides: OPENROUTER_API_KEY and/or GROQ_API_KEY,
 # plus SUNDAY_HOSTED_GITHUB_AUTH=1 for the zero-config free tier.
