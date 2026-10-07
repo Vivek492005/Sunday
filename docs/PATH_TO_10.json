@@ -1,7 +1,7 @@
 {
   "phases": [
     {
-      "detail": "Fresh full CI dispatched on current main; human gates (screen-reader, pcap, live eval) pending",
+      "detail": "All human gates done (screen-reader, pcap, live eval, baselines, smoke); fresh CI running",
       "name": "Production Readiness",
       "percent": 75,
       "status": "active",
