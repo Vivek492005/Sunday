@@ -133,6 +133,10 @@ export class BrowserdServer {
   private transport: BrowserTransport | undefined;
   /** Who currently drives the browser: the agent, or the user (takeover). */
   private control: 'agent' | 'user' = 'agent';
+  /** Whether the screencast is currently running (frame capture active). */
+  private screencastRunning = false;
+  /** Screencast was running when the user took over (auto-resume on release). */
+  private screencastWasRunning = false;
   /** Latest screencast frame (base64 JPEG), served by browser/frame/latest. */
   private lastFrame: string | null = null;
   private lastFramePush = 0;
@@ -279,11 +283,13 @@ export class BrowserdServer {
       case 'browser/screencast/start': {
         parseBrowser(name, params);
         await this.startScreencast();
+        this.screencastRunning = true;
         return { ok: true as const };
       }
       case 'browser/screencast/stop': {
         parseBrowser(name, params);
         await this.ensureDriver().stopScreencast();
+        this.screencastRunning = false;
         return { ok: true as const };
       }
       case 'browser/frame/latest': {
@@ -308,11 +314,34 @@ export class BrowserdServer {
       case 'browser/takeover': {
         parseBrowser(name, params);
         this.control = 'user';
+        // P1-6: pause screencast while the user drives — the agent must not
+        // keep capturing frames of the user's own browsing (Privacy M8).
+        // Auto-resume on release if it was running.
+        this.screencastWasRunning = this.screencastRunning;
+        if (this.screencastRunning) {
+          this.screencastRunning = false;
+          try {
+            await this.ensureDriver().stopScreencast();
+          } catch {
+            // driver may not be open; state flags are what matter
+          }
+        }
+        this.lastFrame = null; // don't serve stale pre-takeover frames
         return { ok: true as const, control: 'user' as const };
       }
       case 'browser/release': {
         parseBrowser(name, params);
         this.control = 'agent';
+        // P1-6: resume screencast if it was running before takeover.
+        if (this.screencastWasRunning) {
+          this.screencastWasRunning = false;
+          try {
+            await this.startScreencast();
+            this.screencastRunning = true;
+          } catch {
+            // resume is best-effort
+          }
+        }
         return { ok: true as const, control: 'agent' as const };
       }
       case 'browser/control': {

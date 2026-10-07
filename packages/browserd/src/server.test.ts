@@ -314,3 +314,44 @@ describe('BrowserdServer', () => {
     expect(stopped.result.tracePath).toBe(join(mediaDir, 'trace.zip'));
   });
 });
+
+describe('P1-6: takeover pauses screencast', () => {
+  it('stops frame capture on takeover, resumes on release', async () => {
+    const h = await makeHarness();
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+    await h.call('browser/screencast/start');
+
+    // Frames are flowing.
+    await new Promise((r) => setTimeout(r, 1200));
+    const framesBefore = h.notifications.filter((n) => n.method === 'browser/screencastFrame').length;
+    expect(framesBefore).toBeGreaterThan(0);
+
+    // Takeover pauses capture.
+    await h.call('browser/takeover');
+    const countAtTakeover = h.notifications.length;
+    await new Promise((r) => setTimeout(r, 1200));
+    const framesDuring = h.notifications
+      .slice(countAtTakeover)
+      .filter((n) => n.method === 'browser/screencastFrame').length;
+    expect(framesDuring).toBe(0);
+
+    // Release resumes capture.
+    await h.call('browser/release');
+    await new Promise((r) => setTimeout(r, 1200));
+    const framesAfter = h.notifications
+      .slice(countAtTakeover)
+      .filter((n) => n.method === 'browser/screencastFrame').length;
+    expect(framesAfter).toBeGreaterThan(0);
+  });
+
+  it('takeover without screencast does not start it on release', async () => {
+    const h = await makeHarness();
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+    // No screencast started.
+    await h.call('browser/takeover');
+    await h.call('browser/release');
+    await new Promise((r) => setTimeout(r, 800));
+    const frames = h.notifications.filter((n) => n.method === 'browser/screencastFrame').length;
+    expect(frames).toBe(0);
+  });
+});

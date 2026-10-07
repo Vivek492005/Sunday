@@ -256,7 +256,7 @@ export class SundayDaemon {
       // for automatic relay (explicit provider: pins still work).
       failover: {
         enabled: true,
-        on: ['rate-limit'],
+        on: ['rate-limit'] as const,
         optOut: (process.env.SUNDAY_RELAY_FAILOVER_OPTOUT ?? '')
           .split(',')
           .map((s) => s.trim())
