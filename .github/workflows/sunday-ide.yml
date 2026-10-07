@@ -112,6 +112,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build all packages (type declarations for typecheck)
+        run: pnpm -r --workspace-concurrency=1 build
       - name: Typecheck all packages
         run: pnpm -r --workspace-concurrency=1 typecheck
 
@@ -178,8 +180,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      # pnpm version comes from packageManager in package.json (single source of truth)
 
       - name: Scan dependencies with pnpm audit
         continue-on-error: true
@@ -250,8 +251,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9 # matches pnpm-lock.yaml lockfileVersion 9.0
+      # pnpm version comes from packageManager in package.json (single source of truth)
 
       - uses: actions/setup-node@v4
         with:

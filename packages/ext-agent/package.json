@@ -39,22 +39,22 @@
       },
       {
         "command": "sunday.mcp.startServer",
-        "title": "Start Server…",
+        "title": "Start Server\u2026",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.stopServer",
-        "title": "Stop Server…",
+        "title": "Stop Server\u2026",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.restartServer",
-        "title": "Restart Server…",
+        "title": "Restart Server\u2026",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.storeSecret",
-        "title": "Store Secret…",
+        "title": "Store Secret\u2026",
         "category": "Sunday MCP"
       },
       {
@@ -65,7 +65,7 @@
       {
         "category": "Sunday",
         "command": "sunday.inlineEdit",
-        "title": "Inline Edit…"
+        "title": "Inline Edit\u2026"
       },
       {
         "category": "Sunday",
@@ -80,7 +80,7 @@
       {
         "category": "Sunday",
         "command": "sunday.orchestration.run",
-        "title": "Run Orchestration…"
+        "title": "Run Orchestration\u2026"
       },
       {
         "category": "Sunday",
@@ -125,7 +125,7 @@
         },
         "sunday.sidecar.path": {
           "default": "",
-          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled → workspace → PATH).",
+          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
           "type": "string"
         },
         "sunday.completion.debounceMs": {
@@ -160,7 +160,7 @@
         },
         "sunday.orchestration.parallel": {
           "default": false,
-          "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",
+          "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 \u2014 stays off until the parallel benchmark passes.",
           "type": "boolean"
         },
         "sunday.backgroundAgents.enabled": {
@@ -242,7 +242,7 @@
   "publisher": "sunday",
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.cjs --external:vscode",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -10,5 +10,9 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "eslint": "^9.18.0",
+    "typescript-eslint": "^8.20.0"
+  }
 }
