@@ -1,4 +1,4 @@
-import { requestChatContinuation, requestNativeFim, streamChatCompletion } from './openai-compatible.js';
+import { ProviderHttpError, requestChatContinuation, requestNativeFim, streamChatCompletion } from './openai-compatible.js';
 import type {
   ChatChunk,
   ChatProvider,
@@ -262,14 +262,44 @@ export class OllamaProvider extends OpenAICompatibleProvider {
  * The gateway enforces a per-user daily free-tier quota server-side.
  *
  * Env:
- *   SUNDAY_API_URL   — gateway base URL (default https://api.sunday.dev)
+ *   SUNDAY_API_URL   — gateway base URL (default https://sunday-ide.onrender.com)
  *   SUNDAY_API_TOKEN — GitHub OAuth token from the IDE sign-in
  *
  * Power users can still set OPENROUTER_API_KEY / GROQ_API_KEY for
  * bring-your-own-key unlimited usage — the router prefers BYOK providers
  * when their keys are present (see registry ordering).
  */
-export const SUNDAY_DEFAULT_API_URL = 'https://api.sunday.dev';
+export const SUNDAY_DEFAULT_API_URL = 'https://sunday-ide.onrender.com';
+
+const SUNDAY_UNREACHABLE_MESSAGE =
+  'Sunday AI is unreachable. Check your internet connection, or set SUNDAY_API_URL to a self-hosted gateway.';
+const SUNDAY_SIGNIN_MESSAGE =
+  "Sunday sign-in required: run the 'Sunday: Sign In' command (or set SUNDAY_API_TOKEN) to use the free AI tier.";
+const SUNDAY_QUOTA_MESSAGE =
+  'Daily free AI quota exhausted (200/day). Try again tomorrow or set OPENROUTER_API_KEY for unlimited BYOK.';
+
+/**
+ * Map raw transport/HTTP failures from the hosted gateway to actionable,
+ * user-friendly messages. The original error is preserved as `cause`.
+ * Cancellation (AbortError) always propagates untouched.
+ */
+function friendlySundayError(err: unknown): Error {
+  if (err instanceof Error && err.name === 'AbortError') return err;
+  if (err instanceof ProviderHttpError) {
+    if (err.status === 401) return new Error(SUNDAY_SIGNIN_MESSAGE, { cause: err });
+    if (err.status === 429) return new Error(SUNDAY_QUOTA_MESSAGE, { cause: err });
+    return new Error(`Sunday AI request failed (HTTP ${err.status}). ${err.bodyText.slice(0, 200)}`, {
+      cause: err,
+    });
+  }
+  if (err instanceof Error && /SUNDAY_API_TOKEN/.test(err.message)) {
+    // Missing token (requireApiKey) — same fix as a 401: sign in.
+    return new Error(SUNDAY_SIGNIN_MESSAGE, { cause: err });
+  }
+  // fetch() rejected: DNS failure, connection refused/reset, TLS error,
+  // timeout — the gateway is unreachable.
+  return new Error(SUNDAY_UNREACHABLE_MESSAGE, { cause: err });
+}
 
 const SUNDAY_DEFAULT_MODELS: ModelEntry[] = [
   {
@@ -307,12 +337,39 @@ export class SundayHostedProvider extends OpenAICompatibleProvider {
     return !!process.env[this.envVar()]?.trim();
   }
 
+  /**
+   * Chat via the hosted gateway. Network outages, missing sign-in, and
+   * free-tier quota exhaustion surface as actionable, user-friendly
+   * messages instead of raw fetch/HTTP errors.
+   */
+  async *chat(request: ChatRequest): AsyncIterable<ChatChunk> {
+    try {
+      yield* super.chat(request);
+    } catch (err) {
+      throw friendlySundayError(err);
+    }
+  }
+
+  /**
+   * Single-shot FIM completion via the hosted gateway. Same friendly
+   * error mapping as chat(); AbortError propagates unchanged.
+   */
+  async complete(request: FimRequest): Promise<FimResult> {
+    try {
+      return await super.complete(request);
+    } catch (err) {
+      throw friendlySundayError(err);
+    }
+  }
+
   async listModels(): Promise<ModelEntry[]> {
     // Try the live model list; fall back to the baked-in default so the
     // provider is usable even when the gateway is briefly unreachable.
+    // The 2s budget keeps model listing snappy offline (and in tests) —
+    // a slow gateway must never block the IDE.
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const timer = setTimeout(() => ctrl.abort(), 2000);
       (timer as unknown as { unref?: () => void }).unref?.();
       try {
         const res = await fetch(`${this.apiUrl()}/v1/models`, {

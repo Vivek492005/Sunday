@@ -7,6 +7,7 @@ import {
   OpenRouterProvider,
   GroqProvider,
   SundayHostedProvider,
+  SUNDAY_DEFAULT_API_URL,
   ProviderHttpError,
   parseSseStream,
   MockChatProvider,
@@ -165,12 +166,64 @@ describe('Sunday hosted provider', () => {
 
   it('uses the default API URL unless overridden', () => {
     delete process.env.SUNDAY_API_URL;
-    expect(new SundayHostedProvider().apiUrl()).toBe('https://api.sunday.dev');
+    expect(new SundayHostedProvider().apiUrl()).toBe('https://sunday-ide.onrender.com');
     process.env.SUNDAY_API_URL = 'https://example.test/';
     try {
       expect(new SundayHostedProvider().apiUrl()).toBe('https://example.test');
     } finally {
       delete process.env.SUNDAY_API_URL;
+    }
+  });
+
+  it('points at the production hosted gateway by default', () => {
+    expect(SUNDAY_DEFAULT_API_URL).toBe('https://sunday-ide.onrender.com');
+  });
+
+  it('maps network failures to a friendly unreachable message', async () => {
+    process.env.SUNDAY_API_TOKEN = 'gh-test-token';
+    vi.stubGlobal('fetch', () => Promise.reject(new TypeError('fetch failed')));
+    try {
+      const p = new SundayHostedProvider();
+      await expect(
+        drain(p.chat({ model: 'x', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] })),
+      ).rejects.toThrow(
+        /Sunday AI is unreachable\. Check your internet connection, or set SUNDAY_API_URL to a self-hosted gateway\./,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.SUNDAY_API_TOKEN;
+    }
+  });
+
+  it('maps 401 to a friendly sign-in message with the original error as cause', async () => {
+    process.env.SUNDAY_API_TOKEN = 'gh-test-token';
+    vi.stubGlobal('fetch', async () => new Response('unauthorized', { status: 401 }));
+    try {
+      const p = new SundayHostedProvider();
+      const err = await drain(
+        p.chat({ model: 'x', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] }),
+      ).catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toMatch(/Sunday sign-in required: run the 'Sunday: Sign In' command/);
+      expect(err.cause).toBeInstanceOf(ProviderHttpError);
+      expect((err.cause as ProviderHttpError).status).toBe(401);
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.SUNDAY_API_TOKEN;
+    }
+  });
+
+  it('maps 429 to a friendly quota message', async () => {
+    process.env.SUNDAY_API_TOKEN = 'gh-test-token';
+    vi.stubGlobal('fetch', async () => new Response('quota exceeded', { status: 429 }));
+    try {
+      const p = new SundayHostedProvider();
+      await expect(
+        drain(p.chat({ model: 'x', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] })),
+      ).rejects.toThrow(/Daily free AI quota exhausted \(200\/day\)/);
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.SUNDAY_API_TOKEN;
     }
   });
 
