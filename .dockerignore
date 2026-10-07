@@ -1,0 +1,18 @@
+# Sunday hosted-gateway Docker build — keep context minimal for fast Render builds
+.git
+.gitignore
+.vscode
+node_modules
+**/node_modules
+**/dist
+**/out
+vscode/
+landing-v2/
+landing/
+docs/
+branding/
+workspace/
+*.log
+.env
+.env.*
+.DS_Store
