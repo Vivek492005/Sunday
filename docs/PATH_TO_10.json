@@ -58,7 +58,7 @@
       ]
     },
     {
-      "detail": "Open VSX, landing page, npm CLI",
+      "detail": "Intentionally deferred by founder 2026-10-07 \u2014 IDE installers on release cover distribution; npm/OpenVSX are additive",
       "name": "Distribution",
       "percent": 80,
       "status": "pending",
