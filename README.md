@@ -10,6 +10,8 @@
 [![Release](https://img.shields.io/github/v/release/Vivek492005/Sunday)](https://github.com/Vivek492005/Sunday/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/Vivek492005/Sunday/sunday-ide.yml?branch=main&label=IDE%20build)](https://github.com/Vivek492005/Sunday/actions)
 
+🎬 **Watch:** [Sunday Promo Video (2 min)](https://github.com/Vivek492005/Sunday/releases/download/v1.0.0-beta.1/sunday-promo-2min.mp4)
+
 ---
 
 ## Contents
