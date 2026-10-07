@@ -34,4 +34,8 @@ export const SESSION_METHODS = {
     params: z.object({ sessionId: z.string().min(1) }),
     result: z.object({ ok: z.literal(true) }),
   },
+  'session/delete': {
+    params: z.object({ sessionId: z.string().min(1) }),
+    result: z.object({ ok: z.literal(true), deleted: z.boolean() }),
+  },
 } as const;

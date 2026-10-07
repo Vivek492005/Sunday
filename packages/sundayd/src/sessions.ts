@@ -27,6 +27,15 @@ function stripHistory(s: StoredSession): Session {
   return rest;
 }
 
+/** Retention: sessions older than this are purged on daemon start.
+ *  Override with SUNDAY_RETENTION_DAYS (0 = keep forever). Default 30. */
+export function retentionDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.SUNDAY_RETENTION_DAYS?.trim();
+  if (raw === undefined || raw === '') return 30;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 30;
+}
+
 /** Session lifecycle + JSON persistence (§7/§9). One file per session under
  *  `~/.sunday/sessions/<id>.json`; `close` drops the in-memory handle but
  *  keeps the file so `restore` can bring the session back. */
@@ -43,7 +52,32 @@ export class SessionStore {
     for (const f of await fs.readdir(this.dir).catch(() => [] as string[])) {
       if (f.endsWith('.tmp')) await fs.unlink(path.join(this.dir, f)).catch(() => undefined);
     }
+    // P1-2 retention sweep: purge sessions older than the retention window.
+    await this.sweepExpired();
     await this.loadAll();
+  }
+
+  /** Delete sessions whose updatedAt is older than the retention window.
+   *  Returns the number of sessions purged. */
+  async sweepExpired(now: number = Date.now()): Promise<number> {
+    const days = retentionDays();
+    if (days <= 0) return 0;
+    const cutoff = now - days * 24 * 60 * 60 * 1000;
+    let purged = 0;
+    for (const f of await fs.readdir(this.dir).catch(() => [] as string[])) {
+      if (!f.endsWith('.json')) continue;
+      const full = path.join(this.dir, f);
+      try {
+        const stat = await fs.stat(full);
+        if (stat.mtimeMs < cutoff) {
+          await fs.unlink(full);
+          purged++;
+        }
+      } catch {
+        // ignore races
+      }
+    }
+    return purged;
   }
 
   create(params: SessionCreateParams = {}): StoredSession {
@@ -100,6 +134,19 @@ export class SessionStore {
   /** Drop the in-memory handle; the file on disk is kept for `restore`. */
   close(id: string): boolean {
     return this.sessions.delete(id);
+  }
+
+  /** Permanently delete a session: drops the in-memory handle AND removes
+   *  the persisted file. Used by `session/delete` (Privacy M7 — the user
+   *  has a right to delete their conversation history). */
+  async delete(id: string): Promise<boolean> {
+    this.sessions.delete(id);
+    try {
+      await fs.unlink(path.join(this.dir, `${id}.json`));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** Persist one session (history included). The write is atomic (temp file +

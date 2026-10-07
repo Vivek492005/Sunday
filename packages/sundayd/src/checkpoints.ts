@@ -143,12 +143,16 @@ export class CheckpointManager {
   }
 
   private async ensureShadowRepo(shadow: string): Promise<void> {
-    await fs.mkdir(shadow, { recursive: true });
+    // Owner-only (0700): the shadow repo is a full workspace snapshot via
+    // `git add -A` — it WILL contain .env files, *.pem keys, etc. (Privacy H3).
+    await fs.mkdir(shadow, { recursive: true, mode: 0o700 });
     const head = path.join(shadow, 'HEAD');
     try {
       await fs.access(head);
     } catch {
       await git(['init', '--bare', '-q', shadow]);
+      // git init respects umask; enforce 0700 explicitly.
+      await fs.chmod(shadow, 0o700).catch(() => undefined);
     }
   }
 

@@ -363,7 +363,7 @@ export class PlaywrightDriver implements Driver {
 
   async startRecording(opts: RecordingStartOptions): Promise<void> {
     const { dir, video = false, trace = false } = opts;
-    await mkdir(dir, { recursive: true });
+    await mkdir(dir, { recursive: true, mode: 0o700 });
     this.recordingDir = dir;
     if (video) {
       this.videoDir = dir;

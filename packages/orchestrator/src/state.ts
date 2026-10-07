@@ -63,25 +63,52 @@ export class FileOrchestrationStateStore {
     return this.dir;
   }
 
-  /** Create the dir; sweep temp files orphaned by a crashed persist. */
+  /** Create the dir (0700); sweep temp files orphaned by a crashed persist;
+   *  purge runs older than the retention window (P1-2). */
   async init(): Promise<void> {
-    await fsp.mkdir(this.dir, { recursive: true });
+    await fsp.mkdir(this.dir, { recursive: true, mode: 0o700 });
     const files = await fsp.readdir(this.dir).catch(() => [] as string[]);
     for (const f of files) {
       if (f.endsWith('.tmp')) {
         await fsp.unlink(path.join(this.dir, f)).catch(() => undefined);
       }
     }
+    await this.sweepExpired();
+  }
+
+  /** Delete run files older than SUNDAY_RETENTION_DAYS (default 30).
+   *  Returns the number of runs purged. */
+  async sweepExpired(now: number = Date.now()): Promise<number> {
+    const raw = process.env.SUNDAY_RETENTION_DAYS?.trim();
+    const days = raw === undefined || raw === '' ? 30 : Number.parseInt(raw, 10);
+    if (!Number.isFinite(days) || days <= 0) return 0;
+    const cutoff = now - days * 24 * 60 * 60 * 1000;
+    let purged = 0;
+    for (const f of await fsp.readdir(this.dir).catch(() => [] as string[])) {
+      if (!f.endsWith('.json')) continue;
+      const full = path.join(this.dir, f);
+      try {
+        const stat = await fsp.stat(full);
+        if (stat.mtimeMs < cutoff) {
+          await fsp.unlink(full);
+          purged++;
+        }
+      } catch {
+        // ignore races
+      }
+    }
+    return purged;
   }
 
   /** Atomic persist (temp file + rename) on every state transition. The tmp
    *  name is unique per write (not just per pid) because parallel units
-   *  persist the same run file concurrently. */
+   *  persist the same run file concurrently. Files are owner-only (0600):
+   *  run state may contain goal text and error strings with secrets. */
   async save(state: OrchestrationRunState): Promise<void> {
     if (!isSafeRunId(state.runId)) throw new Error(`unsafe runId: ${state.runId}`);
     const full = path.join(this.dir, runFileName(state.runId));
     const tmp = `${full}.${process.pid}.${randomUUID()}.tmp`;
-    await fsp.writeFile(tmp, JSON.stringify(state));
+    await fsp.writeFile(tmp, JSON.stringify(state), { mode: 0o600 });
     await fsp.rename(tmp, full);
   }
 

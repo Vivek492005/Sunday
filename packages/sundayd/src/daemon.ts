@@ -548,6 +548,11 @@ export class SundayDaemon {
         this.sessions.close(p.sessionId);
         return { ok: true as const };
       }
+      case 'session/delete': {
+        const p = parseParams(method, req.params);
+        const deleted = await this.sessions.delete(p.sessionId);
+        return { ok: true as const, deleted };
+      }
       case 'tools/list':
         return { tools: this.tools.definitions() };
       case 'models/list':

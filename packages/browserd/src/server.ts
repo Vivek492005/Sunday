@@ -355,7 +355,9 @@ export class BrowserdServer {
    */
   private async startRecordingMedia(video: boolean, trace: boolean): Promise<string> {
     const dir = join(this.mediaBaseDir, this.sessionId, 'media');
-    await mkdir(dir, { recursive: true });
+    // Owner-only (0700): recordings (video.webm, trace.zip) capture page
+    // content including form input values; the Chromium profile holds cookies.
+    await mkdir(dir, { recursive: true, mode: 0o700 });
     await this.ensureDriver().startRecording({ video, trace, dir });
     this.recordingDir = dir;
     return dir;

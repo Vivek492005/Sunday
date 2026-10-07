@@ -113,13 +113,33 @@ function looksBinary(sample: Buffer): boolean {
   return false;
 }
 
-/** Persist the index atomically (tmp file + rename). */
+/** Persist the index atomically (tmp file + rename). Owner-only (0600/0700):
+ *  the index contains full file text, which may include secrets from files
+ *  that aren't gitignored (Privacy H6). */
 function saveIndex(index: WorkspaceIndex): void {
   const dest = indexFilePath(index.root);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.mkdirSync(path.dirname(dest), { recursive: true, mode: 0o700 });
   const tmp = `${dest}.tmp.${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(index));
+  fs.writeFileSync(tmp, JSON.stringify(index), { mode: 0o600 });
   fs.renameSync(tmp, dest);
+}
+
+/** Filenames that must never be indexed: credential files whose contents
+ *  would land verbatim in the on-disk index (Privacy H6). */
+const CREDENTIAL_FILENAME_PATTERNS: RegExp[] = [
+  /^\.env(\.|$)/i,
+  /\.pem$/i,
+  /^(id_rsa|id_dsa|id_ecdsa|id_ed25519)(\.|$)/,
+  /\.key$/i,
+  /^\.npmrc$/,
+  /credentials/i,
+  /secrets?\.ya?ml$/i,
+];
+
+/** True if this repo-relative path looks like a credential file. */
+export function isCredentialFile(relPath: string): boolean {
+  const base = path.basename(relPath);
+  return CREDENTIAL_FILENAME_PATTERNS.some((re) => re.test(base));
 }
 
 /**
@@ -163,6 +183,12 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
       continue;
     }
     if (fst.size > MAX_INDEX_FILE_BYTES) {
+      skipped++;
+      continue;
+    }
+    // Never index credential files — their contents would land verbatim
+    // in the on-disk index (Privacy H6).
+    if (isCredentialFile(entry.path)) {
       skipped++;
       continue;
     }

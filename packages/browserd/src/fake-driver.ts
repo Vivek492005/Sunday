@@ -279,7 +279,7 @@ export class FakeDriver implements Driver {
 
   async startRecording(opts: RecordingStartOptions): Promise<void> {
     this.assertOpen();
-    await mkdir(opts.dir, { recursive: true });
+    await mkdir(opts.dir, { recursive: true, mode: 0o700 });
     if (opts.video) await writeFile(join(opts.dir, 'video.webm'), FAKE_VIDEO_BYTES);
     if (opts.trace) await writeFile(join(opts.dir, 'trace.zip'), FAKE_TRACE_BYTES);
     this.recording = { video: opts.video ?? false, trace: opts.trace ?? false, dir: opts.dir };
