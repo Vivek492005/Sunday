@@ -70,10 +70,10 @@
       ]
     },
     {
-      "detail": "Show HN, Reddit, benchmark write-up",
+      "detail": "Launch drafts + benchmark done; posts not yet published (human step)",
       "name": "Launch & Traction",
-      "percent": 0,
-      "status": "pending",
+      "percent": 40,
+      "status": "in_progress",
       "tasks": [
         "Run orchestration benchmark (on vs off)",
         "Publish technical write-up (dev.to/blog)",
