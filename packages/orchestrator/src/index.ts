@@ -11,3 +11,5 @@ export * from './handlers.js';
 export * from './state.js';
 export * from './merge.js';
 export * from './background.js';
+export { decompose, summarizePlan } from './decompose.js';
+export type { DecomposeOptions } from './decompose.js';
