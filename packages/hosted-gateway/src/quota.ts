@@ -19,7 +19,7 @@ export interface QuotaDecision {
 }
 
 export class DailyQuota {
-  private readonly counts = new Map<number, { day: string; used: number }>();
+  private readonly counts = new Map<string, { day: string; used: number }>();
 
   constructor(private readonly requestsPerDay: number) {
     if (!Number.isFinite(requestsPerDay) || requestsPerDay <= 0) {
@@ -39,9 +39,9 @@ export class DailyQuota {
   }
 
   /** Record one request for a GitHub user id. */
-  tryConsume(githubUserId: number): QuotaDecision {
+  tryConsume(userKey: string): QuotaDecision {
     const day = this.today();
-    const entry = this.counts.get(githubUserId);
+    const entry = this.counts.get(userKey);
     const used = entry && entry.day === day ? entry.used : 0;
     const resetAfterMs = this.msUntilMidnightUtc();
 
@@ -49,7 +49,7 @@ export class DailyQuota {
       return { allowed: false, remaining: 0, resetAfterMs, limit: this.requestsPerDay };
     }
 
-    this.counts.set(githubUserId, { day, used: used + 1 });
+    this.counts.set(userKey, { day, used: used + 1 });
 
     // Opportunistic cleanup of stale days.
     if (this.counts.size > 100_000) {
@@ -67,9 +67,9 @@ export class DailyQuota {
   }
 
   /** How many requests a user has left today (no consumption). */
-  remaining(githubUserId: number): number {
+  remaining(userKey: string): number {
     const day = this.today();
-    const entry = this.counts.get(githubUserId);
+    const entry = this.counts.get(userKey);
     const used = entry && entry.day === day ? entry.used : 0;
     return Math.max(0, this.requestsPerDay - used);
   }

@@ -128,26 +128,47 @@ export async function activate(
   let browserProvider: BrowserViewProvider | undefined;
 
   // -- Sunday hosted gateway (zero-config AI) ---------------------------------------
-  // When the user is signed in with GitHub in the IDE, pass their OAuth token
-  // to sundayd so the `sunday` (hosted) provider works without API keys.
-  // Silent: never prompts — if there's no session, BYOK providers remain.
+  // When the user is signed in with GitHub, Microsoft, or Google in the IDE,
+  // pass their OAuth token to sundayd so the `sunday` (hosted) provider works
+  // without API keys. Silent: never prompts — if there's no session, BYOK
+  // providers remain.
   const configureSundayHosted = async (): Promise<void> => {
     try {
-      const session = await vscode.authentication.getSession('github', ['read:user'], {
-        createIfNone: false,
-        silent: true,
-      });
-      if (!session?.accessToken) return;
+      // Provider id → scopes. VS Code bundles github + microsoft auth;
+      // google has no bundled provider and resolves to undefined gracefully.
+      const candidates: Array<{ provider: string; scopes: string[] }> = [
+        { provider: 'github', scopes: ['read:user'] },
+        { provider: 'microsoft', scopes: ['User.Read'] },
+        { provider: 'google', scopes: ['openid', 'email', 'profile'] },
+      ];
+      let token: string | undefined;
+      let usedProvider: string | undefined;
+      for (const c of candidates) {
+        try {
+          const session = await vscode.authentication.getSession(c.provider, c.scopes, {
+            createIfNone: false,
+            silent: true,
+          });
+          if (session?.accessToken) {
+            token = session.accessToken;
+            usedProvider = c.provider;
+            break;
+          }
+        } catch {
+          // Provider not available (e.g. no Google auth extension) — try next.
+        }
+      }
+      if (!token) return;
       const rpc = await manager.ensureReady();
       await rpc.request(
         'daemon/configure',
         {
           workspaceRoot: wsRoot ?? process.cwd(),
-          sundayApiToken: session.accessToken,
+          sundayApiToken: token,
         },
         { timeoutMs: 15000 },
       );
-      log('Sunday hosted gateway configured (GitHub sign-in)');
+      log(`Sunday hosted gateway configured (${usedProvider} sign-in)`);
     } catch (e) {
       // Non-fatal: hosted provider stays unconfigured, BYOK still works.
       log(`Sunday hosted gateway not configured: ${(e as Error).message}`);

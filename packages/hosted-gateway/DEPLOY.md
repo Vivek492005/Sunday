@@ -9,8 +9,8 @@ Sunday IDE → GitHub sign-in → OAuth token → sundayd → api.sunday.dev →
                                                                     (YOUR provider keys)
 ```
 
-- **Auth**: GitHub OAuth token (from the IDE's built-in GitHub sign-in)
-- **Quota**: 200 requests/day per GitHub user (configurable)
+- **Auth**: GitHub / Google / Microsoft OAuth token (from the IDE sign-in)
+- **Quota**: 200 requests/day per user (configurable)
 - **Abuse**: per-minute rate limits + IP allowlist + audit log (already built)
 
 ## Deploy (Railway — ~5 min)
@@ -21,7 +21,7 @@ Sunday IDE → GitHub sign-in → OAuth token → sundayd → api.sunday.dev →
 4. **Variables** tab → add (see `.env.example` for the full list):
    ```
    OPENROUTER_API_KEY=<your key>      # or GROQ_API_KEY — at least one
-   SUNDAY_HOSTED_GITHUB_AUTH=1
+   SUNDAY_HOSTED_SOCIAL_AUTH=1
    SUNDAY_HOSTED_DAILY_QUOTA=200
    SUNDAY_HOSTED_HOST=0.0.0.0
    ```
@@ -56,6 +56,6 @@ prefers explicit `openrouter:` / `groq:` model refs.
 ## Security notes
 
 - Provider keys live ONLY on the server — never in the IDE, never in git
-- GitHub tokens are verified against api.github.com (5-min cache)
+- OAuth tokens are verified against the provider's userinfo endpoint (5-min cache)
 - The gateway exposes text chat ONLY — no tools, no shell, no file access
 - Token never logged (audit uses `gh:<id> (<login>)` fingerprint)

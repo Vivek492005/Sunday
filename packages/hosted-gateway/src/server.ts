@@ -27,7 +27,7 @@ import { KeyStore, keyFingerprint } from './auth.js';
 import { KeyRateLimiter } from './rate-limit.js';
 import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
-import { GitHubVerifier, type GitHubIdentity } from './github-auth.js';
+import { SocialVerifier, type SocialIdentity } from './social-auth.js';
 import { DailyQuota } from './quota.js';
 import {
   ApiError,
@@ -51,7 +51,7 @@ export class HostedGatewayServer {
   private readonly audit: AuditLog;
   private readonly router: Router;
   private readonly registry: ProviderRegistry;
-  private readonly github: GitHubVerifier;
+  private readonly social: SocialVerifier;
   private readonly quota: DailyQuota;
   private server: Server | undefined;
 
@@ -67,7 +67,7 @@ export class HostedGatewayServer {
     this.audit = new AuditLog(config.auditLog);
     this.registry = deps.registry ?? createDefaultRegistry();
     this.router = deps.router ?? new Router(this.registry, 'openrouter:meta-llama/llama-3.3-70b-instruct');
-    this.github = new GitHubVerifier();
+    this.social = new SocialVerifier(this.config.oauthProviders);
     this.quota = new DailyQuota(config.dailyQuota);
   }
 
@@ -173,18 +173,18 @@ export class HostedGatewayServer {
       // when enabled; a valid GitHub token always wins.
       const isHealth = method === 'GET' && path === '/health';
       let key: { id: string } | undefined;
-      let ghIdentity: GitHubIdentity | undefined;
+      let socialIdentity: SocialIdentity | undefined;
       if (!isHealth) {
         const secret = KeyStore.extractBearer(req.headers.authorization);
 
-        if (this.config.githubAuth && secret) {
-          ghIdentity = (await this.github.verify(secret)) ?? undefined;
+        if (this.config.socialAuth && secret) {
+          socialIdentity = (await this.social.verify(secret)) ?? undefined;
         }
 
-        if (ghIdentity) {
-          // Per-user identity: rate-limit key becomes the GitHub user id.
-          key = { id: `gh:${ghIdentity.id}` };
-          keyId = `gh:${ghIdentity.id} (${ghIdentity.login})`;
+        if (socialIdentity) {
+          // Per-user identity: rate-limit key becomes the namespaced user id.
+          key = { id: socialIdentity.key };
+          keyId = `${socialIdentity.key} (${socialIdentity.label})`;
         } else {
           const found = this.keys.verify(secret);
           if (!found) {
@@ -194,8 +194,8 @@ export class HostedGatewayServer {
             throw new ApiError(
               401,
               'unauthorized',
-              this.config.githubAuth
-                ? 'valid GitHub token or gateway API key required'
+              this.config.socialAuth
+                ? 'valid social login token or gateway API key required'
                 : 'valid Bearer API key required',
             );
           }
@@ -238,9 +238,9 @@ export class HostedGatewayServer {
         model = chatReq.model;
         promptTokensEst = chatReq.promptTokensEst;
 
-        // 4b. Daily free-tier quota (GitHub-identified users only).
-        if (ghIdentity) {
-          const q = this.quota.tryConsume(ghIdentity.id);
+        // 4b. Daily free-tier quota (social-identified users only).
+        if (socialIdentity) {
+          const q = this.quota.tryConsume(socialIdentity.key);
           res.setHeader('X-Quota-Limit', String(q.limit));
           res.setHeader('X-Quota-Remaining', String(q.remaining));
           if (!q.allowed) {
