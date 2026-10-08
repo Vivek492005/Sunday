@@ -70,7 +70,7 @@ describe('loadAgentsMd', () => {
 
 describe('loadNestedAgentsMd', () => {
   it('merges root→leaf with the nearest file last (nearest wins)', () => {
-    const { root, child, grandchild } = makeTree();
+    const { root, grandchild } = makeTree();
     writeFileSync(join(root, AGENTS_MD_FILE), 'root rules');
     writeFileSync(join(grandchild, AGENTS_MD_FILE), 'leaf rules');
     const entries = loadNestedAgentsMd(root, join(grandchild, 'code.ts'));

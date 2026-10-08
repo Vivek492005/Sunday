@@ -19,7 +19,7 @@ function makeRepo(files: Record<string, string>): string {
     const full = join(root, rel);
     mkdirSync(join(full, '..'), { recursive: true });
     if (rel.endsWith('.bin')) {
-      require('node:fs').writeFileSync(full, Buffer.from([0x00, 0x01, 0x02, 0xff]));
+      writeFileSync(full, Buffer.from([0x00, 0x01, 0x02, 0xff]));
     } else {
       writeFileSync(full, content);
     }
