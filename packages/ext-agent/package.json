@@ -171,6 +171,11 @@
         "category": "Sunday",
         "command": "sunday.sync.download",
         "title": "Sync: Download Sessions (Encrypted)"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.skills.browse",
+        "title": "Browse Community Skills"
       }
     ],
     "keybindings": [
@@ -242,6 +247,11 @@
           "type": "boolean",
           "default": false,
           "description": "Opt-in: end-to-end encrypted session sync (sunday.sync.upload / download). The encryption passphrase is asked each time and never stored. Default off."
+        },
+        "sunday.skills.registryUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Community skills registry JSON URL for Sunday: Browse Community Skills. Empty = the default registry on the Sunday repo."
         },
         "sunday.orchestration.parallel": {
           "default": false,
