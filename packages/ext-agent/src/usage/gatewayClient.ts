@@ -127,13 +127,18 @@ export async function fetchUsageSnapshot(
   fetchImpl: GatewayFetch,
   gatewayUrl: string,
   sessionToken: string,
+  streakDays?: number,
 ): Promise<UsageSnapshot> {
   if (!sessionToken) throw new GatewayAuthError('sign in to Sunday to see usage');
+  const headers: Record<string, string> = { authorization: `Bearer ${sessionToken}` };
+  // Streak bonus: tell the gateway our current streak so it can apply bonus quota.
+  // Sanitized server-side; omitted when unknown (server treats as 0).
+  if (typeof streakDays === 'number' && Number.isFinite(streakDays) && streakDays > 0) {
+    headers['x-sunday-streak-days'] = String(Math.floor(streakDays));
+  }
   let res: { ok: boolean; status: number; json(): Promise<unknown> };
   try {
-    res = await fetchImpl(`${gatewayUrl}/me/usage`, {
-      headers: { authorization: `Bearer ${sessionToken}` },
-    });
+    res = await fetchImpl(`${gatewayUrl}/me/usage`, { headers });
   } catch (err) {
     throw new GatewayUnreachableError(
       `could not reach the Sunday gateway: ${(err as Error).message}`,

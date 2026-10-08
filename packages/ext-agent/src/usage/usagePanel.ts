@@ -20,6 +20,7 @@ import {
   type GatewayFetch,
   type UsageSnapshot,
 } from './gatewayClient.js';
+import { currentStreakDays } from '../engagement/index.js';
 
 /** WebviewPanel view type for the usage dashboard. */
 export const USAGE_VIEW_TYPE = 'sunday.usageView';
@@ -224,7 +225,7 @@ export function registerUsageCommands(
         setBody(renderUsageState('auth'));
         return;
       }
-      const snapshot = await fetchUsageSnapshot(fetchImpl, url, token);
+      const snapshot = await fetchUsageSnapshot(fetchImpl, url, token, currentStreakDays());
       setBody(renderUsageHtml(snapshot));
     } catch (err) {
       log(`usage: refresh failed: ${(err as Error).message}`);
