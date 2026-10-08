@@ -73,12 +73,18 @@ importers:
 
   packages/ext-agent:
     dependencies:
+      '@sunday/context':
+        specifier: workspace:*
+        version: link:../context
       '@sunday/mcp':
         specifier: workspace:*
         version: link:../mcp
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@sunday/tools':
+        specifier: workspace:*
+        version: link:../tools
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
