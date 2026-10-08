@@ -45,7 +45,9 @@ import { registerAgentsMd } from './agentsMd.js';
 import { registerStyleInfer } from './styleInfer.js';
 import { registerInitProject } from './templates/initProject.js';
 import { AGENT_MODE_ENV, getAgentMode, registerAgentModes } from './modes.js';
-import { STYLE_AUTOINFER_ENV } from '@sunday/context';
+import { registerMemoryApplyFrom, type CrossProjectMemory, type CrossProjectStore } from './memoryApply.js';
+import { AgentSender } from './agentSend.js';
+import { STYLE_AUTOINFER_ENV, projectIdFor } from '@sunday/context';
 import {
   registerAccountStatusBar,
   GOOGLE_AUTH_EXTENSION_ID,
@@ -648,6 +650,68 @@ export async function activate(
     };
     context.subscriptions.push(registerMemoryPanel(context, memoryStore));
     context.subscriptions.push(registerRulesView(context, ruleStore as any));
+
+    // Group B5: cross-project learning — `sunday.memory.applyFrom` lets the
+    // user pull memories from another project into the current session.
+    // Same JSONL file as the panel adapter above; scoring mirrors
+    // MemoryStore.search (token overlap); untagged records count as 'global'.
+    const stopWords = new Set(['the','a','an','and','or','to','of','in','on','for','with','by','is','are','was','were','be','it','this','that','we','i','you','at','as','from','will','should','can','has','have','had','do']);
+    const tokenize = (text: string): string[] =>
+      text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1 && !stopWords.has(t));
+    const readMemories = async (): Promise<CrossProjectMemory[]> => {
+      try {
+        const raw = await fs.promises.readFile(memoryFile, 'utf8');
+        return raw.split('\n').filter(Boolean).map((l) => {
+          let m: any;
+          try { m = JSON.parse(l); } catch { return undefined; }
+          if (!m || typeof m.text !== 'string') return undefined;
+          return {
+            id: String(m.id ?? ''),
+            text: String(m.text ?? ''),
+            timestamp: String(m.timestamp ?? ''),
+            project: String(m.project ?? '') || 'global',
+            tags: Array.isArray(m.tags) ? m.tags.map((t: unknown) => String(t)) : [],
+            source: m.source === 'manual' ? 'manual' : 'auto',
+          } as CrossProjectMemory;
+        }).filter((m): m is CrossProjectMemory => m !== undefined);
+      } catch { return []; }
+    };
+    const crossProjectStore: CrossProjectStore = {
+      listProjects: async () => [...new Set((await readMemories()).map((m) => m.project))].sort(),
+      queryByProject: async (projectId: string, query: string, limit = 10) => {
+        const queryTokens = tokenize(query);
+        const scored = (await readMemories())
+          .filter((m) => m.project === projectId)
+          .map((m) => {
+            const memTokens = new Set(tokenize(m.text));
+            const memTags = m.tags.map((t) => t.toLowerCase());
+            let score = 0;
+            for (const t of queryTokens) {
+              if (memTokens.has(t)) score += 2;
+              if (memTags.includes(t)) score += 3;
+            }
+            return { m, score };
+          })
+          .filter((s) => s.score > 0 || queryTokens.length === 0)
+          .sort((a, b) => b.score - a.score || (b.m.timestamp < a.m.timestamp ? -1 : 1));
+        return scored.slice(0, limit).map((s) => s.m);
+      },
+    };
+    const memoryAgentSender = new AgentSender({
+      ensureBridge: async () => {
+        const b = await getBridgeForCommands();
+        if (!b) throw new Error('Sunday sidecar is not running.');
+        return b;
+      },
+      getCwd: () => wsRoot,
+      log,
+    });
+    registerMemoryApplyFrom(context, {
+      store: crossProjectStore,
+      currentProjectId: () => (wsRoot ? projectIdFor(wsRoot) : undefined),
+      sendToAgent: (message: string) => memoryAgentSender.send(message).then(() => undefined),
+      log,
+    });
   } catch (err) {
     log(`feature views (memory/rules) skipped: ${(err as Error).message}`);
   }

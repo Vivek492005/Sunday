@@ -10,7 +10,7 @@
  * duplicated here.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -54,6 +54,19 @@ export interface MemoryListOptions {
 const MEMORIES_FILE = 'memories.jsonl';
 const LABEL_MAX = 60;
 
+/**
+ * Project id for a workspace root: first 16 hex chars of its sha1.
+ * Mirrors `projectIdFor` in `@sunday/context` (style-infer.ts) — kept
+ * local so this package stays dependency-light; the algorithms must stay
+ * in sync.
+ */
+export function projectId(workspaceRoot: string): string {
+  return createHash('sha1').update(resolve(workspaceRoot)).digest('hex').slice(0, 16);
+}
+
+/** Project tag for memories not tied to any workspace. */
+export const GLOBAL_PROJECT = 'global';
+
 /** Tokenise for keyword matching: lowercase alphanumerics, drop stop words. */
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'by',
@@ -78,10 +91,31 @@ function tokens(text: string): string[] {
 export class MemoryStore {
   private readonly homeDir: string;
   private readonly file: string;
+  /** One-time migration of untagged (pre-project) records → 'global'. */
+  private migrated = false;
 
   constructor(opts: MemoryStoreOptions = {}) {
     this.homeDir = resolve(opts.homeDir ?? homedir());
     this.file = join(this.homeDir, '.sunday', 'memory', MEMORIES_FILE);
+  }
+
+  /**
+   * Backfill: records written before project tagging (missing/empty
+   * `project`) get `project = 'global'`. Runs once per store instance,
+   * ahead of the first read or write.
+   */
+  private async ensureMigrated(): Promise<void> {
+    if (this.migrated) return;
+    this.migrated = true;
+    const records = await this.readAll();
+    let changed = false;
+    for (const rec of records) {
+      if (!rec.project) {
+        rec.project = GLOBAL_PROJECT;
+        changed = true;
+      }
+    }
+    if (changed) await this.writeAll(records);
   }
 
   private async readAll(): Promise<LongTermMemory[]> {
@@ -118,6 +152,7 @@ export class MemoryStore {
    * timestamp.
    */
   async save(mem: Omit<LongTermMemory, 'id' | 'timestamp'>): Promise<LongTermMemory> {
+    await this.ensureMigrated();
     const clean = mem.text.trim();
     if (clean.length === 0) throw new Error('Refusing to save empty memory.');
     assertNoSecrets(clean);
@@ -142,6 +177,7 @@ export class MemoryStore {
    * break newest-first. An empty query returns the newest records.
    */
   async search(query: string, opts: MemorySearchOptions = {}): Promise<LongTermMemory[]> {
+    await this.ensureMigrated();
     const limit = opts.limit ?? 10;
     const queryTokens = tokens(query);
     const wantedTags = (opts.tags ?? []).map((t) => t.toLowerCase());
@@ -170,6 +206,7 @@ export class MemoryStore {
 
   /** Newest-first listing. */
   async list(opts: MemoryListOptions = {}): Promise<LongTermMemory[]> {
+    await this.ensureMigrated();
     const limit = opts.limit ?? 50;
     const records = await this.readAll();
     records.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
@@ -178,11 +215,37 @@ export class MemoryStore {
 
   /** Delete by id. Returns true when a record was removed. */
   async delete(id: string): Promise<boolean> {
+    await this.ensureMigrated();
     const records = await this.readAll();
     const kept = records.filter((r) => r.id !== id);
     if (kept.length === records.length) return false;
     await this.writeAll(kept);
     return true;
+  }
+
+  /**
+   * Distinct project ids present in the store, sorted. Powers the
+   * "apply memories from another project" picker.
+   */
+  async listProjects(): Promise<string[]> {
+    await this.ensureMigrated();
+    const projects = new Set<string>();
+    for (const mem of await this.readAll()) {
+      projects.add(mem.project || GLOBAL_PROJECT);
+    }
+    return [...projects].sort();
+  }
+
+  /**
+   * Relevance search scoped to a single project — memories from other
+   * projects never leak in. Same scoring as {@link search}.
+   */
+  async queryByProject(
+    projectId: string,
+    query: string,
+    limit = 10,
+  ): Promise<LongTermMemory[]> {
+    return this.search(query, { project: projectId, limit });
   }
 }
 
@@ -230,7 +293,7 @@ export interface TranscriptTurn {
  */
 export function extractMemories(
   transcript: TranscriptTurn[],
-  project = 'default',
+  project: string = GLOBAL_PROJECT,
 ): Omit<LongTermMemory, 'id' | 'timestamp'>[] {
   const candidates: Omit<LongTermMemory, 'id' | 'timestamp'>[] = [];
   const seen = new Set<string>();

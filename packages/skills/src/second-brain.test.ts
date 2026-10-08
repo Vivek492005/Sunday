@@ -202,3 +202,70 @@ describe('formatMemoriesForPrompt', () => {
     expect(formatMemoriesForPrompt([])).toBe('');
   });
 });
+
+describe('cross-project learning (B5)', () => {
+  it('projectId is a stable 16-char hash of the workspace root', async () => {
+    const { projectId } = await import('./second-brain.js');
+    const id = projectId('/tmp/some/workspace');
+    expect(id).toMatch(/^[0-9a-f]{16}$/);
+    expect(projectId('/tmp/some/workspace')).toBe(id);
+    expect(projectId('/tmp/other/workspace')).not.toBe(id);
+  });
+
+  it('tags memories with the project id on write', async () => {
+    const { projectId } = await import('./second-brain.js');
+    const pid = projectId('/tmp/proj-a');
+    const saved = await store.save({ text: 'project a decision note', project: pid, tags: [], source: 'manual' });
+    expect(saved.project).toBe(pid);
+  });
+
+  it('listProjects returns distinct sorted project ids', async () => {
+    await store.save({ text: 'note one here', project: 'proj-b', tags: [], source: 'manual' });
+    await store.save({ text: 'note two here', project: 'proj-a', tags: [], source: 'manual' });
+    await store.save({ text: 'note three here', project: 'proj-b', tags: [], source: 'manual' });
+    expect(await store.listProjects()).toEqual(['proj-a', 'proj-b']);
+  });
+
+  it('queryByProject isolates projects (no cross-project leakage)', async () => {
+    await store.save({ text: 'alpha uses pnpm workspaces', project: 'proj-a', tags: [], source: 'manual' });
+    await store.save({ text: 'beta uses pnpm workspaces', project: 'proj-b', tags: [], source: 'manual' });
+    const a = await store.queryByProject('proj-a', 'pnpm workspaces');
+    expect(a).toHaveLength(1);
+    expect(a[0]?.project).toBe('proj-a');
+    const b = await store.queryByProject('proj-b', 'pnpm workspaces');
+    expect(b).toHaveLength(1);
+    expect(b[0]?.project).toBe('proj-b');
+    const none = await store.queryByProject('proj-c', 'pnpm workspaces');
+    expect(none).toHaveLength(0);
+  });
+
+  it('queryByProject respects the limit', async () => {
+    for (let i = 0; i < 5; i++) {
+      await store.save({ text: `shared keyword memory ${i}`, project: 'p', tags: [], source: 'manual' });
+    }
+    expect(await store.queryByProject('p', 'shared keyword', 3)).toHaveLength(3);
+  });
+
+  it('migrates untagged (legacy) memories to "global" on first use', async () => {
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+    const dir = join(homeDir, '.sunday', 'memory');
+    await mkdir(dir, { recursive: true });
+    // Legacy records: missing/empty project field.
+    await writeFile(
+      join(dir, 'memories.jsonl'),
+      [
+        JSON.stringify({ id: 'legacy-1', text: 'old memory without project', timestamp: '2025-01-01T00:00:00.000Z', tags: [], source: 'auto' }),
+        JSON.stringify({ id: 'legacy-2', text: 'old memory with empty project', timestamp: '2025-01-02T00:00:00.000Z', project: '', tags: [], source: 'auto' }),
+        JSON.stringify({ id: 'tagged-1', text: 'already tagged memory', timestamp: '2025-01-03T00:00:00.000Z', project: 'proj-x', tags: [], source: 'auto' }),
+      ].join('\n') + '\n',
+    );
+    const listed = await store.list();
+    expect(listed.find((m) => m.id === 'legacy-1')?.project).toBe('global');
+    expect(listed.find((m) => m.id === 'legacy-2')?.project).toBe('global');
+    expect(listed.find((m) => m.id === 'tagged-1')?.project).toBe('proj-x');
+    expect(await store.listProjects()).toEqual(['global', 'proj-x']);
+    // Tagged records are untouched by the migration.
+    expect((await store.list()).filter((m) => m.project === 'proj-x')).toHaveLength(1);
+  });
+});

@@ -149,6 +149,16 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.agentsMd.reload",
+        "title": "Reload AGENTS.md Instructions"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.style.infer",
+        "title": "Infer Project Code Style"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.initProject",
         "title": "New Project from Template…"
       },
@@ -156,6 +166,11 @@
         "category": "Sunday",
         "command": "sunday.mode.set",
         "title": "Set Agent Mode…"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.memory.applyFrom",
+        "title": "Apply Memories from Another Project…"
       },
       {
         "category": "Sunday",
@@ -297,6 +312,11 @@
           "default": "",
           "description": "Container image for sunday.sandbox.mode=docker. Must be present locally (docker pull it once); empty = alpine:latest.",
           "type": "string"
+        },
+        "sunday.style.autoInfer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically infer the project's code style once per project on the first session (stored in ~/.sunday/styles/). Applies on the next sidecar restart."
         },
         "sunday.update.checkOnStartup": {
           "type": "boolean",
