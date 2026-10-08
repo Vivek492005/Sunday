@@ -20,11 +20,14 @@ import {
   type ActiveRule,
   type SkillSummary,
 } from '@sunday/skills';
+import { formatForPrompt as formatAgentsMd, loadAgentsMd } from '@sunday/context';
 
 export interface SystemPromptData {
   skills: SkillSummary[];
   rules: ActiveRule[];
   memory: { workspace?: string; user?: string };
+  /** Formatted AGENTS.md block (already delimited); ''/undefined when none found. */
+  agentsMd?: string;
 }
 
 export interface SystemPromptOptions {
@@ -64,7 +67,7 @@ function truncate(s: string): string {
   return t.length > MAX_SECTION_CHARS ? `${t.slice(0, MAX_SECTION_CHARS)}\n…[truncated]` : t;
 }
 
-/** Gather skills, rules, and memory for a session cwd. */
+/** Gather skills, rules, memory, and AGENTS.md for a session cwd. */
 export async function collectSystemPromptData(
   opts: SystemPromptOptions = {},
 ): Promise<SystemPromptData> {
@@ -75,7 +78,16 @@ export async function collectSystemPromptData(
     new RuleLoader({ workspaceDir, userDir }).loadActiveRules(),
     loadMemory({ workspaceDir, userDir }),
   ]);
-  return { skills, rules, memory };
+  // Group B1: AGENTS.md is read fresh per session (no cache), so edits
+  // apply to the next session automatically. Content stays untrusted —
+  // formatForPrompt() wraps it in <repo-instructions> delimiters.
+  let agentsMd = '';
+  try {
+    agentsMd = formatAgentsMd(loadAgentsMd(workspaceDir));
+  } catch {
+    agentsMd = '';
+  }
+  return { skills, rules, memory, agentsMd };
 }
 
 /**
@@ -129,6 +141,12 @@ export function buildSystemPrompt(data: SystemPromptData): string {
         ...memBlocks,
       ].join('\n'),
     );
+  }
+
+  // Group B1: verbatim AGENTS.md block, already delimited as untrusted
+  // repository context by formatForPrompt().
+  if (data.agentsMd) {
+    sections.push(['## Repository instructions', '', data.agentsMd].join('\n'));
   }
 
   return sections.join('\n\n');

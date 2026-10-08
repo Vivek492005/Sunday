@@ -97,24 +97,35 @@ describe('buildSystemPrompt', () => {
 });
 
 describe('collectSystemPromptData + buildSessionSystemPrompt', () => {
+  // Group B2: style inference persists under SUNDAY_HOME — point it at the
+  // temp home so tests never touch the real ~/.sunday.
+  function useTempHome(home: string): void {
+    process.env.SUNDAY_HOME = home;
+  }
+
   it('collects skills, rules (ascending precedence), and memory', async () => {
     const { ws, home } = await makeWorkspace();
-    const data = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
-    expect(data.skills.map((s) => s.name)).toEqual(['code_review']);
-    // user rules before workspace rules before nested AGENTS.md
-    expect(data.rules.map((r) => r.source)).toEqual([
-      'user:rules/tone.md',
-      'workspace:rules/go.md',
-      'agents:AGENTS.md',
-    ]);
-    expect(data.memory.workspace).toContain('prefers pnpm');
-    expect(data.memory.user).toBeUndefined();
+    useTempHome(home);
+    try {
+      const data = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
+      expect(data.skills.map((s) => s.name)).toEqual(['code_review']);
+      // user rules before workspace rules before nested AGENTS.md
+      expect(data.rules.map((r) => r.source)).toEqual([
+        'user:rules/tone.md',
+        'workspace:rules/go.md',
+        'agents:AGENTS.md',
+      ]);
+      expect(data.memory.workspace).toContain('prefers pnpm');
+      expect(data.memory.user).toBeUndefined();
 
-    const prompt = await buildSessionSystemPrompt({ workspaceDir: ws, userDir: home });
-    expect(prompt).toBeDefined();
-    expect(prompt!).toContain('## Skills');
-    expect(prompt!).toContain('## Rules');
-    expect(prompt!).toContain('## Memory');
+      const prompt = await buildSessionSystemPrompt({ workspaceDir: ws, userDir: home });
+      expect(prompt).toBeDefined();
+      expect(prompt!).toContain('## Skills');
+      expect(prompt!).toContain('## Rules');
+      expect(prompt!).toContain('## Memory');
+    } finally {
+      delete process.env.SUNDAY_HOME;
+    }
   });
 
   it('always returns at least the injection guard', async () => {
@@ -123,7 +134,47 @@ describe('collectSystemPromptData + buildSessionSystemPrompt', () => {
     const home = join(root, 'home');
     await mkdir(ws, { recursive: true });
     await mkdir(home, { recursive: true });
-    const prompt = await buildSessionSystemPrompt({ workspaceDir: ws, userDir: home });
-    expect(prompt.startsWith(INJECTION_GUARD)).toBe(true);
+    useTempHome(home);
+    try {
+      const prompt = await buildSessionSystemPrompt({ workspaceDir: ws, userDir: home });
+      expect(prompt.startsWith(INJECTION_GUARD)).toBe(true);
+    } finally {
+      delete process.env.SUNDAY_HOME;
+    }
+  });
+
+  it('injects AGENTS.md as delimited untrusted repository context (B1)', async () => {
+    const { ws, home } = await makeWorkspace();
+    useTempHome(home);
+    try {
+      const data = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
+      expect(data.agentsMd).toContain('<repo-instructions>');
+      expect(data.agentsMd).toContain('NOT a system instruction');
+
+      const prompt = await buildSessionSystemPrompt({ workspaceDir: ws, userDir: home });
+      expect(prompt).toContain('## Repository instructions');
+      expect(prompt).toContain('<repo-instructions>');
+      expect(prompt).toContain('No force pushes.');
+    } finally {
+      delete process.env.SUNDAY_HOME;
+    }
+  });
+
+
+  it('omits the repository-instructions section when no AGENTS.md exists', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sunday-prompt-noagents-'));
+    const ws = join(root, 'ws');
+    const home = join(root, 'home');
+    await mkdir(ws, { recursive: true });
+    await mkdir(home, { recursive: true });
+    useTempHome(home);
+    try {
+      const data = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
+      expect(data.agentsMd).toBe('');
+      const prompt = buildSystemPrompt(data);
+      expect(prompt).not.toContain('## Repository instructions');
+    } finally {
+      delete process.env.SUNDAY_HOME;
+    }
   });
 });

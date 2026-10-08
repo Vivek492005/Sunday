@@ -6,3 +6,4 @@ export * from './repoMap.js';
 export * from './indexer.js';
 export * from './search.js';
 export * from './handlers.js';
+export * from './agents-md.js';
