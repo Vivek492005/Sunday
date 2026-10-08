@@ -163,9 +163,16 @@ export function loadNestedAgentsMd(
   for (const dir of chain) {
     const content = readAgentsMdFile(path.join(dir, AGENTS_MD_FILE));
     if (content === undefined) continue;
-    entries.push({ dir: path.relative(root, dir) || '.', content });
+    // Normalize to POSIX separators so `dir` is consistent across platforms
+    // (path.relative returns backslashes on Windows).
+    entries.push({ dir: toPosixPath(path.relative(root, dir)) || '.', content });
   }
   return entries;
+}
+
+/** Convert native path separators to POSIX forward slashes. */
+function toPosixPath(p: string): string {
+  return p.split(path.sep).join('/');
 }
 
 /**
