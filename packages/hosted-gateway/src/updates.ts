@@ -125,6 +125,10 @@ export class UpdateChecker {
             Accept: 'application/vnd.github+json',
             // GitHub API requires a User-Agent.
             'User-Agent': 'sunday-hosted-gateway',
+            // Optional: authenticated requests get 5,000/hr vs 60/hr for shared IPs.
+            ...(process.env.GITHUB_TOKEN
+              ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+              : {}),
           },
           signal: controller.signal,
         });
