@@ -340,6 +340,11 @@ body {
   animation: mic-pulse 1.2s ease-in-out infinite;
 }
 
+/* Shown (clickable, explanatory tooltip) when the Web Speech API is missing. */
+.mic-btn.unsupported {
+  opacity: 0.55;
+}
+
 @keyframes mic-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }

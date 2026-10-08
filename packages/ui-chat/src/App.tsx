@@ -92,7 +92,11 @@ export function App(): JSX.Element {
           dispatch({ kind: 'turn-state', activeTurn: m.activeTurn });
           break;
         case 'sunday/voice/config':
-          setVoiceConfig({ inputEnabled: !!m.inputEnabled, outputEnabled: !!m.outputEnabled });
+          setVoiceConfig({
+            inputEnabled: !!m.inputEnabled,
+            outputEnabled: !!m.outputEnabled,
+            language: typeof m.language === 'string' && m.language ? m.language : 'en-US',
+          });
           break;
       }
     };
@@ -145,7 +149,12 @@ export function App(): JSX.Element {
       {state.error && <div className="conn-error" role="alert">{state.error}</div>}
       <MessageList messages={state.messages} />
       <div className="composer-row">
-        <Composer onSend={send} disabled={false} voiceInputEnabled={voiceConfig.inputEnabled} />
+        <Composer
+          onSend={send}
+          disabled={false}
+          voiceInputEnabled={voiceConfig.inputEnabled}
+          voiceLanguage={voiceConfig.language}
+        />
         <StopButton visible={busy} onStop={() => postToExtension({ type: 'sunday/chat/cancel' })} />
       </div>
     </div>

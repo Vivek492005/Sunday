@@ -21,10 +21,16 @@ is **experimental and off by default**.
 
 - Voice input needs Chrome/Edge (the only browsers shipping
   `SpeechRecognition`/`webkitSpeechRecognition`) **and** microphone permission.
-  Firefox/Safari show no mic button.
+  When the API is missing, the mic button is still shown with a
+  "Voice input not supported in this browser" tooltip; clicking it shows an
+  info message instead of failing silently.
+- Recognition is non-continuous with live interim transcripts: one utterance
+  per mic toggle.
+- The recognition language is `sunday.voice.language` (BCP 47 tag, default
+  `en-US`); malformed tags fall back to `en-US`.
 - Voice output needs `speechSynthesis` (all modern browsers).
-- When the APIs are unavailable, the UI degrades gracefully: no mic button,
-  no TTS toggle, no errors.
+- When the APIs are unavailable, the UI degrades gracefully: no TTS toggle,
+  no errors.
 
 ## Disabling
 

@@ -227,7 +227,37 @@ describe('stripForSpeech', () => {
 });
 
 describe('voice config defaults', () => {
-  it('both voice features default to off', () => {
-    expect(VOICE_CONFIG_DEFAULTS).toEqual({ inputEnabled: false, outputEnabled: false });
+  it('both voice features default to off, language to en-US', () => {
+    expect(VOICE_CONFIG_DEFAULTS).toEqual({
+      inputEnabled: false,
+      outputEnabled: false,
+      language: 'en-US',
+    });
+  });
+});
+
+describe('recognizer options (Group D spec)', () => {
+  it('uses interim results, non-continuous recognition', () => {
+    const { ctor, instances } = makeFakeCtor();
+    const r = new VoiceRecognizer(ctor, cb());
+    expect(r.start()).toBe(true);
+    const rec = instances[0] as SpeechRecognitionLike;
+    expect(rec.interimResults).toBe(true);
+    expect(rec.continuous).toBe(false);
+    expect(rec.maxAlternatives).toBe(1);
+  });
+
+  it('defaults the recognition language to en-US', () => {
+    const { ctor, instances } = makeFakeCtor();
+    const r = new VoiceRecognizer(ctor, cb());
+    r.start();
+    expect((instances[0] as SpeechRecognitionLike).lang).toBe('en-US');
+  });
+
+  it('honors an explicit language tag', () => {
+    const { ctor, instances } = makeFakeCtor();
+    const r = new VoiceRecognizer(ctor, cb());
+    r.start('hi-IN');
+    expect((instances[0] as SpeechRecognitionLike).lang).toBe('hi-IN');
   });
 });

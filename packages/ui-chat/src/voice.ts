@@ -100,7 +100,10 @@ export class VoiceRecognizer {
       rec.lang = lang;
       rec.interimResults = true;
       rec.maxAlternatives = 1;
-      rec.continuous = true;
+      // Group D: non-continuous. One utterance per toggle — the mic button
+      // stays the explicit on/off switch, and interim results still give a
+      // live transcript while speaking.
+      rec.continuous = false;
       rec.onresult = (e) => {
         let interim = '';
         let fin = '';
@@ -238,6 +241,12 @@ export function stripForSpeech(text: string): string {
 export interface VoiceConfig {
   inputEnabled: boolean;
   outputEnabled: boolean;
+  /** BCP 47 language tag for SpeechRecognition.lang (set by the extension host). */
+  language: string;
 }
 
-export const VOICE_CONFIG_DEFAULTS: VoiceConfig = { inputEnabled: false, outputEnabled: false };
+export const VOICE_CONFIG_DEFAULTS: VoiceConfig = {
+  inputEnabled: false,
+  outputEnabled: false,
+  language: 'en-US',
+};

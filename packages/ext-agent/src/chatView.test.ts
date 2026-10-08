@@ -15,6 +15,9 @@ vi.mock('vscode', () => ({
       get: (_key: string, def: unknown) => def,
     }),
   },
+  window: {
+    showInformationMessage: vi.fn(),
+  },
 }));
 
 import { ChatViewProvider, resolveChatDistDir } from './chatView.js';
@@ -134,6 +137,19 @@ describe('ChatViewProvider', () => {
     expect(voiceMsg).toMatchObject({ type: 'sunday/voice/config' });
     expect(typeof voiceMsg.inputEnabled).toBe('boolean');
     expect(typeof voiceMsg.outputEnabled).toBe('boolean');
+    expect(voiceMsg.language).toBe('en-US');
+    provider.dispose();
+  });
+
+  it("shows an info message for 'sunday/voice/unsupported' (graceful fallback, no crash)", async () => {
+    const vscode = await import('vscode');
+    const { provider } = makeProvider(bridge, extensionPath);
+    const { view, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/voice/unsupported' });
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledTimes(1);
+    const msg = (vscode.window.showInformationMessage as any).mock.calls[0][0];
+    expect(msg).toContain('not supported');
     provider.dispose();
   });
 

@@ -12,6 +12,10 @@ import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
 import type { ChatEventNotification, ChatEventRelay } from '@sunday/protocol';
 import { composeChatMessage, type ImageAttachment } from './mentions.js';
+import {
+  buildVoiceConfigMessage,
+  VOICE_UNSUPPORTED_MESSAGE,
+} from './voice.js';
 
 export const CHAT_VIEW_TYPE = 'sunday.chatView';
 
@@ -93,11 +97,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Read sunday.voice.* config and push it to the webview. */
   private postVoiceConfig(): void {
     const cfg = vscode.workspace.getConfiguration('sunday');
-    this.post({
-      type: 'sunday/voice/config',
-      inputEnabled: cfg.get<boolean>('voice.inputEnabled', false),
-      outputEnabled: cfg.get<boolean>('voice.outputEnabled', false),
-    });
+    this.post(buildVoiceConfigMessage(cfg));
   }
 
   /** Re-subscribe when the bridge instance changes (sidecar restart/crash). */
@@ -167,6 +167,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'sunday/models/get':
           await this.handleModelsGet();
+          break;
+        case 'sunday/voice/unsupported':
+          // The chat webview's mic button is shown (with an explanatory
+          // tooltip) even when the Web Speech API is missing; clicking it
+          // reports here so the user gets a native info message instead of
+          // a dead button or a crash.
+          void vscode.window.showInformationMessage(VOICE_UNSUPPORTED_MESSAGE);
           break;
         default:
           this.deps.log(`chat view: ignoring unknown message type "${m.type}"`);

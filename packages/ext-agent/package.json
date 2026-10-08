@@ -168,6 +168,11 @@
           "default": false,
           "description": "Experimental: speak agent responses aloud via the browser speechSynthesis API (on-device). Default off."
         },
+        "sunday.voice.language": {
+          "type": "string",
+          "default": "en-US",
+          "description": "BCP 47 language tag for voice dictation (Web Speech API), e.g. en-US, hi-IN. Default en-US."
+        },
         "sunday.orchestration.parallel": {
           "default": false,
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 \u2014 stays off until the parallel benchmark passes.",

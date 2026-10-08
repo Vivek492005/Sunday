@@ -54,7 +54,7 @@ export type InboundMessage =
   | ({ type: 'sunday/chat/event' } & ChatEventNotificationWire)
   | { type: 'sunday/models/list'; models: ModelView[] }
   | { type: 'sunday/chat/state'; activeTurn: string | null }
-  | { type: 'sunday/voice/config'; inputEnabled: boolean; outputEnabled: boolean };
+  | { type: 'sunday/voice/config'; inputEnabled: boolean; outputEnabled: boolean; language: string };
 
 /** Webview → extension. */
 export type OutboundMessage =
@@ -67,7 +67,10 @@ export type OutboundMessage =
       images?: ImageWire[];
     }
   | { type: 'sunday/chat/cancel' }
-  | { type: 'sunday/models/get' };
+  | { type: 'sunday/models/get' }
+  /** Sent when the user clicks the mic button while the Web Speech API is
+   *  missing — the extension host answers with a native info message. */
+  | { type: 'sunday/voice/unsupported' };
 
 // -- view state ---------------------------------------------------------------
 

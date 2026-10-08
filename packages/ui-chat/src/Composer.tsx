@@ -15,12 +15,16 @@ import {
   type ImageWire,
 } from './images.js';
 import { MentionPopup } from './MentionPopup.js';
+import { postToExtension } from './vscode.js';
 import {
   VoiceRecognizer,
   getSpeechRecognitionCtor,
   isSpeechRecognitionSupported,
   type VoiceInputState,
 } from './voice.js';
+
+/** Tooltip on the mic button when the Web Speech API is unavailable. */
+export const VOICE_UNSUPPORTED_TOOLTIP = 'Voice input not supported in this browser';
 
 interface KeyEvent {
   key: string;
@@ -37,12 +41,15 @@ export function Composer({
   onSend,
   disabled,
   voiceInputEnabled = false,
+  voiceLanguage = 'en-US',
 }: {
   /** Text plus image attachments (data: URLs) from pastes. */
   onSend: (text: string, images: ImageWire[]) => void;
   disabled: boolean;
   /** Show the microphone button (Web Speech API). Default off. */
   voiceInputEnabled?: boolean;
+  /** BCP 47 language tag for SpeechRecognition.lang. Default en-US. */
+  voiceLanguage?: string;
 }): JSX.Element {
   const [text, setText] = useState('');
   const [images, setImages] = useState<AttachedImage[]>([]);
@@ -56,7 +63,12 @@ export function Composer({
   const voiceSupported = voiceInputEnabled && isSpeechRecognitionSupported();
 
   const toggleVoice = (): void => {
-    if (!voiceSupported) return;
+    if (!voiceSupported) {
+      // The button stays visible with an explanatory tooltip even when the
+      // API is missing; the extension host shows a native info message.
+      postToExtension({ type: 'sunday/voice/unsupported' });
+      return;
+    }
     if (recognizerRef.current?.state === 'listening') {
       recognizerRef.current.stop();
       return;
@@ -82,7 +94,7 @@ export function Composer({
       },
     });
     recognizerRef.current = rec;
-    if (rec.start()) setVoiceState('listening');
+    if (rec.start(voiceLanguage)) setVoiceState('listening');
     else setVoiceState('error');
   };
 
@@ -249,17 +261,27 @@ export function Composer({
       >
         ↑
       </button>
-      {voiceSupported && (
+      {voiceInputEnabled && (
         <button
           type="button"
-          className={`mic-btn${voiceState === 'listening' ? ' listening' : ''}`}
+          className={`mic-btn${voiceState === 'listening' ? ' listening' : ''}${
+            voiceSupported ? '' : ' unsupported'
+          }`}
           onClick={toggleVoice}
           disabled={disabled}
-          aria-label={voiceState === 'listening' ? 'Stop voice input' : 'Start voice input'}
+          aria-label={
+            voiceSupported
+              ? voiceState === 'listening'
+                ? 'Stop voice input'
+                : 'Start voice input'
+              : 'Voice input unavailable'
+          }
           title={
-            voiceState === 'listening'
-              ? 'Stop listening'
-              : 'Dictate with your microphone (processed on-device by your browser)'
+            voiceSupported
+              ? voiceState === 'listening'
+                ? 'Stop listening'
+                : 'Dictate with your microphone (processed on-device by your browser)'
+              : VOICE_UNSUPPORTED_TOOLTIP
           }
         >
           {voiceState === 'listening' ? '⏹' : '🎤'}
