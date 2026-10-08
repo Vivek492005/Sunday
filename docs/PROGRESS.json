@@ -58,7 +58,7 @@
       "name": "Hosted Gateway Live",
       "percent": 100,
       "status": "done",
-      "detail": "sunday-final-ide.onrender.com live, 200 req/day free tier, Google OAuth published"
+      "detail": "sunday-final-ide.onrender.com live, 200 req/day free tier, Google OAuth published; admin gateway: /admin/login allowlist, role=admin JWT, bypasses switch-limit+quota (b432119c)"
     },
     {
       "name": "Phase 9.a/9.b (Accounts)",
@@ -85,5 +85,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-08T12:13:27+00:00"
+  "updated": "2026-10-08T19:09:20+00:00"
 }
