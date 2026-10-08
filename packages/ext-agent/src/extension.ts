@@ -56,6 +56,7 @@ import {
   GOOGLE_AUTH_EXTENSION_ID,
   GOOGLE_SIGN_OUT_COMMAND,
 } from './accountView.js';
+import { registerGitHubCommands } from './githubRepos.js';
 import {
   createEntitlementsCache,
   sourceLabel,
@@ -820,6 +821,11 @@ export async function activate(
       onSignedOut: () => entitlements.notifySignedOut(),
     }),
   );
+
+  // -- GitHub: sign-in + one-click repo import ----------------------------------
+  // Uses the built-in `github` auth provider (Device Flow); no Sunday-specific
+  // OAuth app needed. See githubRepos.ts for the conflict rationale.
+  context.subscriptions.push(registerGitHubCommands(context, { log }));
 
   // -- A1: cloud async tasks ---------------------------------------------------
   // Submit/list commands + 30s completion polling (silent unless enabled).

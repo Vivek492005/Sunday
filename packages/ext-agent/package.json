@@ -118,6 +118,21 @@
         "category": "Sunday"
       },
       {
+        "command": "sunday.github.signIn",
+        "title": "Sign in with GitHub",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.github.signOut",
+        "title": "Sign out of GitHub",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.github.cloneRepo",
+        "title": "Clone GitHub Repository…",
+        "category": "Sunday"
+      },
+      {
         "category": "Sunday",
         "command": "sunday.cloudTask.submit",
         "title": "Submit Cloud Task\u2026"
