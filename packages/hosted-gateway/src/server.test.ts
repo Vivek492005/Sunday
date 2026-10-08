@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ProviderRegistry,
   Router,
@@ -47,8 +51,12 @@ interface Started {
 async function start(
   config: HostedGatewayConfig,
   mocked?: { router: Router; registry: ProviderRegistry },
+  dataDir?: string,
 ): Promise<Started> {
-  const server = new HostedGatewayServer(config, mocked ?? {});
+  const server = new HostedGatewayServer(config, {
+    ...(mocked ?? {}),
+    ...(dataDir ? { dataDir } : {}),
+  });
   await server.listen();
   const a = server.address();
   return { server, base: `http://${a.host}:${a.port}` };
@@ -80,11 +88,28 @@ async function req(
 
 describe('HostedGatewayServer', () => {
   let started: Started | undefined;
+  // A1: isolated task-store dirs (the default data dir is shared otherwise).
+  const tmpDirs: string[] = [];
 
   afterEach(async () => {
     await started?.server.close();
     started = undefined;
+    for (const d of tmpDirs.splice(0)) rmSync(d, { recursive: true, force: true });
   });
+
+  /** Start a server whose agent-task store lives in a fresh tmp dir. */
+  async function startIsolated(
+    config: HostedGatewayConfig,
+    mocked?: { router: Router; registry: ProviderRegistry },
+  ): Promise<Started> {
+    const dataDir = mkdtempSync(join(tmpdir(), 'sunday-gw-agent-tasks-'));
+    tmpDirs.push(dataDir);
+    // The gateway requires data/plans.json (entitlements); seed it from
+    // the repo's real plans file.
+    const here = dirname(fileURLToPath(import.meta.url));
+    copyFileSync(join(here, '..', 'data', 'plans.json'), join(dataDir, 'plans.json'));
+    return start(config, mocked, dataDir);
+  }
 
   it('serves /health without auth', async () => {
     started = await start(baseConfig());
@@ -220,6 +245,94 @@ describe('HostedGatewayServer', () => {
     started = await start(baseConfig({ ipAllowlist: ['10.99.99.99'] }));
     const r = await req(started.base, '/health');
     expect(r.status).toBe(403);
+  });
+
+  // A1: async agent tasks -------------------------------------------------------
+  it('requires auth for /agent/tasks', async () => {
+    started = await startIsolated(baseConfig());
+    expect((await req(started.base, '/agent/tasks')).status).toBe(401);
+    expect((await req(started.base, '/agent/tasks', { key: 'wrong' })).status).toBe(401);
+    const r = await req(started.base, '/agent/tasks', { key: KEY });
+    expect(r.status).toBe(200);
+    expect((r.json as { tasks: unknown[] }).tasks).toEqual([]);
+  });
+
+  it('runs the task lifecycle create \u2192 claim \u2192 complete over HTTP', async () => {
+    started = await startIsolated(baseConfig(), mockRouter());
+    const base = started.base;
+
+    const created = await req(base, '/agent/tasks', {
+      method: 'POST',
+      key: KEY,
+      body: { prompt: 'summarize the repo', repo_context: 'sunday' },
+    });
+    expect(created.status).toBe(201);
+    const task = (created.json as { task: { id: string; status: string } }).task;
+    expect(task.status).toBe('queued');
+    expect(created.json).not.toHaveProperty('userId');
+
+    const listed = await req(base, '/agent/tasks', { key: KEY });
+    expect((listed.json as { tasks: Array<{ id: string }> }).tasks.map((t) => t.id)).toEqual([task.id]);
+
+    const fetched = await req(base, `/agent/tasks/${task.id}`, { key: KEY });
+    expect(fetched.status).toBe(200);
+    expect((fetched.json as { task: { status: string } }).task.status).toBe('queued');
+
+    const claimed = await req(base, `/agent/tasks/${task.id}/claim`, { method: 'POST', key: KEY });
+    expect(claimed.status).toBe(200);
+    expect((claimed.json as { task: { status: string } }).task.status).toBe('claimed');
+
+    // Double-claim is a conflict, not a silent re-claim.
+    const claimed2 = await req(base, `/agent/tasks/${task.id}/claim`, { method: 'POST', key: KEY });
+    expect(claimed2.status).toBe(409);
+
+    const done = await req(base, `/agent/tasks/${task.id}/result`, {
+      method: 'POST',
+      key: KEY,
+      body: { result: 'done: 12 files summarized' },
+    });
+    expect(done.status).toBe(200);
+    const final = (done.json as { task: { status: string; result: string } }).task;
+    expect(final.status).toBe('completed');
+    expect(final.result).toBe('done: 12 files summarized');
+  });
+
+  it('rejects invalid task payloads with 400', async () => {
+    started = await startIsolated(baseConfig(), mockRouter());
+    const base = started.base;
+    expect(
+      (await req(base, '/agent/tasks', { method: 'POST', key: KEY, body: {} })).status,
+    ).toBe(400);
+    expect(
+      (await req(base, '/agent/tasks', { method: 'POST', key: KEY, body: { prompt: '  ' } })).status,
+    ).toBe(400);
+    expect(
+      (
+        await req(base, '/agent/tasks/task_x/result', {
+          method: 'POST',
+          key: KEY,
+          body: { nope: 1 },
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it('returns 404 for unknown task ids and isolates tasks per key', async () => {
+    started = await startIsolated(baseConfig({ keys: [{ id: 'a', secret: 'key-a' }, { id: 'b', secret: 'key-b' }] }), mockRouter());
+    const base = started.base;
+    const created = await req(base, '/agent/tasks', {
+      method: 'POST',
+      key: 'key-a',
+      body: { prompt: 'private' },
+    });
+    const id = (created.json as { task: { id: string } }).task.id;
+    // Other identity sees nothing.
+    expect((await req(base, `/agent/tasks/${id}`, { key: 'key-b' })).status).toBe(404);
+    expect(
+      (await req(base, `/agent/tasks/${id}/claim`, { method: 'POST', key: 'key-b' })).status,
+    ).toBe(409);
+    expect(((await req(base, '/agent/tasks', { key: 'key-b' })).json as { tasks: unknown[] }).tasks).toEqual([]);
+    expect((await req(base, '/agent/tasks/task_missing', { key: 'key-a' })).status).toBe(404);
   });
 });
 

@@ -725,10 +725,6 @@ export async function activate(
   // NodeJS.Timeout has unref in the extension host; guard for test envs.
   (entitlementsTimer as unknown as { unref?: () => void }).unref?.();
 
-  // -- A1: cloud async tasks ---------------------------------------------------
-  // Submit/list commands + 30s completion polling (silent unless enabled).
-  registerCloudTaskCommands(context, defaultCloudTaskDeps(log));
-
   // -- Sunday auto-update ------------------------------------------------------
   // Checks the hosted gateway for new IDE releases. Manual via the
   // `sunday.checkForUpdates` command (Help menu); automatic once per

@@ -37,6 +37,7 @@ import { workspaceSecrets } from './workspace-secrets.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
+import { CloudTaskRunner } from './task-runner.js';
 import { buildSessionSystemPrompt } from './system-prompt.js';
 import { CompletionOrchestrator } from './completion.js';
 
@@ -176,6 +177,13 @@ export interface DaemonOptions {
    * workspace's trust verdict at construction). Defaults to no-op.
    */
   onWorkspaceTrustChanged?: (workspaceRoot: string) => void;
+  /**
+   * A1: cloud async tasks. When enabled, the daemon polls the hosted
+   * gateway for queued agent tasks and executes them in the background.
+   * Default: env `SUNDAY_CLOUD_TASKS_ENABLED=1` enables; the gateway URL
+   * defaults to `SUNDAY_API_URL` (stamped by the extension).
+   */
+  cloudTasks?: { enabled?: boolean; gatewayUrl?: string };
 }
 
 function publicSession(s: StoredSession): Session {
@@ -223,6 +231,8 @@ export class SundayDaemon {
   private readonly sandbox: SandboxConfig;
   /** Phase 2: context — injected `context/*` handlers (see DaemonOptions). */
   private readonly contextHandlers: DaemonContextHandlers | undefined;
+  /** A1: background poller for cloud async tasks (no-op unless enabled). */
+  private readonly cloudTaskRunner: CloudTaskRunner;
   /** Phase 4: dynamically registered method handlers (manager methods).
    *  Wired via `registerManagerMethods(daemon)` in manager.ts. */
   private readonly extraHandlers = new Map<string, (params: unknown) => Promise<unknown>>();
@@ -316,6 +326,24 @@ export class SundayDaemon {
     // S3: per-boot token. The spawning extension stamps SUNDAY_DAEMON_BOOT_TOKEN;
     // standalone/CLI boots get a fresh random token (fail-closed: unknown to callers).
     this.bootToken = opts.bootToken ?? process.env[DAEMON_BOOT_TOKEN_ENV] ?? randomUUID();
+
+    // A1: cloud async tasks — background poll loop. Disabled by default
+    // (`sunday.cloudTasks.enabled`); the poller is a pure no-op until then.
+    this.cloudTaskRunner = new CloudTaskRunner({
+      gatewayUrl:
+        opts.cloudTasks?.gatewayUrl ??
+        (process.env.SUNDAY_API_URL?.trim() || 'https://sunday-final-ide.onrender.com'),
+      // Sunday hosted credential (IDE sign-in token), stamped by the
+      // extension into SUNDAY_API_TOKEN via daemon/configure. Never logged.
+      authToken: () => process.env.SUNDAY_API_TOKEN?.trim() || undefined,
+      enabled: () =>
+        opts.cloudTasks?.enabled ?? process.env.SUNDAY_CLOUD_TASKS_ENABLED === '1',
+      execute: (prompt) => this.runBackgroundPrompt(prompt),
+      onTaskFinished: (t) =>
+        this.transport.notify('cloudtask/event', { taskId: t.id, status: t.status }),
+      log: (m) => console.error(`[sundayd] ${m}`),
+    });
+    this.cloudTaskRunner.start();
   }
 
   async start(): Promise<void> {
@@ -456,9 +484,35 @@ export class SundayDaemon {
       await Promise.allSettled([...this.pendingPersists]);
       // Phase 6: stop the browser child (no-op when never started).
       await this.browserdManager?.stop().catch(() => undefined);
+      // A1: stop the cloud-task poll loop.
+      this.cloudTaskRunner.stop();
     } finally {
       this.onShutdown();
     }
+  }
+
+  /**
+   * A1: execute one background prompt through the agent pipeline (used by
+   * the cloud task runner and the task scheduler). Runs an ephemeral
+   * sub-agent turn and returns the streamed assistant text. Tool approvals
+   * flow through the shared PolicyGate like any sub-agent turn.
+   */
+  private async runBackgroundPrompt(prompt: string): Promise<string> {
+    let out = '';
+    await this.runSubAgent({
+      title: 'background task',
+      cwd: process.cwd(),
+      systemPrompt:
+        'You are Sunday, an autonomous coding assistant executing a background task. ' +
+        'Complete the task using the available tools and finish with a concise summary of what was done.',
+      prompt,
+      tools: this.tools,
+      maxIterations: 25,
+      onEvent: (event) => {
+        if (event.type === 'text-delta') out += event.delta;
+      },
+    });
+    return out.trim() || '(task completed with no text output)';
   }
 
   private async dispatch(req: JsonRpcRequest): Promise<unknown> {
