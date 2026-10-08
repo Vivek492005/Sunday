@@ -22,8 +22,11 @@ describeWin('SEC-12: session file permissions', () => {
     await store.persist(s);
 
     const dirMode = (await stat(sdir)).mode & 0o777;
-    expect(dirMode).toBe(0o700);
     const fileMode = (await stat(join(sdir, `${s.id}.json`))).mode & 0o777;
-    expect(fileMode).toBe(0o600);
+    // Unix permission bits not supported on Windows.
+    if (process.platform !== 'win32') {
+      expect(dirMode).toBe(0o700);
+      expect(fileMode).toBe(0o600);
+    }
   });
 });

@@ -125,7 +125,10 @@ describe('persistence', () => {
     const t = a.create('user-1', 'persist me');
     const file = join(dir, 'agent-tasks.json');
     expect(existsSync(file)).toBe(true);
-    expect(statSync(file).mode & 0o777).toBe(0o600);
+    // Unix permission bits not supported on Windows.
+    if (process.platform !== 'win32') {
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+    }
 
     const b = new AgentTaskStore(dir);
     expect(b.get('user-1', t.id)?.prompt).toBe('persist me');

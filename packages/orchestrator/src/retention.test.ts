@@ -41,7 +41,10 @@ describe('FileOrchestrationStateStore.sweepExpired', () => {
     await store.init();
     await store.save(makeRun('perm-run') as any);
     const st = statSync(join(dir, 'perm-run.json'));
-    expect(st.mode & 0o777).toBe(0o600);
+    // Unix permission bits not supported on Windows.
+    if (process.platform !== 'win32') {
+      expect(st.mode & 0o777).toBe(0o600);
+    }
   });
 
   it('creates dir with 0700 permissions', async () => {
@@ -49,6 +52,9 @@ describe('FileOrchestrationStateStore.sweepExpired', () => {
     const store = new FileOrchestrationStateStore(dir);
     await store.init();
     const st = statSync(dir);
-    expect(st.mode & 0o777).toBe(0o700);
+    // Unix permission bits not supported on Windows.
+    if (process.platform !== 'win32') {
+      expect(st.mode & 0o777).toBe(0o700);
+    }
   });
 });

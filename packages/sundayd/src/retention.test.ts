@@ -102,6 +102,9 @@ describe('session file permissions (P1-3)', () => {
     const s = store.create({});
     await store.persist(s);
     const fileStat = statSync(join(dir, `${s.id}.json`));
-    expect(fileStat.mode & 0o777).toBe(0o600);
+    // Unix permission bits not supported on Windows.
+    if (process.platform !== 'win32') {
+      expect(fileStat.mode & 0o777).toBe(0o600);
+    }
   });
 });

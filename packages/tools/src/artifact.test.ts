@@ -65,7 +65,10 @@ describe('createArtifactFile', () => {
       expect(r.bytes).toBe(5);
       expect(existsSync(r.path)).toBe(true);
       expect(readFileSync(r.path, 'utf8')).toBe('hello');
-      expect(statSync(r.path).mode & 0o777).toBe(0o600);
+      // Unix permission bits are not supported on Windows (mode is always 0o666).
+      if (process.platform !== 'win32') {
+        expect(statSync(r.path).mode & 0o777).toBe(0o600);
+      }
     }
   });
 

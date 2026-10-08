@@ -56,7 +56,10 @@ describe('SyncStore', () => {
     const { store, cleanup } = tmpStore();
     try {
       store.save('u1', 'blob', 't');
-      expect(store.modeFor('u1')).toBe(0o600);
+      // Unix permission bits not supported on Windows.
+      if (process.platform !== 'win32') {
+        expect(store.modeFor('u1')).toBe(0o600);
+      }
     } finally {
       cleanup();
     }

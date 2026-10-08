@@ -233,10 +233,12 @@ describe('accounts endpoints', () => {
     expect(r2.status).toBe(200);
     expect((r2.json as { user: { id: string } }).user.id).toBe(j.user.id);
 
-    // Files exist, are 0600, and contain no raw tokens.
+    // Files exist, are 0600 (Unix only — Windows has no permission bits), and contain no raw tokens.
     for (const name of ['users.json', 'sessions.json']) {
       const p = join(started.dataDir, name);
-      expect(statSync(p).mode & 0o777).toBe(0o600);
+      if (process.platform !== 'win32') {
+        expect(statSync(p).mode & 0o777).toBe(0o600);
+      }
       const raw = readFileSync(p, 'utf8');
       expect(raw).not.toContain(j.refresh_token);
     }

@@ -7,3 +7,6 @@ vscode/extensions/sunday-agent/
 
 # Sunday hosted gateway runtime data (users/sessions JSON — never commit)
 packages/hosted-gateway/data/
+
+# Copilot extension test simulation cache (test artifacts — never commit)
+vscode/extensions/copilot/test/simulation/cache/
