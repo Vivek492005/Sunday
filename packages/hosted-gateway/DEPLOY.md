@@ -24,6 +24,7 @@ Sunday IDE → GitHub sign-in → OAuth token → sundayd → api.sunday.dev →
    SUNDAY_HOSTED_SOCIAL_AUTH=1
    SUNDAY_HOSTED_DAILY_QUOTA=200
    SUNDAY_HOSTED_HOST=0.0.0.0
+   SUNDAY_SESSION_SECRET=<generate: openssl rand -base64 48>
    ```
 5. **Deploy** → Railway gives you a URL like `https://sunday-api.up.railway.app`
 6. **Point the IDE at it**: set the default API URL

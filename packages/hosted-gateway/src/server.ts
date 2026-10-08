@@ -4,7 +4,10 @@
  * Middleware order per request:
  *   1. IP allowlist (403 when the operator configured one and the IP misses)
  *   2. Body read with a hard byte cap (413 on overflow)
- *   3. API key auth — Bearer, constant-time (401; skipped for /health)
+ *   3. API key auth — Bearer, constant-time (401; skipped for /health and
+ *      /auth/*); social OAuth, then gateway API key, then Sunday session
+ *      JWT (9.a) as a fallback that never breaks the earlier modes
+ *   3b. /auth/* strict per-IP rate limit (20 req/min, 429 + Retry-After)
  *   4. Request validation (400 on malformed / tools / disallowed model)
  *   5. Per-key token-bucket rate limit (429 + Retry-After)
  *   6. Upstream provider call (timeout + client-disconnect abort)

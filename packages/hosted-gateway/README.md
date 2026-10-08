@@ -84,6 +84,7 @@ file (`SUNDAY_HOSTED_CONFIG`, `{"keys":[{"id":"alice","secret":"…"}]}`).
 | `SUNDAY_HOSTED_ALLOWLIST` | — | IP/CIDR allowlist |
 | `SUNDAY_HOSTED_AUDIT_LOG` | `stdout` | Audit log file or `stdout` |
 | `SUNDAY_HOSTED_UPSTREAM_TIMEOUT_MS` | `120000` | Provider call timeout |
+| `SUNDAY_SESSION_SECRET` | *(required)* | HS256 secret for Sunday session JWTs (Phase 9.a); generate with `openssl rand -base64 48` |
 
 ## Security notes for operators
 

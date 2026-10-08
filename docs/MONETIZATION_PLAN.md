@@ -654,6 +654,18 @@ product is stable enough to support paying users — see Open Question #1.*
 sign back in; session survives an app restart; works identically whether or not the backend is reachable for
 every *other* Sunday feature (local-first guarantee, ADR-20).
 
+> **9.a implementation note (2026-10-08, hosted-gateway).** The Accounts
+> service is implemented in `packages/hosted-gateway/src/accounts.ts`:
+> Google token → session JWT (1h, HS256) + rotating refresh token (30d),
+> `data/users.json` + `data/sessions.json` JSON files (0600 in a 0700 dir,
+> atomic tmp+rename writes), and `GET /me/entitlements` returning the Basic
+> plan. JSON-file storage is a deliberate no-billing-phase stopgap.
+> **Billing (9.c) REQUIRES Postgres** — flat files are not safe under
+> concurrent writers (lost updates on refresh-token rotation, no
+> idempotency ledger for webhook events) and must be replaced before any
+> money flows. Render's free tier ships no managed Postgres, so the
+> database move is scheduled with the 9.c billing work.
+
 **9.b — Entitlements and gating (still no real payments).**
 5. `plans`/`entitlements` tables, seeded with Basic/Smart/Pro templates (§3, §9.2).
 6. `GET /me/entitlements`; client-side caching and the grace-window fallback (§5.4).

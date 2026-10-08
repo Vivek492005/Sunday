@@ -28,6 +28,7 @@ function baseConfig(overrides: Partial<HostedGatewayConfig> = {}): HostedGateway
     socialAuth: false,
     oauthProviders: ['github', 'google', 'microsoft'],
     dailyQuota: 200,
+    sessionSecret: 'test-session-secret-not-for-production',
     ...overrides,
   };
 }
@@ -236,7 +237,11 @@ describe('config loading', () => {
 
   it('parses id:secret pairs and bare secrets', async () => {
     const { loadConfig } = await import('./config.js');
-    const c = loadConfig({ ...process.env, SUNDAY_HOSTED_KEYS: 'alice:s1,bare2' });
+    const c = loadConfig({
+      ...process.env,
+      SUNDAY_HOSTED_KEYS: 'alice:s1,bare2',
+      SUNDAY_SESSION_SECRET: 's3cret-for-tests',
+    });
     expect(c.keys).toEqual([
       { id: 'alice', secret: 's1' },
       { id: 'key-2', secret: 'bare2' },

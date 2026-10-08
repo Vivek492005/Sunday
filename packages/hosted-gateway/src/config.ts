@@ -59,6 +59,12 @@ export interface HostedGatewayConfig {
   oauthProviders: Array<'github' | 'google' | 'microsoft'>;
   /** Free-tier requests per GitHub user per UTC day. Env: SUNDAY_HOSTED_DAILY_QUOTA */
   dailyQuota: number;
+  /**
+   * HS256 secret for signing Sunday session JWTs (Phase 9.a accounts).
+   * Env: SUNDAY_SESSION_SECRET. Required at startup — fail fast when
+   * missing/empty. Generate with e.g. `openssl rand -base64 48`.
+   */
+  sessionSecret: string;
 }
 
 interface FileConfig {
@@ -122,6 +128,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     );
   }
 
+  // Phase 9.a: accounts are always on — fail fast without a session secret.
+  const sessionSecret = env.SUNDAY_SESSION_SECRET?.trim() ?? '';
+  if (sessionSecret.length === 0) {
+    throw new Error(
+      'no session secret configured: set SUNDAY_SESSION_SECRET to a long random value (e.g. `openssl rand -base64 48`)',
+    );
+  }
+
   return {
     port: num(env.SUNDAY_HOSTED_PORT, num(env.PORT, 8080)),
     host: env.SUNDAY_HOSTED_HOST?.trim() || '127.0.0.1',
@@ -139,5 +153,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     socialAuth,
     oauthProviders: oauthProviders.length > 0 ? oauthProviders : ['github', 'google', 'microsoft'],
     dailyQuota: num(env.SUNDAY_HOSTED_DAILY_QUOTA, 200),
+    sessionSecret,
   };
 }

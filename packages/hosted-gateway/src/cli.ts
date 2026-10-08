@@ -50,6 +50,7 @@ Environment (see README.md):
   SUNDAY_HOSTED_MODELS        model allowlist, comma-separated (default: all)
   SUNDAY_HOSTED_ALLOWLIST     IP/CIDR allowlist, comma-separated (default: none)
   SUNDAY_HOSTED_AUDIT_LOG     audit log path or "stdout" (default stdout)
+  SUNDAY_SESSION_SECRET       HS256 session-JWT secret (required)
 
 Provider keys (operator's): OPENROUTER_API_KEY, GROQ_API_KEY.`);
       process.exit(0);
