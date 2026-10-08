@@ -1,6 +1,6 @@
 # 🎮 Sunday Engagement Master Plan
 
-**Version:** 2.0 | **Date:** 2026-10-08 | **Status:** Streaks implementing
+**Version:** 3.0 | **Date:** 2026-10-08 | **Status:** Streaks implementing
 **Research:** Duolingo, LeetCode, GitHub, Codewars, Habitica
 
 ---
@@ -10,6 +10,35 @@
 > **Reward shipped work, not app opens.**
 > Commit, tests, PRs, AI tasks — yehi count hoga. Sirf IDE kholna count nahi hoga.
 > *(GitHub ne 2016 me streak counter hataya tha kyunki log fake presence dikhane lage the — ye galti nahi dohraenge.)*
+
+---
+
+## 🔇 Two-Mode Design (founder requirement — sabse important!)
+
+Engagement **kabhi** normal VS Code workflow me interfere nahi karega.
+
+### Passive Mode (sirf file read/write/edit, AI agents nahi use kar raha)
+- Sirf streak day **silently** track hogi (background me, pata bhi nahi chalega)
+- Status bar me bas `🔥 12` — ek chhota number, koi disturbance nahi
+- ❌ Koi quest prompt nahi
+- ❌ Koi XP popup nahi
+- ❌ Koi achievement toast nahi
+- ✅ Sirf ye 2 notifications (max 1/day):
+  - Streak milestone: "🎉 7-day streak! +100 bonus/day unlocked!"
+  - 8 PM at-risk: "🔥 Streak khatre me hai, thoda code kar lo"
+
+### Active Mode (AI agents use kar raha hai)
+- 🎉 Full engagement: quests, achievements, XP, celebrations
+- 🎁 Bonus rate limit unlock notifications
+- Quest progress updates, achievement toasts
+
+### Auto-Detect kaise?
+- Setting: `sunday.engagement.quietMode` (default: auto)
+- Session me **pehli AI agent use** pe active mode on ho jayega
+- Usse pehle bilkul shaant — jaise engagement system hai hi nahi
+- Streak tracking **dono modes** me chalti hai (foundation hai)
+
+> **Principle:** *Jo user sirf code edit kar raha hai, use kabhi tang mat karo. Engagement uske kaam ke aas-paas ho, uske kaam ke beech me nahi.*
 
 ---
 
