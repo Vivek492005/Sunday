@@ -108,7 +108,13 @@ describe('GET /me/usage', () => {
     const base = await startServer();
     const r = await req(base, '/me/usage', { token: sessionToken('user-1') });
     expect(r.status).toBe(200);
-    expect(r.json.today).toEqual({ requests: 0, tokens_in: 0, tokens_out: 0 });
+    expect(r.json.today).toEqual({
+      requests: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      base_requests: 0,
+      bonus_requests: 0,
+    });
     expect(r.json.by_model).toEqual([]);
     expect(r.json.history_7d).toHaveLength(7);
   });
@@ -145,5 +151,53 @@ describe('GET /me/usage', () => {
     });
     const r = await req(base, '/me/usage', { token: sessionToken('bob') });
     expect(r.json.today.requests).toBe(0);
+  });
+});
+
+describe('GET /me/usage/today', () => {
+  it('requires a valid Sunday session token', async () => {
+    const base = await startServer();
+    expect((await req(base, '/me/usage/today')).status).toBe(401);
+    expect((await req(base, '/me/usage/today', { token: 'test-secret-1' })).status).toBe(401);
+  });
+
+  it('reports base quota with no streak', async () => {
+    const base = await startServer();
+    const r = await req(base, '/me/usage/today', { token: sessionToken('u-today-1') });
+    expect(r.status).toBe(200);
+    expect(r.json.streak_days).toBe(0);
+    expect(r.json.streak_bonus).toBe(0);
+    expect(r.json.base_quota).toBe(200);
+    expect(r.json.total_quota).toBe(200);
+    expect(r.json.quota_remaining).toBe(200);
+    expect(r.json.quota_reset_after_ms).toBeGreaterThan(0);
+    expect(r.json.requests).toBe(0);
+    expect(r.json.base_requests).toBe(0);
+    expect(r.json.bonus_requests).toBe(0);
+  });
+
+  it('applies streak bonus tiers to total_quota', async () => {
+    const base = await startServer();
+    const token = sessionToken('u-today-2');
+    const seven = await req(base, '/me/usage/today?streak_days=7', { token });
+    expect(seven.json.streak_days).toBe(7);
+    expect(seven.json.streak_bonus).toBe(100);
+    expect(seven.json.total_quota).toBe(300);
+    const fourteen = await req(base, '/me/usage/today?streak_days=14', { token });
+    expect(fourteen.json.streak_bonus).toBe(200);
+    expect(fourteen.json.total_quota).toBe(400);
+    const thirty = await req(base, '/me/usage/today?streak_days=30', { token });
+    expect(thirty.json.streak_bonus).toBe(500);
+    expect(thirty.json.total_quota).toBe(700);
+  });
+
+  it('sanitizes garbage streak_days', async () => {
+    const base = await startServer();
+    const token = sessionToken('u-today-3');
+    const r = await req(base, '/me/usage/today?streak_days=banana', { token });
+    expect(r.status).toBe(200);
+    expect(r.json.streak_days).toBe(0);
+    expect(r.json.streak_bonus).toBe(0);
+    expect(r.json.total_quota).toBe(200);
   });
 });

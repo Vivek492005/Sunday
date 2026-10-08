@@ -8,14 +8,22 @@
  * per process anyway).
  */
 
+export type QuotaType = 'base' | 'streak_bonus';
+
 export interface QuotaDecision {
   allowed: boolean;
   /** Requests remaining today (0 when denied). */
   remaining: number;
   /** Ms until the quota resets (UTC midnight). */
   resetAfterMs: number;
-  /** The daily limit. */
+  /** The daily limit (base + streak bonus when applicable). */
   limit: number;
+  /**
+   * Which quota bucket the consumed (or would-be) request falls in.
+   * 'base' = within the plan's base quota, 'streak_bonus' = within the
+   * streak bonus band. Present only on tryConsumeWithBonus.
+   */
+  quotaType?: QuotaType;
 }
 
 export class DailyQuota {
@@ -40,13 +48,31 @@ export class DailyQuota {
 
   /** Record one request for a GitHub user id. */
   tryConsume(userKey: string): QuotaDecision {
+    const d = this.tryConsumeWithBonus(userKey, 0);
+    // Preserve the exact legacy shape for existing callers/tests.
+    const { quotaType: _qt, ...legacy } = d;
+    return legacy;
+  }
+
+  /**
+   * Record one request with a streak bonus applied on top of the base quota.
+   * The bonus band sits strictly above the base quota: the first
+   * `requestsPerDay` requests of the day are 'base', anything beyond (up to
+   * base + bonus) is 'streak_bonus'. Denied requests report the bucket they
+   * would have consumed.
+   */
+  tryConsumeWithBonus(userKey: string, bonus: number): QuotaDecision {
+    const extra =
+      Number.isFinite(bonus) && bonus > 0 ? Math.floor(bonus) : 0;
+    const limit = this.requestsPerDay + extra;
     const day = this.today();
     const entry = this.counts.get(userKey);
     const used = entry && entry.day === day ? entry.used : 0;
     const resetAfterMs = this.msUntilMidnightUtc();
+    const quotaType: QuotaType = used < this.requestsPerDay ? 'base' : 'streak_bonus';
 
-    if (used >= this.requestsPerDay) {
-      return { allowed: false, remaining: 0, resetAfterMs, limit: this.requestsPerDay };
+    if (used >= limit) {
+      return { allowed: false, remaining: 0, resetAfterMs, limit, quotaType };
     }
 
     this.counts.set(userKey, { day, used: used + 1 });
@@ -60,10 +86,23 @@ export class DailyQuota {
 
     return {
       allowed: true,
-      remaining: this.requestsPerDay - used - 1,
+      remaining: limit - used - 1,
       resetAfterMs,
-      limit: this.requestsPerDay,
+      limit,
+      quotaType,
     };
+  }
+
+  /** Requests consumed today (no consumption). Includes bonus-band usage. */
+  usedToday(userKey: string): number {
+    const day = this.today();
+    const entry = this.counts.get(userKey);
+    return entry && entry.day === day ? entry.used : 0;
+  }
+
+  /** Ms until the quota resets (UTC midnight). */
+  msUntilReset(): number {
+    return this.msUntilMidnightUtc();
   }
 
   /** How many requests a user has left today (no consumption). */

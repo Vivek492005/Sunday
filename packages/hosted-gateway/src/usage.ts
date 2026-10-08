@@ -13,6 +13,8 @@
  * pattern used by AccountsService (0600 files under the data dir).
  */
 
+import type { QuotaType } from './quota.js';
+
 export interface UsageDayPoint {
   day: string;
   requests: number;
@@ -25,7 +27,15 @@ export interface UsageModelPoint {
 }
 
 export interface UsageSnapshot {
-  today: { requests: number; tokens_in: number; tokens_out: number };
+  today: {
+    requests: number;
+    tokens_in: number;
+    tokens_out: number;
+    /** Requests served from the base quota (absent in older snapshots). */
+    base_requests?: number;
+    /** Requests served from the streak-bonus band. */
+    bonus_requests?: number;
+  };
   by_model: UsageModelPoint[];
   history_7d: UsageDayPoint[];
 }
@@ -34,6 +44,8 @@ interface DayBucket {
   requests: number;
   tokensIn: number;
   tokensOut: number;
+  baseRequests: number;
+  bonusRequests: number;
   models: Map<string, { requests: number; tokens: number }>;
 }
 
@@ -56,19 +68,24 @@ export class UsageMeter {
     }
     let b = perUser.get(day);
     if (!b) {
-      b = { requests: 0, tokensIn: 0, tokensOut: 0, models: new Map() };
+      b = { requests: 0, tokensIn: 0, tokensOut: 0, baseRequests: 0, bonusRequests: 0, models: new Map() };
       perUser.set(day, b);
     }
     return b;
   }
 
-  /** Record one completed chat completion for a user key. */
+  /**
+   * Record one completed chat completion for a user key.
+   * quotaType labels whether the request was served from the base quota or
+   * the streak-bonus band (metering keeps the two separate).
+   */
   record(
     userKey: string,
     model: string,
     tokensIn: number,
     tokensOut: number,
     atMs: number = Date.now(),
+    quotaType: QuotaType = 'base',
   ): void {
     if (!userKey || !model) return;
     const day = UsageMeter.dayKey(atMs);
@@ -78,6 +95,8 @@ export class UsageMeter {
     b.requests += 1;
     b.tokensIn += ti;
     b.tokensOut += to;
+    if (quotaType === 'streak_bonus') b.bonusRequests += 1;
+    else b.baseRequests += 1;
     const m = b.models.get(model) ?? { requests: 0, tokens: 0 };
     m.requests += 1;
     m.tokens += ti + to;
@@ -125,6 +144,8 @@ export class UsageMeter {
         requests: t?.requests ?? 0,
         tokens_in: t?.tokensIn ?? 0,
         tokens_out: t?.tokensOut ?? 0,
+        base_requests: t?.baseRequests ?? 0,
+        bonus_requests: t?.bonusRequests ?? 0,
       },
       by_model: [...byModel.entries()]
         .map(([model, m]) => ({ model, requests: m.requests, tokens: m.tokens }))

@@ -7,7 +7,7 @@ describe('UsageMeter', () => {
   it('returns a zeroed snapshot for unknown users (empty data)', () => {
     const m = new UsageMeter();
     const s = m.snapshot('nobody');
-    expect(s.today).toEqual({ requests: 0, tokens_in: 0, tokens_out: 0 });
+    expect(s.today).toEqual({ requests: 0, tokens_in: 0, tokens_out: 0, base_requests: 0, bonus_requests: 0 });
     expect(s.by_model).toEqual([]);
     expect(s.history_7d).toHaveLength(7);
     expect(s.history_7d.every((p) => p.requests === 0)).toBe(true);
@@ -18,7 +18,7 @@ describe('UsageMeter', () => {
     m.record('u1', 'openrouter:llama', 100, 50);
     m.record('u1', 'openrouter:llama', 200, 100);
     const s = m.snapshot('u1');
-    expect(s.today).toEqual({ requests: 2, tokens_in: 300, tokens_out: 150 });
+    expect(s.today).toEqual({ requests: 2, tokens_in: 300, tokens_out: 150, base_requests: 2, bonus_requests: 0 });
     expect(s.by_model).toEqual([{ model: 'openrouter:llama', requests: 2, tokens: 450 }]);
   });
 
@@ -67,7 +67,26 @@ describe('UsageMeter', () => {
   it('clamps negative/NaN token counts', () => {
     const m = new UsageMeter();
     m.record('u', 'm', -5, NaN);
-    expect(m.snapshot('u').today).toEqual({ requests: 1, tokens_in: 0, tokens_out: 0 });
+    expect(m.snapshot('u').today).toEqual({ requests: 1, tokens_in: 0, tokens_out: 0, base_requests: 1, bonus_requests: 0 });
+  });
+
+  it('labels base vs streak_bonus usage separately', () => {
+    const m = new UsageMeter();
+    m.record('u', 'm', 10, 10, Date.now(), 'base');
+    m.record('u', 'm', 10, 10, Date.now(), 'base');
+    m.record('u', 'm', 10, 10, Date.now(), 'streak_bonus');
+    const t = m.snapshot('u').today;
+    expect(t.requests).toBe(3);
+    expect(t.base_requests).toBe(2);
+    expect(t.bonus_requests).toBe(1);
+  });
+
+  it('defaults quotaType to base', () => {
+    const m = new UsageMeter();
+    m.record('u', 'm', 1, 1);
+    const t = m.snapshot('u').today;
+    expect(t.base_requests).toBe(1);
+    expect(t.bonus_requests).toBe(0);
   });
 
   it('prunes buckets older than the retention window', () => {

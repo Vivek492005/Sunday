@@ -236,6 +236,16 @@
         "category": "Sunday",
         "command": "sunday.skills.browse",
         "title": "Browse Community Skills"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.streak.show",
+        "title": "Streak: Show Coding Streak"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.streak.vacation",
+        "title": "Streak: Toggle Vacation Mode"
       }
     ],
     "keybindings": [
@@ -388,6 +398,26 @@
           "type": "string",
           "default": "",
           "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only — NOT for production. Never commit a real key here; prefer workspace settings over user settings."
+        },
+        "sunday.engagement.streaksEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track coding streaks and show the streak counter in the status bar."
+        },
+        "sunday.engagement.streakNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show streak milestone celebrations (7/14/30 days) and the 8 PM streak-at-risk nudge. Streak tracking itself is unaffected."
+        },
+        "sunday.engagement.quietMode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "passive",
+            "active"
+          ],
+          "default": "auto",
+          "description": "Engagement UI mode. 'auto' (default): passive until you use an AI agent feature this session, then active. 'passive': never show quest/achievement/XP prompts - streak tracking stays silent. 'active': full engagement UI. Passive mode: never interrupt a user who is just editing files."
         }
       },
       "title": "Sunday"

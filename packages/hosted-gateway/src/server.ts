@@ -32,6 +32,8 @@ import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
 import { SocialVerifier, type SocialIdentity } from './social-auth.js';
 import { DailyQuota } from './quota.js';
+import type { QuotaType } from './quota.js';
+import { getStreakBonus, parseStreakDays } from './streakBonus.js';
 import { UsageMeter } from './usage.js';
 import { MAX_SYNC_BLOB_BYTES, SyncStore } from './sync.js';
 import { UpdateChecker, type UpdatePlatform } from './updates.js';
@@ -302,6 +304,7 @@ export class HostedGatewayServer {
     let model: string | undefined;
     let promptTokensEst = 0;
     let completionTokensEst = 0;
+    let quotaType: QuotaType = 'base';
     let error: string | undefined;
 
     try {
@@ -619,6 +622,40 @@ export class HostedGatewayServer {
         return;
       }
 
+      // Engagement: today's quota with the streak bonus applied. The client
+      // reports its local streak length (?streak_days=N); the bonus band sits
+      // strictly above the base quota (v1 trusts the client; see streakBonus.ts).
+      if (method === 'GET' && path === '/me/usage/today') {
+        if (!sessionUserId) {
+          status = 401;
+          throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
+        }
+        const query = (req.url ?? '').split('?')[1] ?? '';
+        const params = new URLSearchParams(query);
+        const streakDays = parseStreakDays(params.get('streak_days'));
+        const streakBonus = getStreakBonus(streakDays);
+        const baseQuota = this.config.dailyQuota;
+        const totalQuota = baseQuota + streakBonus;
+        const userKey = `sess:${sessionUserId}`;
+        const snap = this.usage.snapshot(userKey);
+        const used = this.quota.usedToday(userKey);
+        status = 200;
+        this.sendJson(res, 200, {
+          requests: snap.today.requests,
+          tokens_in: snap.today.tokens_in,
+          tokens_out: snap.today.tokens_out,
+          base_requests: snap.today.base_requests ?? 0,
+          bonus_requests: snap.today.bonus_requests ?? 0,
+          streak_days: streakDays,
+          streak_bonus: streakBonus,
+          base_quota: baseQuota,
+          total_quota: totalQuota,
+          quota_remaining: Math.max(0, totalQuota - used),
+          quota_reset_after_ms: this.quota.msUntilReset(),
+        });
+        return;
+      }
+
       // D3: end-to-end encrypted session sync. Session-auth only. The blob
       // is stored VERBATIM — the server never decrypts it (see the security
       // contract in sync.ts). Size cap: 5 MiB.
@@ -785,9 +822,18 @@ export class HostedGatewayServer {
         // 4b. Daily free-tier quota (social-identified users only).
         // Admin sessions bypass explicitly (defense in depth — admin
         // tokens never produce a socialIdentity anyway).
+        // Streak bonus: the client reports its local streak length via the
+        // X-Sunday-Streak-Days header; the bonus band sits strictly above
+        // the base quota (v1 trusts the client; see streakBonus.ts).
         if (socialIdentity && !isAdminSession) {
-          const q = this.quota.tryConsume(socialIdentity.key);
+          const streakDays = parseStreakDays(req.headers['x-sunday-streak-days']);
+          const streakBonus = getStreakBonus(streakDays);
+          const q = this.quota.tryConsumeWithBonus(socialIdentity.key, streakBonus);
+          quotaType = q.quotaType ?? 'base';
           res.setHeader('X-Quota-Limit', String(q.limit));
+          res.setHeader('X-Quota-Base-Limit', String(this.config.dailyQuota));
+          res.setHeader('X-Quota-Streak-Bonus', String(streakBonus));
+          res.setHeader('X-Quota-Type', quotaType);
           res.setHeader('X-Quota-Remaining', String(q.remaining));
           if (!q.allowed) {
             status = 429;
@@ -796,7 +842,7 @@ export class HostedGatewayServer {
             throw new ApiError(
               429,
               'quota_exceeded',
-              `daily free-tier quota exhausted (${q.limit}/day), resets in ${Math.ceil(retrySec / 60)}m`,
+              `daily free-tier quota exhausted (${q.limit}/day${streakBonus > 0 ? ` incl. +${streakBonus} streak bonus` : ''}), resets in ${Math.ceil(retrySec / 60)}m`,
             );
           }
         }
@@ -830,7 +876,7 @@ export class HostedGatewayServer {
           if (chatReq.stream) {
             const streamedChars = await this.streamSse(res, chatReq.model, routed.stream, requestId);
             completionTokensEst = Math.max(1, Math.ceil(streamedChars / 4));
-            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst);
+            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst, quotaType);
           } else {
             const { text, finishReason } = await this.collectText(routed.stream);
             completionTokensEst = Math.max(1, Math.ceil(text.length / 4));
@@ -842,7 +888,7 @@ export class HostedGatewayServer {
               completionTokens: completionTokensEst,
               finishReason,
             }));
-            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst);
+            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst, quotaType);
           }
         } finally {
           clearTimeout(timeout);
@@ -928,9 +974,9 @@ export class HostedGatewayServer {
    * (streaming and non-streaming). Best-effort — metering must never break
    * response handling, so failures are swallowed.
    */
-  private recordUsage(userKey: string, model: string, tokensIn: number, tokensOut: number): void {
+  private recordUsage(userKey: string, model: string, tokensIn: number, tokensOut: number, quotaType: QuotaType = 'base'): void {
     try {
-      this.usage.record(userKey, model, tokensIn, tokensOut);
+      this.usage.record(userKey, model, tokensIn, tokensOut, Date.now(), quotaType);
     } catch {
       /* metering is advisory */
     }

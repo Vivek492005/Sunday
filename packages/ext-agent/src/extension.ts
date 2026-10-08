@@ -56,6 +56,7 @@ import {
   GOOGLE_AUTH_EXTENSION_ID,
   GOOGLE_SIGN_OUT_COMMAND,
 } from './accountView.js';
+import { registerStreakEngagement } from './engagement/streakView.js';
 import { registerGitHubCommands } from './githubRepos.js';
 import {
   createEntitlementsCache,
@@ -821,6 +822,13 @@ export async function activate(
       onSignedOut: () => entitlements.notifySignedOut(),
     }),
   );
+
+  // -- Engagement: coding streaks (Phase E.1) -----------------------------------
+  // Silent streak-day tracking always runs (passive mode: never interrupt a
+  // user who is just editing files). Only milestone celebrations (7/14/30d,
+  // max 1/day) and the 8 PM at-risk nudge may notify in passive mode; full
+  // quest/achievement/XP UI unlocks in active mode (after AI agent use).
+  context.subscriptions.push(registerStreakEngagement(context, { log }));
 
   // -- GitHub: sign-in + one-click repo import ----------------------------------
   // Uses the built-in `github` auth provider (Device Flow); no Sunday-specific
