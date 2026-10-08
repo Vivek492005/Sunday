@@ -134,6 +134,11 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.artifacts.open",
+        "title": "Open Artifacts Panel"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.admin.setPlan",
         "title": "Sunday Admin: Set User Plan…"
       },

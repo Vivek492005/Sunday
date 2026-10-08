@@ -9,6 +9,12 @@ export interface ToolContext {
   cwd: string;
   signal?: AbortSignal;
   /**
+   * A3: agent session id. Used by `create_artifact` to namespace output
+   * under `~/.sunday/artifacts/<session>/`. Optional — tools that don't
+   * need it ignore it; the artifact tool falls back to 'default'.
+   */
+  sessionId?: string;
+  /**
    * Sandbox execution for `run_terminal`. Stamped by sundayd from
    * `sunday.sandbox.*` (default: mode 'off' = host execution). Only
    * `run_terminal` reads this — other tools ignore it.

@@ -6,6 +6,7 @@ import { ghPrCreateTool, ghPrReviewTool } from './pr.js';
 import { runTerminalTool } from './terminal.js';
 import { searchTool } from './search.js';
 import { validateArgs } from './validate.js';
+import { createArtifactTool } from './artifact.js';
 import { err, type Tool, type ToolContext, type ToolResult } from './types.js';
 
 /** Registry: validates arguments against each tool's JSON Schema, then runs. */
@@ -72,6 +73,8 @@ export function createDefaultTools(): Tool[] {
     ghPrCreateTool,
     ghPrReviewTool,
     generateCommandTool,
+    // A3: durable user-facing artifacts (HTML/Markdown/Mermaid).
+    createArtifactTool,
   ];
 }
 

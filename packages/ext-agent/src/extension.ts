@@ -56,6 +56,7 @@ import {
 } from './entitlements/entitlementsCache.js';
 import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
 import { registerBestOfN } from './bestOfNView.js';
+import { registerArtifacts } from './artifacts/artifactsPanel.js';
 import { defaultAdminPlanDeps, registerAdminPlanCommand } from './adminPlan.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
@@ -716,6 +717,9 @@ export async function activate(
     getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     log,
   });
+
+  // -- A3: artifacts panel -----------------------------------------------------
+  registerArtifacts(context, { log });
 
   // -- Admin plan toggle (Phase 9.b, Task 8) ----------------------------------
   // Testing-only: set a user's plan on the hosted gateway (x-admin-key from

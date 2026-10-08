@@ -11,5 +11,6 @@ export * from './terminal.js';
 export * from './git.js';
 export * from './pr.js';
 export * from './gen-command.js';
+export * from './artifact.js';
 export * from './registry.js';
 export * from './scopes.js';
