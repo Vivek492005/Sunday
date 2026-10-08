@@ -17,6 +17,13 @@
         "id": "google"
       }
     ],
+    "commands": [
+      {
+        "command": "sunday.google.signOut",
+        "title": "Sign Out of Google",
+        "category": "Sunday"
+      }
+    ],
     "configuration": {
       "title": "Google Authentication",
       "properties": {
@@ -24,16 +31,25 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Google OAuth client ID for Sunday IDE sign-in. Create one at https://console.cloud.google.com/apis/credentials (Desktop app type)."
+        },
+        "sunday.account.gatewayUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Sunday hosted-gateway base URL used for Sunday session issuance (Phase 9.a). Empty = https://sunday-final-ide.onrender.com (overridable via the SUNDAY_GATEWAY_URL environment variable)."
         }
       }
     }
   },
   "scripts": {
-    "compile": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.js --external:vscode"
+    "compile": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.js --external:vscode",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "esbuild src/session.test.ts --bundle --platform=node --format=cjs --outfile=dist/test/session.test.js && node --test dist/test/session.test.js",
+    "pretest": "npm run typecheck"
   },
   "devDependencies": {
     "@types/vscode": "^1.140.0",
     "@types/node": "^20.0.0",
-    "esbuild": "^0.21.0"
+    "esbuild": "^0.21.0",
+    "typescript": "^5.6.0"
   }
 }

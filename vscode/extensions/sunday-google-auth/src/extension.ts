@@ -11,12 +11,27 @@
  *
  * Scopes: openid email profile (minimal — we only need the user identity
  * for the Sunday hosted gateway free tier).
+ *
+ * Phase 9.a: a Sunday hosted-gateway session is layered on top of Google
+ * sign-in (see `session.ts`). After the Google access token is obtained it is
+ * exchanged at POST {gateway}/auth/session for a Sunday session JWT + refresh
+ * token, kept in SecretStorage under `sunday.sessionToken` / `sunday.refreshToken`
+ * / `sunday.user`. The gateway is best-effort: Google sign-in always succeeds
+ * even when the gateway is unreachable, and `getSundaySession()` returns
+ * `undefined` in Google-only mode.
  */
 
 import * as vscode from 'vscode';
 import * as http from 'http';
 import * as crypto from 'crypto';
 import { URL, URLSearchParams } from 'url';
+import {
+  SundaySessionManager,
+  SundaySession,
+  SecretStore,
+  nodeFetch,
+  resolveGatewayUrl,
+} from './session';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -35,6 +50,18 @@ interface StoredSession {
 
 const DEFAULT_CLIENT_ID = '110112861017-vceq10n514dajcj2hakr1mulk2feop6t.apps.googleusercontent.com';
 
+let sundaySessionManager: SundaySessionManager | undefined;
+
+/**
+ * Return the current Sunday hosted-gateway session (Phase 9.a), refreshing
+ * the JWT first when it is expired. `undefined` when signed out or when the
+ * gateway session could not be established/refreshed (Google-only mode).
+ * Also exposed on the extension's exported API object for other extensions.
+ */
+export function getSundaySession(): Promise<SundaySession | undefined> {
+  return sundaySessionManager?.getSundaySession() ?? Promise.resolve(undefined);
+}
+
 function getClientId(): string {
   return (
     process.env.SUNDAY_GOOGLE_CLIENT_ID?.trim() ||
@@ -43,11 +70,36 @@ function getClientId(): string {
   );
 }
 
+function getGatewayUrl(): string {
+  return resolveGatewayUrl({
+    envUrl: process.env.SUNDAY_GATEWAY_URL,
+    settingUrl: vscode.workspace
+      .getConfiguration('sunday.account')
+      .get<string>('gatewayUrl', ''),
+  });
+}
+
 export class GoogleAuthProvider implements vscode.AuthenticationProvider {
   private readonly _onDidChangeSessions = new vscode.EventEmitter<vscode.AuthenticationProviderAuthenticationSessionsChangeEvent>();
   readonly onDidChangeSessions = this._onDidChangeSessions.event;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  /** Sunday hosted-gateway session layered on top of Google sign-in (Phase 9.a). */
+  readonly sundaySession: SundaySessionManager;
+
+  constructor(private readonly context: vscode.ExtensionContext) {
+    const secretStore: SecretStore = {
+      get: (key) => context.secrets.get(key),
+      store: (key, value) => context.secrets.store(key, value),
+      delete: (key) => context.secrets.delete(key),
+    };
+    this.sundaySession = new SundaySessionManager(
+      secretStore,
+      getGatewayUrl(),
+      () => this._onDidChangeSessions.fire({ added: [], removed: [], changed: [] }),
+      nodeFetch,
+    );
+    sundaySessionManager = this.sundaySession;
+  }
 
   private async loadSessions(): Promise<StoredSession[]> {
     const raw = await this.context.secrets.get(SECRET_KEY);
@@ -118,6 +170,16 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
     const next = [session];
     await this.saveSessions(next);
 
+    // Phase 9.a: layer the Sunday gateway session on top. Local-first — the
+    // Google sign-in succeeds even if the gateway is unreachable; in that
+    // case getSundaySession() simply returns undefined (Google-only mode).
+    const established = await this.sundaySession.establish(tokens.accessToken);
+    if (!established.ok) {
+      console.warn(
+        `[sunday-google-auth] Sunday session unavailable (${established.reason}); continuing in Google-only mode.`,
+      );
+    }
+
     return {
       id: session.id,
       accessToken: session.accessToken,
@@ -127,6 +189,10 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
   }
 
   async removeSession(id: string): Promise<void> {
+    // Phase 9.a: best-effort Sunday gateway logout, then delete the Sunday
+    // secrets. Never throws; the Google revoke below always runs.
+    await this.sundaySession.signOut();
+
     const sessions = await this.loadSessions();
     const target = sessions.find((s) => s.id === id);
     if (target) {
@@ -146,6 +212,18 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
       }
     }
     await this.saveSessions(sessions.filter((s) => s.id !== id));
+  }
+
+  /**
+   * Sign out of every stored Google session (best-effort token revocation +
+   * clear). The single supported sign-out path for other extensions, exposed
+   * via the `sunday.google.signOut` command.
+   */
+  async signOut(): Promise<void> {
+    const sessions = await this.loadSessions();
+    for (const s of sessions) {
+      await this.removeSession(s.id);
+    }
   }
 
   // -- OAuth internals ----------------------------------------------------------
@@ -292,13 +370,27 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
   }
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+/** API surface this extension exposes to other extensions (Phase 9.a). */
+export interface SundayGoogleAuthApi {
+  /**
+   * Current Sunday hosted-gateway session, refreshing the JWT when expired.
+   * `undefined` when signed out or in Google-only mode.
+   */
+  getSundaySession(): Promise<SundaySession | undefined>;
+}
+
+export function activate(context: vscode.ExtensionContext): SundayGoogleAuthApi {
   const provider = new GoogleAuthProvider(context);
   context.subscriptions.push(
     vscode.authentication.registerAuthenticationProvider('google', 'Google', provider, {
       supportsMultipleAccounts: false,
     }),
+    // Phase 9.a: the Sunday Account UI (sunday-agent extension) drives
+    // sign-out through this command, because `vscode.authentication` has no
+    // public session-removal API. Revoking + clearing is provider-internal.
+    vscode.commands.registerCommand('sunday.google.signOut', () => provider.signOut()),
   );
+  return { getSundaySession };
 }
 
 export function deactivate(): void {}

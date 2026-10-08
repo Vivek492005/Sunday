@@ -35,6 +35,7 @@ import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
 import { registerProactiveMode } from './proactiveMode.js';
+import { registerAccountStatusBar } from './accountView.js';
 import { randomUUID } from 'node:crypto';
 import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 
@@ -612,6 +613,9 @@ export async function activate(
   }
   context.subscriptions.push(registerSwarmWebview(context));
   context.subscriptions.push(registerProactiveMode(context));
+
+  // -- Sunday Account status bar UI shell (Phase 9.a: minimal, no billing) ---
+  context.subscriptions.push(registerAccountStatusBar(context, { log }));
 
   // -- smoke-test API ---------------------------------------------------------
   // Minimal hooks for the Electron smoke harness (scripts/smoke/). Not part of
