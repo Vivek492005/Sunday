@@ -87,10 +87,98 @@ Sunday takes the editor you already know — VS Code — and rebuilds it around 
 
 ## ✨ Features
 
+### 🆓 Zero-Config Free Tier
+- **No API keys needed** — sign in with Google, get **200 free AI requests/day**
+- **Hosted gateway** — [sunday-final-ide.onrender.com](https://sunday-final-ide.onrender.com) serves free open models
+- **BYOK always available** — bring your own OpenRouter/Groq keys for unlimited use
+- **Local-first** — BYOK and local routes work fully offline, no account needed
+
+### 🧠 Second Brain Memory
+- **Automatic memory extraction** — the agent remembers your preferences, decisions, and project context across sessions
+- **Semantic search** — recall anything with natural language queries
+- **Cross-project learning** — apply learnings from one project to another
+- **Privacy-first** — stored locally in `~/.sunday/memory/`, secrets never memorized
+
+### 🔄 Self-Improving Agent
+- **Learns from corrections** — when you fix the agent, it extracts a reusable rule
+- **Rules engine** — learned rules are injected into every future session
+- **Rules view** — browse, edit, and manage learned rules
+
+### 👥 One-Prompt Swarm
+- **Decompose any task** — one prompt becomes a Kanban board of parallel subtasks
+- **Live Kanban UI** — watch subtasks move from queued → running → done
+- **Stop-all** — kill the entire swarm with one click
+
+### 🔮 Proactive Mode
+- **Opt-in idle detection** — when you're away, the agent investigates failing tests and open issues
+- **Audit log** — every proactive action is logged for your review
+- **Your control** — enable/disable anytime, nothing runs without your permission
+
+### ☁️ Cloud Async Tasks
+- **Fire and forget** — submit a task, get notified when it's done
+- **Background execution** — runs via sundayd even with the IDE minimized
+
+### 🎯 Best-of-N Attempts
+- **Multiple solutions** — the agent tries N approaches in parallel (varied temperatures and strategies)
+- **Comparison view** — pick the winner from a side-by-side diff
+
+### 🎨 Artifacts
+- **Interactive output** — agents create live HTML previews, diagrams (Mermaid), and documents
+- **Sandboxed rendering** — safe iframe isolation for HTML artifacts
+
+### 🎛️ Mission Control
+- **Fleet dashboard** — all running agents in one view: orchestration runs, browser sessions, cloud tasks, scheduled tasks
+- **Live status** — 2-second refresh, log tails, Stop/Restart controls
+
+### ⏰ Scheduled Tasks
+- **Cron for agents** — "every morning at 9am, check test health and report"
+- **Overlap protection** — skips runs that would collide with in-flight work
+
+### 📋 AGENTS.md Support
+- **Repo-level instructions** — drop an `AGENTS.md` in your repo root; the agent always follows it
+- **Per-directory overrides** — nearest AGENTS.md wins
+
+### 🎨 Style Inference
+- **Learns your code style** — indent, quotes, naming conventions from your existing code
+- **Auto-applied** — generated code matches your project's style
+
+### 📦 Project Templates
+- **One-command scaffolding** — `sunday.initProject` with React+TS, Node API, Python CLI, Next.js templates
+
+### 🎭 Agent Modes
+- **Architect** — read-only planning mode
+- **Implementer** — full execution mode
+- **Reviewer** — read + critique, no writes
+
+### 🔀 PR Automation
+- **End-to-end PRs** — agent creates branch, commits, pushes, and opens a PR with generated description
+- **Review handling** — fetches review comments for the agent to address
+
+### 🎨 Design-to-Code
+- **Image to component** — paste a design screenshot, get framework-matched code (auto-detects React/Vue/etc.)
+- **Diff preview** — review before applying
+
+### 🧙 Repo Onboarding Wizard
+- **One-command setup** — detects stack, installs deps, creates `.env`, runs dev server
+- **Checklist UI** — visual progress through each setup step
+
+### ⌨️ Terminal Command Generation
+- **Natural language to shell** — describe what you want, get a safe command (always approval-gated)
+
+### 🗣️ Voice Input
+- **Speak your prompt** — microphone input via Web Speech API in the chat panel
+
+### 📊 Usage Dashboard
+- **Track your consumption** — per-model token usage, 7-day history, daily limits
+- **Inline SVG charts** — no external dependencies
+
+### 🔄 Auto-Update
+- **Check for Updates** — in the Help menu, plus automatic check on startup
+- **One-click install** — download and launch the installer; no manual re-download needed
+
 ### 🤖 Autonomous Agent
 - **Multi-step task execution** — describe a feature, the agent plans, codes, and verifies
 - **Hierarchical orchestration** — Orchestrator breaks work into parallel units → Feature Agents execute → Verifier checks (max 8 units, overlap detection, budget enforcement)
-- **Background agents** — detached runs that survive editor close, deliver results as GitHub PRs *(experimental)*
 - **Checkpointing** — shadow-git gives hunk-level undo for every agent change
 
 ### 🧠 Editor Intelligence
@@ -103,29 +191,25 @@ Sunday takes the editor you already know — VS Code — and rebuilds it around 
 
 ### 🌐 Agent Browser
 - **Live browser view** — watch the agent browse (2fps screencast)
-- **Takeover mode** — grab control mid-task, hand it back when done
+- **Takeover mode** — grab control mid-task, hand it back when done (pauses screencast for privacy)
 - **13 `browser_*` tools** — navigation, snapshots, console, screenshots, walkthroughs
 - **Policy-gated** — `file://` and private IPs blocked, new origins need approval
 
-### 🗣️ Voice *(experimental)*
-- **Voice input** — speak your prompt via Web Speech API
-- **Voice output** — hear responses via speech synthesis
-- **Privacy-first** — no audio touches Sunday servers; text is reviewed before sending
+### 🔧 Developer Tools
+- **MCP support** — Model Context Protocol servers (stdio + HTTP), namespaced tools
+- **Skills system** — reusable prompt + script bundles with trust gating, plus community marketplace
+- **Terminal integration** — run commands with approval, auto-explain errors
+- **Git integration** — status, diff, log, commit generation
+- **Session sync** — end-to-end encrypted session backup across devices (opt-in)
 
 ### 💻 Multiple Frontends
 | Frontend | Status | Description |
 |----------|--------|-------------|
 | **VS Code extension** | ✅ Stable | Full IDE experience (this repo's primary target) |
-| **Sunday IDE** | 🔄 In progress | Branded VS Code fork (Windows/Linux/macOS) |
+| **Sunday IDE** | ✅ Beta | Branded VS Code fork (Windows/Linux/macOS) — v1.0.0-beta.1 |
 | **CLI** (`sunday`) | ✅ Stable | `sunday chat`, `sunday status`, `sunday sessions` |
 | **JetBrains plugin** | 🔄 In progress | IntelliJ Platform plugin (Kotlin) |
-| **Hosted gateway** | ✅ Stable | OpenAI-compatible API server with abuse controls |
-
-### 🔧 Developer Tools
-- **MCP support** — Model Context Protocol servers (stdio + HTTP), namespaced tools
-- **Skills system** — reusable prompt + script bundles with trust gating
-- **Terminal integration** — run commands with approval, auto-explain errors
-- **Git integration** — status, diff, log, commit generation
+| **Hosted gateway** | ✅ Live | OpenAI-compatible API, free tier (200 req/day) |
 
 ---
 
@@ -141,7 +225,13 @@ Download the full IDE from the [1.0.0-beta.1 release](https://github.com/Vivek49
 | macOS (ARM64) | Sunday DMG installer |
 | Linux (x64) | Sunday tarball |
 
-Set your API keys:
+**No API keys needed to start!** Open Sunday → click **Sign in with Google** → get **200 free AI requests/day** via the Sunday hosted gateway. That's it.
+
+> **🔄 Staying updated:** Sunday checks for updates automatically on startup. You can also check manually via **Help → Check for Updates**. When a new version is available, one click downloads and installs it — no manual re-download needed.
+
+<details>
+<summary><b>Prefer your own API keys? (BYOK)</b></summary>
+
 ```sh
 # Get free keys from:
 # - OpenRouter: https://openrouter.ai/keys
@@ -150,7 +240,8 @@ export OPENROUTER_API_KEY="sk-or-..."
 export GROQ_API_KEY="gsk_..."
 ```
 
-Open Sunday → Chat view → start building!
+BYOK routes work fully offline with no account required.
+</details>
 
 ### Option 2: VS Code Extension
 
@@ -257,7 +348,7 @@ This is a pnpm monorepo. Each package is independently versioned and tested.
 | `scripts/` | Build, packaging, and verification scripts |
 | `docs/` | Architecture, security, eval, and guides |
 
-**Total: ~1,013 tests**, all passing on Linux. See [docs/PROJECT_BLUEPRINT.md](docs/PROJECT_BLUEPRINT.md) for the full phase-by-phase breakdown.
+**Total: ~1,885 tests**, all passing. See [docs/PROJECT_BLUEPRINT.md](docs/PROJECT_BLUEPRINT.md) for the full phase-by-phase breakdown.
 
 ---
 
@@ -337,6 +428,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 - [x] 8/11 release gates with concrete evidence
 - [x] Build gate — CI green on 3 platforms (Linux, macOS, Windows)
 - [x] Full IDE installers (Windows/macOS/Linux)
+- [x] Zero-config free tier — hosted gateway live, Google sign-in, 200 req/day
+- [x] 5 productivity features — Second Brain, Self-Improving Agent, Swarm UI, Proactive Mode
+- [x] 18 competitive features — artifacts, mission control, best-of-N, AGENTS.md, and more
+- [x] Auto-update — Check for Updates + one-click install
+- [x] Accounts & entitlements — Basic/Smart/Pro plan foundation (Phase 9.a/9.b)
+- [x] P0 + P1 security hardening
 - [ ] Accessibility gate — human screen-reader sign-off (pending)
 - [ ] Human verification steps (pcap, soak, live eval, QA ritual)
 
@@ -345,11 +442,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 - [ ] JetBrains plugin compile + publish
 - [ ] Daemon Stage 4 re-implementation (idle shutdown, autostart)
 - [ ] Installer code signing
+- [ ] Terms of Service + Privacy Policy published
 
-### Future
+### Future (on demand signal)
+- [ ] Billing integration — Paddle checkout, Smart/Pro subscriptions (Phase 9.c)
+- [ ] Managed model gateway — paid provider routes (Phase 9.d)
 - [ ] Ollama local model support (optional, not default)
 - [ ] Next-edit LLM re-ranker (currently heuristic)
-- [ ] Deferred security items (SEC-09 taint tracking, SEC-10 credential gating)
 
 ---
 
