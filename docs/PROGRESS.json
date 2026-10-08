@@ -41,6 +41,42 @@
       "name": "Phase 8 (Backlog)",
       "percent": 100,
       "status": "done"
+    },
+    {
+      "name": "Five Productivity Features",
+      "percent": 100,
+      "status": "done",
+      "detail": "Second Brain, Self-Improving Agent, Swarm UI, Proactive Mode, Zero-Config \u2014 129 tests"
+    },
+    {
+      "name": "Security Hardening (P0+P1)",
+      "percent": 100,
+      "status": "done",
+      "detail": "14 fixes: 8 P0 + 6 P1, 15/15 typecheck, adversarial verified"
+    },
+    {
+      "name": "Hosted Gateway Live",
+      "percent": 100,
+      "status": "done",
+      "detail": "sunday-final-ide.onrender.com live, 200 req/day free tier, Google OAuth published"
+    },
+    {
+      "name": "Phase 9.a/9.b (Accounts)",
+      "percent": 100,
+      "status": "done",
+      "detail": "Session JWT, entitlements, Basic/Smart/Pro plans, Plan & Billing UI"
+    },
+    {
+      "name": "Auto-Update",
+      "percent": 100,
+      "status": "done",
+      "detail": "Help \u2192 Check for Updates, startup auto-check, /updates/check endpoint live"
+    },
+    {
+      "name": "18 Competitive Features",
+      "percent": 100,
+      "status": "done",
+      "detail": "Artifacts, Mission Control, Best-of-N, AGENTS.md, PR automation, and 13 more \u2014 1,885 tests total"
     }
   ],
   "project": "Sunday IDE",
@@ -49,5 +85,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-06T19:56:13+00:00"
+  "updated": "2026-10-08T12:13:27+00:00"
 }
