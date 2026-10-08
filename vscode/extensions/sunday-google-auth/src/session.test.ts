@@ -452,3 +452,39 @@ describe('gateway timeout', () => {
     );
   });
 });
+
+describe('exchangeGoogleToken account-switch limit', () => {
+  it('sends machine_id when provided', async () => {
+    const fetch = makeFetch((url) => {
+      assert.equal(url, `${GW}/auth/session`);
+      return jsonResponse(200, exchangeBody(makeJwt(futureExp())));
+    });
+    await exchangeGoogleToken(fetch, GW, 'google-token-abc', 5000, 'machine-xyz');
+    assert.deepEqual(fetch.calls[0].body, {
+      google_access_token: 'google-token-abc',
+      machine_id: 'machine-xyz',
+    });
+  });
+
+  it('omits machine_id when not provided (backward compat)', async () => {
+    const fetch = makeFetch(() => jsonResponse(200, exchangeBody(makeJwt(futureExp()))));
+    await exchangeGoogleToken(fetch, GW, 'google-token-abc');
+    assert.deepEqual(fetch.calls[0].body, { google_access_token: 'google-token-abc' });
+  });
+
+  it('surfaces 429 account_switch_limit with code and retryAfter', async () => {
+    const fetch = makeFetch(() =>
+      jsonResponse(429, {
+        error: { code: 'account_switch_limit', message: 'too many', type: 'invalid_request_error' },
+        retryAfter: 3600,
+      }),
+    );
+    await assert.rejects(exchangeGoogleToken(fetch, GW, 'tok'), (e: unknown) => {
+      assert.ok(e instanceof GatewayError);
+      assert.equal(e.status, 429);
+      assert.equal(e.code, 'account_switch_limit');
+      assert.equal(e.retryAfterSec, 3600);
+      return true;
+    });
+  });
+});

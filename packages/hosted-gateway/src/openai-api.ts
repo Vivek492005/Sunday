@@ -27,6 +27,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Extra fields merged into the JSON error body (e.g. retryAfter). */
+    readonly extra?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -154,7 +156,11 @@ export function errorBody(err: unknown): { status: number; body: unknown } {
   if (err instanceof ApiError) {
     return {
       status: err.status,
-      body: { error: { message: err.message, type: 'invalid_request_error', code: err.code } },
+      body: {
+        error: { message: err.message, type: 'invalid_request_error', code: err.code },
+        // Flat aliases for clients that prefer them (e.g. account_switch_limit).
+        ...(err.extra ?? {}),
+      },
     };
   }
   const message = err instanceof Error ? err.message : 'internal server error';

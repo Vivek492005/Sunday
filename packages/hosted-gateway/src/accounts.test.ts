@@ -46,6 +46,19 @@ async function mockGoogleFetch(input: string | URL | Request, init?: RequestInit
         email: 'dev@example.com',
       });
     }
+    // Extra test tokens for account-switch limit tests (distinct subs).
+    const extraSubs: Record<string, string> = {
+      'google-token-2': 'google-sub-456',
+      'google-token-3': 'google-sub-789',
+    };
+    if (token && extraSubs[token]) {
+      return json({
+        sub: extraSubs[token],
+        expires_in: '3599',
+        aud: SUNDAY_GOOGLE_CLIENT_ID,
+        email: `${extraSubs[token]}@example.com`,
+      });
+    }
     if (token === 'expired-google-token') {
       return json({ sub: 'google-sub-123', expires_in: '0', aud: SUNDAY_GOOGLE_CLIENT_ID });
     }
@@ -60,6 +73,21 @@ async function mockGoogleFetch(input: string | URL | Request, init?: RequestInit
         name: 'Dev User',
         picture: 'https://example.com/pic.png',
       });
+    }
+    // Extra test tokens for account-switch limit tests.
+    const extraUserinfo: Record<string, { sub: string; email: string }> = {
+      'google-token-2': { sub: 'google-sub-456', email: 'user2@example.com' },
+      'google-token-3': { sub: 'google-sub-789', email: 'user3@example.com' },
+    };
+    for (const [token, info] of Object.entries(extraUserinfo)) {
+      if (auth === `Bearer ${token}`) {
+        return json({
+          sub: info.sub,
+          email: info.email,
+          name: info.sub,
+          picture: '',
+        });
+      }
     }
     return json({ error: 'invalid_token' }, 401);
   }
@@ -123,9 +151,9 @@ async function start(config: HostedGatewayConfig): Promise<Started> {
 async function req(
   base: string,
   path: string,
-  opts: { method?: string; bearer?: string; body?: unknown; rawBody?: string } = {},
+  opts: { method?: string; bearer?: string; body?: unknown; rawBody?: string; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; headers: Headers; json: unknown; text: string }> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...(opts.headers ?? {}) };
   if (opts.bearer !== undefined) headers['authorization'] = `Bearer ${opts.bearer}`;
   let body: string | undefined;
   if (opts.rawBody !== undefined) body = opts.rawBody;
@@ -414,5 +442,196 @@ describe('config: SUNDAY_SESSION_SECRET', () => {
     expect(() =>
       loadConfig({ ...process.env, SUNDAY_HOSTED_KEYS: 'a:b', SUNDAY_SESSION_SECRET: '' }),
     ).toThrow(/session secret/);
+  });
+});
+
+describe('account-switch rate limiting', () => {
+  const MACHINE = 'machine-abc-123';
+
+  function basicUser(id: string): Parameters<AccountsService['checkAccountSwitchLimit']>[3] {
+    return {
+      id,
+      google_sub: `sub-${id}`,
+      email: `${id}@example.com`,
+      display_name: id,
+      avatar_url: '',
+      plan: 'basic',
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  function paidUser(id: string) {
+    return { ...basicUser(id), plan: 'pro' as const };
+  }
+
+  it('allows the first two distinct accounts', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-1', basicUser('u1')).allowed).toBe(true);
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-2', basicUser('u2')).allowed).toBe(true);
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+  });
+
+  it('denies the third distinct account within 24h with retryAfter', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+    const check = svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-3', basicUser('u3'));
+    expect(check.allowed).toBe(false);
+    expect(check.retryAfterSec).toBeGreaterThan(0);
+    expect(check.retryAfterSec).toBeLessThanOrEqual(24 * 3600);
+  });
+
+  it('allows re-login with the same account (not counted as a switch)', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+    // Same sub signing in again is always allowed.
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-1', basicUser('u1')).allowed).toBe(true);
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-2', basicUser('u2')).allowed).toBe(true);
+  });
+
+  it('limits are per-provider: google and microsoft tracked separately', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'g-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'g-2', 'u2');
+    // Microsoft is a separate bucket — still allowed.
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'microsoft', 'm-1', basicUser('u3')).allowed).toBe(true);
+    // But google is full.
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'g-3', basicUser('u4')).allowed).toBe(false);
+  });
+
+  it('prunes entries older than 24h', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+    // Backdate the entries beyond the window by editing the persisted file.
+    const dataDir = (svc as unknown as { dataDir: string }).dataDir;
+    void dataDir;
+    // Simulate ageing by re-creating the service with a manipulated log.
+    const svc2 = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    const old = Date.now() - 25 * 3600 * 1000;
+    (svc2 as unknown as { signinLog: unknown[] }).signinLog = [
+      { machineId: MACHINE, provider: 'google', sub: 'sub-1', userId: 'u1', at: old },
+      { machineId: MACHINE, provider: 'google', sub: 'sub-2', userId: 'u2', at: old },
+    ];
+    // Old entries are pruned on check — a new account is allowed.
+    expect(svc2.checkAccountSwitchLimit(MACHINE, 'google', 'sub-3', basicUser('u3')).allowed).toBe(true);
+  });
+
+  it('paid users bypass the limit', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-3', paidUser('u3')).allowed).toBe(true);
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-9', paidUser('u9')).allowed).toBe(true);
+  });
+
+  it('missing machineId skips the check (backward compat)', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    for (let i = 0; i < 5; i++) {
+      expect(
+        svc.checkAccountSwitchLimit(undefined, 'google', `sub-${i}`, basicUser(`u${i}`)).allowed,
+      ).toBe(true);
+    }
+  });
+
+  it('clearSigninLog removes a machine\'s entries (admin support)', () => {
+    const svc = new AccountsService(SESSION_SECRET, { dataDir: freshDataDir() });
+    svc.recordSignin(MACHINE, 'google', 'sub-1', 'u1');
+    svc.recordSignin(MACHINE, 'google', 'sub-2', 'u2');
+    svc.recordSignin('other-machine', 'google', 'sub-9', 'u9');
+    expect(svc.clearSigninLog(MACHINE)).toBe(2);
+    // Machine is clear — new account allowed again.
+    expect(svc.checkAccountSwitchLimit(MACHINE, 'google', 'sub-3', basicUser('u3')).allowed).toBe(true);
+    // Other machine untouched.
+    expect(svc.clearSigninLog('other-machine')).toBe(1);
+    expect(svc.clearSigninLog('nonexistent')).toBe(0);
+  });
+
+  it('isPaidPlan: smart/pro bypass, basic does not', async () => {
+    const { isPaidPlan } = await import('./accounts.js');
+    expect(isPaidPlan('smart')).toBe(true);
+    expect(isPaidPlan('pro')).toBe(true);
+    expect(isPaidPlan('basic')).toBe(false);
+    expect(isPaidPlan(undefined)).toBe(false);
+  });
+});
+
+describe('POST /auth/session account-switch limit (endpoint)', () => {
+  let started: Started | undefined;
+
+  afterEach(async () => {
+    await started?.server.close();
+    started = undefined;
+  });
+
+  it('429 with account_switch_limit on the third distinct account from one machine', async () => {
+    started = await start(baseConfig());
+    const machineId = 'machine-limit-test';
+    const signin = (token: string) =>
+      req(started!.base, '/auth/session', {
+        method: 'POST',
+        body: { google_access_token: token, machine_id: machineId },
+      });
+
+    expect((await signin(GOOGLE_TOKEN)).status).toBe(200);
+    expect((await signin('google-token-2')).status).toBe(200);
+    // Third distinct account → 429.
+    const r3 = await signin('google-token-3');
+    expect(r3.status).toBe(429);
+    const body = r3.json as { error: { code: string }; retryAfter?: number };
+    expect(body.error.code).toBe('account_switch_limit');
+    expect(typeof body.retryAfter).toBe('number');
+    expect(body.retryAfter).toBeGreaterThan(0);
+
+    // Re-login with an existing account still works (not a switch).
+    expect((await signin(GOOGLE_TOKEN)).status).toBe(200);
+  });
+
+  it('no machine_id → no limit (backward compat)', async () => {
+    started = await start(baseConfig());
+    const signin = (token: string) =>
+      req(started!.base, '/auth/session', {
+        method: 'POST',
+        body: { google_access_token: token },
+      });
+    expect((await signin(GOOGLE_TOKEN)).status).toBe(200);
+    expect((await signin('google-token-2')).status).toBe(200);
+    expect((await signin('google-token-3')).status).toBe(200);
+  });
+
+  it('POST /admin/signin-log/clear resets the limit (admin key)', async () => {
+    started = await start(baseConfig({ adminKey: 'test-admin-key' }));
+    const machineId = 'machine-clear-test';
+    const signin = (token: string) =>
+      req(started!.base, '/auth/session', {
+        method: 'POST',
+        body: { google_access_token: token, machine_id: machineId },
+      });
+    await signin(GOOGLE_TOKEN);
+    await signin('google-token-2');
+    expect((await signin('google-token-3')).status).toBe(429);
+
+    // Admin clears the machine's log.
+    const clear = await req(started.base, '/admin/signin-log/clear', {
+      method: 'POST',
+      body: { machineId },
+      headers: { 'x-admin-key': 'test-admin-key' },
+    });
+    expect(clear.status).toBe(200);
+    expect((clear.json as { cleared: number }).cleared).toBe(2);
+
+    // Now the third account works.
+    expect((await signin('google-token-3')).status).toBe(200);
+  });
+
+  it('POST /admin/signin-log/clear: 403 without admin key', async () => {
+    started = await start(baseConfig({ adminKey: 'test-admin-key' }));
+    const r = await req(started.base, '/admin/signin-log/clear', {
+      method: 'POST',
+      body: { machineId: 'x' },
+    });
+    expect(r.status).toBe(403);
   });
 });

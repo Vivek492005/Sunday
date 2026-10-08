@@ -101,6 +101,36 @@ export interface GoogleAccountInfo {
   picture: string;
 }
 
+/**
+ * Account-switch rate limiting (anti free-tier Sybil abuse).
+ * Max distinct accounts per machine per provider per rolling 24h.
+ */
+export const ACCOUNT_SWITCH_MAX = 2;
+export const ACCOUNT_SWITCH_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export type AuthProvider = 'google' | 'microsoft';
+
+export interface SigninLogEntry {
+  machineId: string;
+  provider: AuthProvider;
+  /** Provider account id (google_sub / ms_sub). */
+  sub: string;
+  userId: string;
+  /** Epoch ms of the sign-in. */
+  at: number;
+}
+
+export interface AccountSwitchCheck {
+  allowed: boolean;
+  /** Seconds until the oldest entry ages out (only when denied). */
+  retryAfterSec?: number;
+}
+
+/** Paid plans bypass the account-switch limit. */
+export function isPaidPlan(plan: string | undefined): boolean {
+  return plan === 'smart' || plan === 'pro';
+}
+
 export interface AccountsDeps {
   /** Directory holding users.json/sessions.json. Default: `<pkg>/data`. */
   dataDir?: string;
@@ -216,6 +246,7 @@ export class AccountsService {
   private readonly plans: PlansFile | undefined;
   private users: UserRecord[] = [];
   private sessions: SessionRecord[] = [];
+  private signinLog: SigninLogEntry[] = [];
 
   constructor(sessionSecret: string, deps: AccountsDeps = {}) {
     if (!sessionSecret || sessionSecret.length === 0) {
@@ -228,6 +259,7 @@ export class AccountsService {
     mkdirSync(this.dataDir, { recursive: true, mode: 0o700 });
     this.users = this.loadJson<UserRecord[]>('users.json', []);
     this.sessions = this.loadJson<SessionRecord[]>('sessions.json', []);
+    this.signinLog = this.loadJson<SigninLogEntry[]>('signin_log.json', []);
     // Phase 9.b migration: records written before plans existed may lack
     // `plan` (or carry an unknown value) — they keep working as Basic, and
     // the normalized record is persisted so the migration runs once.
@@ -360,11 +392,91 @@ export class AccountsService {
   }
 
   /**
+   * Prune sign-in log entries older than the 24h window. Called on every
+   * check so the file stays small.
+   */
+  private pruneSigninLog(now: number): void {
+    const cutoff = now - ACCOUNT_SWITCH_WINDOW_MS;
+    const before = this.signinLog.length;
+    this.signinLog = this.signinLog.filter((e) => e.at > cutoff);
+    if (this.signinLog.length !== before) {
+      this.saveJson('signin_log.json', this.signinLog);
+    }
+  }
+
+  /**
+   * Account-switch rate limit check. Returns allowed=true when:
+   * - no machineId was supplied (old clients; skip the check), or
+   * - the user is on a paid plan (bypass), or
+   * - this sub already signed in from this machine+provider in the window
+   *   (re-login, not a switch), or
+   * - fewer than ACCOUNT_SWITCH_MAX distinct subs in the window.
+   * Otherwise returns allowed=false with retryAfterSec until the oldest
+   * entry ages out.
+   */
+  checkAccountSwitchLimit(
+    machineId: string | undefined,
+    provider: AuthProvider,
+    sub: string,
+    user: UserRecord,
+  ): AccountSwitchCheck {
+    if (!machineId || typeof machineId !== 'string' || machineId.length === 0) {
+      return { allowed: true }; // backward compat: old clients don't send it
+    }
+    if (isPaidPlan(user.plan)) {
+      return { allowed: true }; // paid subscribers: no limit
+    }
+    const now = Date.now();
+    this.pruneSigninLog(now);
+    const relevant = this.signinLog.filter(
+      (e) => e.machineId === machineId && e.provider === provider,
+    );
+    const distinctSubs = new Set(relevant.map((e) => e.sub));
+    if (distinctSubs.has(sub)) {
+      return { allowed: true }; // re-login with the same account
+    }
+    if (distinctSubs.size < ACCOUNT_SWITCH_MAX) {
+      return { allowed: true };
+    }
+    // Denied: compute retry-after from the oldest entry in the window.
+    const oldest = Math.min(...relevant.map((e) => e.at));
+    const retryAfterSec = Math.max(
+      1,
+      Math.ceil((oldest + ACCOUNT_SWITCH_WINDOW_MS - now) / 1000),
+    );
+    return { allowed: false, retryAfterSec };
+  }
+
+  /** Record a successful sign-in for account-switch tracking. */
+  recordSignin(machineId: string, provider: AuthProvider, sub: string, userId: string): void {
+    this.signinLog.push({ machineId, provider, sub, userId, at: Date.now() });
+    this.saveJson('signin_log.json', this.signinLog);
+  }
+
+  /**
+   * Admin: clear sign-in log entries for a machine (support cases).
+   * Returns the number of entries removed.
+   */
+  clearSigninLog(machineId: string): number {
+    const before = this.signinLog.length;
+    this.signinLog = this.signinLog.filter((e) => e.machineId !== machineId);
+    const removed = before - this.signinLog.length;
+    if (removed > 0) {
+      this.saveJson('signin_log.json', this.signinLog);
+    }
+    return removed;
+  }
+
+  /**
    * POST /auth/session: verify the Google access token, find/create the
    * user, issue a session JWT + refresh token. 400 when the token is
-   * missing, 401 when Google rejects it.
+   * missing, 401 when Google rejects it, 429 when the account-switch
+   * limit is hit for this machine.
    */
-  async createSession(googleAccessToken: unknown): Promise<{
+  async createSession(
+    googleAccessToken: unknown,
+    opts: { machineId?: string; provider?: AuthProvider } = {},
+  ): Promise<{
     session_token: string;
     refresh_token: string;
     user: { id: string; email: string; display_name: string; avatar_url: string };
@@ -378,6 +490,21 @@ export class AccountsService {
       throw new ApiError(401, 'invalid_google_token', 'Google token verification failed');
     }
     const user = this.findOrCreateUser(info);
+    // Account-switch rate limit: max 2 distinct accounts per machine per
+    // provider per 24h (anti free-tier Sybil abuse). Runs before minting.
+    const provider = opts.provider ?? 'google';
+    const switchCheck = this.checkAccountSwitchLimit(opts.machineId, provider, info.sub, user);
+    if (!switchCheck.allowed) {
+      throw new ApiError(
+        429,
+        'account_switch_limit',
+        "You've signed in with 2 accounts in the last 24 hours on this device. Try again tomorrow, or upgrade for unlimited access.",
+        { retryAfter: switchCheck.retryAfterSec },
+      );
+    }
+    if (opts.machineId) {
+      this.recordSignin(opts.machineId, provider, info.sub, user.id);
+    }
     const { raw } = this.mintRefreshToken(user.id);
     return {
       session_token: this.issueSessionToken(user.id),

@@ -105,10 +105,16 @@ export const nodeFetch: HttpFetch = (url, init) =>
 export class GatewayError extends Error {
   /** HTTP status when the gateway answered; undefined for network errors. */
   readonly status?: number;
-  constructor(message: string, status?: number, cause?: unknown) {
+  /** Machine-readable error code from the gateway (e.g. 'account_switch_limit'). */
+  readonly code?: string;
+  /** Seconds until retry (for 429 responses). */
+  readonly retryAfterSec?: number;
+  constructor(message: string, status?: number, cause?: unknown, code?: string, retryAfterSec?: number) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = 'GatewayError';
     this.status = status;
+    this.code = code;
+    this.retryAfterSec = retryAfterSec;
   }
   get isNetworkError(): boolean {
     return this.status === undefined;
@@ -133,9 +139,24 @@ async function postJson(
       signal: controller.signal,
     });
     if (!res.ok) {
+      // Try to extract the machine-readable error code and retryAfter.
+      let code: string | undefined;
+      let retryAfterSec: number | undefined;
+      try {
+        const errBody = (await res.json()) as Record<string, unknown>;
+        const nested = errBody.error as Record<string, unknown> | undefined;
+        if (typeof nested?.code === 'string') code = nested.code;
+        else if (typeof errBody.error === 'string') code = errBody.error;
+        if (typeof errBody.retryAfter === 'number') retryAfterSec = errBody.retryAfter;
+      } catch {
+        // Body isn't JSON — fall through with status only.
+      }
       throw new GatewayError(
         `Sunday gateway request failed (HTTP ${res.status})`,
         res.status,
+        undefined,
+        code,
+        retryAfterSec,
       );
     }
     return await res.json();
@@ -182,11 +203,15 @@ export async function exchangeGoogleToken(
   gatewayUrl: string,
   googleAccessToken: string,
   timeoutMs: number = GATEWAY_TIMEOUT_MS,
+  machineId?: string,
 ): Promise<{ sessionToken: string; refreshToken: string; user: SundayUser }> {
   const body = (await postJson(
     fetchImpl,
     `${gatewayUrl}/auth/session`,
-    { google_access_token: googleAccessToken },
+    {
+      google_access_token: googleAccessToken,
+      ...(machineId ? { machine_id: machineId } : {}),
+    },
     timeoutMs,
   )) as Record<string, unknown>;
   const user = (body.user ?? {}) as Record<string, unknown>;
@@ -302,7 +327,8 @@ export class SundaySessionManager {
    */
   async establish(
     googleAccessToken: string,
-  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    machineId?: string,
+  ): Promise<{ ok: true } | { ok: false; reason: string; code?: string; retryAfterSec?: number }> {
     const previousRefresh = await this.storage
       .get(SECRET_REFRESH_TOKEN)
       .catch(() => undefined);
@@ -321,6 +347,7 @@ export class SundaySessionManager {
         this.gatewayUrl,
         googleAccessToken,
         this.timeoutMs,
+        machineId,
       );
       await this.storage.store(SECRET_SESSION_TOKEN, result.sessionToken);
       await this.storage.store(SECRET_REFRESH_TOKEN, result.refreshToken);
@@ -328,7 +355,9 @@ export class SundaySessionManager {
     } catch (e) {
       await this.clear(false);
       const reason = e instanceof Error ? e.message : String(e);
-      return { ok: false, reason };
+      const code = e instanceof GatewayError ? e.code : undefined;
+      const retryAfterSec = e instanceof GatewayError ? e.retryAfterSec : undefined;
+      return { ok: false, reason, code, retryAfterSec };
     }
     this.emitChanged();
     return { ok: true };

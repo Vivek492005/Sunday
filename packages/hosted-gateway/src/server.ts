@@ -57,6 +57,9 @@ const VERSION = '0.1.0';
 /** POST /admin/users/:id/plan — Phase 9.b admin plan toggle (testing only). */
 const ADMIN_PLAN_ROUTE_RE = /^\/admin\/users\/([A-Za-z0-9_-]{1,64})\/plan$/;
 
+/** POST /admin/signin-log/clear — clear account-switch log for a machine (support). */
+const ADMIN_SIGNIN_LOG_CLEAR_RE = /^\/admin\/signin-log\/clear$/;
+
 /**
  * Constant-time string comparison for the admin key. Lengths must match
  * first (timingSafeEqual throws on unequal lengths) — a wrong-length key
@@ -279,7 +282,9 @@ export class HostedGatewayServer {
       // Bearer, so it skips the Bearer auth block below (it keeps the
       // top-level per-IP limiter, which already ran for this route).
       const adminPlanMatch = method === 'POST' ? ADMIN_PLAN_ROUTE_RE.exec(path) : null;
-      const isAdminRoute = adminPlanMatch !== null;
+      const adminSigninLogClearMatch =
+        method === 'POST' ? ADMIN_SIGNIN_LOG_CLEAR_RE.exec(path) : null;
+      const isAdminRoute = adminPlanMatch !== null || adminSigninLogClearMatch !== null;
 
       // 1. IP allowlist.
       if (!ipAllowed(ip, this.config.ipAllowlist)) {
@@ -384,7 +389,9 @@ export class HostedGatewayServer {
       if (isAuthRoute) {
         const body = await this.parseJsonBody(req);
         if (path === '/auth/session') {
-          const created = await this.accounts.createSession(body.google_access_token);
+          const created = await this.accounts.createSession(body.google_access_token, {
+            machineId: typeof body.machine_id === 'string' ? body.machine_id : undefined,
+          });
           status = 200;
           this.sendJson(res, 200, created);
           return;
@@ -435,7 +442,7 @@ export class HostedGatewayServer {
       // SUNDAY_ADMIN_KEY; an unset key fails closed (403 on every call).
       // The key is NEVER logged. Rate limiting comes from the top-level
       // per-IP limiter, which already admitted this request.
-      if (adminPlanMatch) {
+      if (adminPlanMatch || adminSigninLogClearMatch) {
         const configuredKey = this.config.adminKey;
         const presentedKey = req.headers['x-admin-key'];
         const keyOk =
@@ -451,13 +458,27 @@ export class HostedGatewayServer {
             configuredKey ? 'invalid admin key' : 'admin API is not configured',
           );
         }
+        // Sub-route: POST /admin/signin-log/clear {machineId} — support tool
+        // for clearing a machine's account-switch log.
+        if (adminSigninLogClearMatch) {
+          const body = await this.parseJsonBody(req);
+          const machineId = body.machineId;
+          if (typeof machineId !== 'string' || machineId.length === 0) {
+            status = 400;
+            throw new ApiError(400, 'missing_machine_id', 'body.machineId is required');
+          }
+          const removed = this.accounts.clearSigninLog(machineId);
+          status = 200;
+          this.sendJson(res, 200, { cleared: removed });
+          return;
+        }
         const body = await this.parseJsonBody(req);
         const plan = body.plan;
         if (plan !== 'basic' && plan !== 'smart' && plan !== 'pro') {
           status = 400;
           throw new ApiError(400, 'invalid_plan', 'body.plan must be one of basic|smart|pro');
         }
-        const targetUserId = adminPlanMatch[1] as string;
+        const targetUserId = adminPlanMatch![1] as string;
         const updated = this.accounts.setUserPlan(targetUserId, plan);
         if (!updated) {
           status = 404;

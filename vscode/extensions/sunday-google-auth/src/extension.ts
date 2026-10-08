@@ -175,8 +175,27 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
     // Phase 9.a: layer the Sunday gateway session on top. Local-first — the
     // Google sign-in succeeds even if the gateway is unreachable; in that
     // case getSundaySession() simply returns undefined (Google-only mode).
-    const established = await this.sundaySession.establish(tokens.accessToken);
+    // machineId enables the server's account-switch rate limit (anti Sybil).
+    const established = await this.sundaySession.establish(
+      tokens.accessToken,
+      vscode.env.machineId,
+    );
     if (!established.ok) {
+      if (established.code === 'account_switch_limit') {
+        const retryNote =
+          established.retryAfterSec && established.retryAfterSec > 60
+            ? ` (try again in ~${Math.ceil(established.retryAfterSec / 3600)}h)`
+            : '';
+        const choice = await vscode.window.showWarningMessage(
+          `You've used 2 Google accounts on this device in the last 24 hours${retryNote}. ` +
+            `Try again tomorrow — or upgrade to a paid plan for unlimited switching.`,
+          'View plans',
+          'Dismiss',
+        );
+        if (choice === 'View plans') {
+          await vscode.commands.executeCommand('sunday.billing.upgrade');
+        }
+      }
       console.warn(
         `[sunday-google-auth] Sunday session unavailable (${established.reason}); continuing in Google-only mode.`,
       );
