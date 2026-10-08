@@ -149,6 +149,11 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.initProject",
+        "title": "New Project from Template…"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.designToCode",
         "title": "Generate Component from Design Image\u2026"
       },

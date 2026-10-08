@@ -91,6 +91,7 @@ mkdirSync(join(STAGE, 'dist'), { recursive: true });
   writeFileSync(join(STAGE, 'package.json'), JSON.stringify(manifest, null, 2));
 }
 cpSync(join(ROOT, 'packages/ext-agent/dist/extension.cjs'), join(STAGE, 'dist/extension.cjs'));
+cpSync(join(ROOT, 'packages/ext-agent/templates'), join(STAGE, 'templates'), { recursive: true });
 const readme = join(ROOT, 'packages/ext-agent/README.md');
 if (existsSync(readme)) cpSync(readme, join(STAGE, 'README.md'));
 cpSync(join(ROOT, 'packages/ui-chat/dist'), join(STAGE, 'ui-chat/dist'), { recursive: true });
