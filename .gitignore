@@ -4,3 +4,6 @@ dist/
 .DS_Store
 # Staged at build time by scripts/sync-builtin.sh — never committed.
 vscode/extensions/sunday-agent/
+
+# Sunday hosted gateway runtime data (users/sessions JSON — never commit)
+packages/hosted-gateway/data/
