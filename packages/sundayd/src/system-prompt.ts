@@ -20,7 +20,18 @@ import {
   type ActiveRule,
   type SkillSummary,
 } from '@sunday/skills';
-import { formatForPrompt as formatAgentsMd, loadAgentsMd } from '@sunday/context';
+import {
+  formatForPrompt as formatAgentsMd,
+  formatStyleForPrompt,
+  inferStyle,
+  loadAgentsMd,
+  loadStoredStyle,
+  saveStyle,
+  STYLE_AUTOINFER_ENV,
+} from '@sunday/context';
+
+/** Re-exported for consumers that already import from here. */
+export { STYLE_AUTOINFER_ENV };
 
 export interface SystemPromptData {
   skills: SkillSummary[];
@@ -28,6 +39,8 @@ export interface SystemPromptData {
   memory: { workspace?: string; user?: string };
   /** Formatted AGENTS.md block (already delimited); ''/undefined when none found. */
   agentsMd?: string;
+  /** One-line code-style summary; ''/undefined when disabled or undetectable. */
+  codeStyle?: string;
 }
 
 export interface SystemPromptOptions {
@@ -87,7 +100,21 @@ export async function collectSystemPromptData(
   } catch {
     agentsMd = '';
   }
-  return { skills, rules, memory, agentsMd };
+  // Group B2: style is inferred once per project (bounded: 50 files/200KB)
+  // and cached in ~/.sunday/styles/; later sessions just load the file.
+  // Disabled when the extension stamps SUNDAY_STYLE_AUTOINFER=0.
+  let codeStyle = '';
+  try {
+    if (process.env[STYLE_AUTOINFER_ENV] !== '0') {
+      const stored = loadStoredStyle(workspaceDir);
+      const style = stored ?? inferStyle(workspaceDir);
+      if (!stored) saveStyle(workspaceDir, style);
+      codeStyle = formatStyleForPrompt(style);
+    }
+  } catch {
+    codeStyle = '';
+  }
+  return { skills, rules, memory, agentsMd, codeStyle };
 }
 
 /**
@@ -147,6 +174,11 @@ export function buildSystemPrompt(data: SystemPromptData): string {
   // repository context by formatForPrompt().
   if (data.agentsMd) {
     sections.push(['## Repository instructions', '', data.agentsMd].join('\n'));
+  }
+
+  // Group B2: one-line style summary so the agent matches house style.
+  if (data.codeStyle) {
+    sections.push(['## Code style', '', data.codeStyle].join('\n'));
   }
 
   return sections.join('\n\n');

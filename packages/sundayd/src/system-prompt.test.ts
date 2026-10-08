@@ -160,6 +160,21 @@ describe('collectSystemPromptData + buildSessionSystemPrompt', () => {
     }
   });
 
+  it('injects the inferred code style once per project (B2)', async () => {
+    const { ws, home } = await makeWorkspace();
+    useTempHome(home);
+    try {
+      const first = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
+      expect(first.codeStyle).toBeTruthy();
+      // Second collect reuses the stored file (no re-inference needed).
+      const second = await collectSystemPromptData({ workspaceDir: ws, userDir: home });
+      expect(second.codeStyle).toBe(first.codeStyle);
+      const prompt = buildSystemPrompt(second);
+      expect(prompt).toContain('## Code style');
+    } finally {
+      delete process.env.SUNDAY_HOME;
+    }
+  });
 
   it('omits the repository-instructions section when no AGENTS.md exists', async () => {
     const root = await mkdtemp(join(tmpdir(), 'sunday-prompt-noagents-'));
