@@ -7,6 +7,8 @@ vi.mock('vscode', () => ({}));
 
 import {
   DEFAULT_PLAN,
+  GITHUB_PROVIDER_ID,
+  GITHUB_SCOPES,
   GOOGLE_PROVIDER_ID,
   GOOGLE_SCOPES,
   GOOGLE_SIGN_OUT_COMMAND,
@@ -62,6 +64,25 @@ describe('deriveAccountState', () => {
     });
   });
 
+  it('records the provider when given', () => {
+    expect(
+      deriveAccountState(makeSession('vivek@example.com'), undefined, 'github'),
+    ).toEqual({
+      signedIn: true,
+      provider: 'github',
+      email: 'vivek@example.com',
+      plan: 'Basic',
+    });
+    expect(
+      deriveAccountState(makeSession('vivek@example.com'), { plan: 'smart' }, 'google'),
+    ).toEqual({
+      signedIn: true,
+      provider: 'google',
+      email: 'vivek@example.com',
+      plan: 'Smart',
+    });
+  });
+
   it('takes the plan from the Sunday session when present', () => {
     expect(deriveAccountState(makeSession('vivek@example.com'), { plan: 'smart' })).toEqual({
       signedIn: true,
@@ -101,6 +122,17 @@ describe('accountStatusBarLabel', () => {
     ).toBe('$(account) vivek@example.com · Basic');
   });
 
+  it('shows the GitHub provider suffix when signed in via GitHub', () => {
+    expect(
+      accountStatusBarLabel({
+        signedIn: true,
+        provider: 'github',
+        email: 'octocat',
+        plan: 'Basic',
+      }),
+    ).toBe('$(account) octocat · Basic · GitHub');
+  });
+
   it('reflects a non-Basic plan', () => {
     expect(
       accountStatusBarLabel({ signedIn: true, email: 'vivek@example.com', plan: 'Smart' }),
@@ -131,11 +163,12 @@ describe('accountStatusBarTooltip', () => {
 });
 
 describe('quick-pick items', () => {
-  it('signed-out menu offers exactly one "Sign in with Google" row', () => {
+  it('signed-out menu offers "Sign in with Google" and "Sign in with GitHub"', () => {
     const items = buildSignedOutPickItems();
-    expect(items).toHaveLength(1);
-    expect(items[0].action).toBe('sign-in');
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.action)).toEqual(['sign-in-google', 'sign-in-github']);
     expect(items[0].label).toContain('Sign in with Google');
+    expect(items[1].label).toContain('Sign in with GitHub');
   });
 
   it('signed-in menu shows email, plan badge, Sign out and Close', () => {
@@ -167,8 +200,10 @@ describe('quick-pick items', () => {
 });
 
 describe('quick-pick actions', () => {
-  it('signed-out: sign-in row → signIn, dismiss/Close → none', () => {
-    expect(signedOutPickAction(buildSignedOutPickItems()[0])).toBe('signIn');
+  it('signed-out: Google row → signInGoogle, GitHub row → signInGitHub, dismiss → none', () => {
+    const items = buildSignedOutPickItems();
+    expect(signedOutPickAction(items[0])).toBe('signInGoogle');
+    expect(signedOutPickAction(items[1])).toBe('signInGitHub');
     expect(signedOutPickAction(undefined)).toBe('none');
   });
 
@@ -185,6 +220,11 @@ describe('constants', () => {
   it('uses the bundled Google provider id and minimal identity scopes', () => {
     expect(GOOGLE_PROVIDER_ID).toBe('google');
     expect([...GOOGLE_SCOPES]).toEqual(['openid', 'email', 'profile']);
+  });
+
+  it('uses the built-in GitHub provider id with repo scope for cloning', () => {
+    expect(GITHUB_PROVIDER_ID).toBe('github');
+    expect([...GITHUB_SCOPES]).toEqual(['read:user', 'user:email', 'repo']);
   });
 
   it('routes sign-out through the auth extension command', () => {

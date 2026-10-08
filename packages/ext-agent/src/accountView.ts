@@ -1,15 +1,17 @@
 // sunday-agent — Sunday Account status bar UI shell (Phase 9.a, minimal).
 //
 // Owns the "Sunday Account" status bar item and its menu:
-//   - Signed OUT → `$(sign-in) Sign in to Sunday` → Google OAuth through the
-//     `sunday-google-auth` authentication provider (id `google`).
+//   - Signed OUT → `$(sign-in) Sign in to Sunday` → Google or GitHub OAuth
+//     through the `sunday-google-auth` (`google`) or built-in (`github`)
+//     authentication providers.
 //   - Signed IN  → `$(account) <email> · <plan>` → quick-pick menu showing the
 //     email, the plan badge (from the auth extension's exported Sunday session
 //     info when available, otherwise "Basic"), plus "Sign out" / "Close".
 //
 // Deliberately no upgrade buttons, no billing links — those arrive in a later
-// phase. Sign-out goes through the auth extension's `sunday.google.signOut`
+// phase. Google sign-out goes through the auth extension's `sunday.google.signOut`
 // command because `vscode.authentication` has no public session-removal API.
+// GitHub sign-out directs to the Accounts menu (same limitation).
 //
 // Test boundary: everything that formats or derives UI state from session
 // data lives in the pure functions below (unit-tested in accountView.test.ts).
@@ -24,6 +26,13 @@ export const GOOGLE_SCOPES: readonly string[] = ['openid', 'email', 'profile'];
 export const GOOGLE_SIGN_OUT_COMMAND = 'sunday.google.signOut';
 /** Extension id of the bundled Google auth provider (may be absent in dev hosts). */
 export const GOOGLE_AUTH_EXTENSION_ID = 'sunday.sunday-google-auth';
+/** Auth provider id of the built-in VS Code GitHub authentication extension. */
+export const GITHUB_PROVIDER_ID = 'github';
+/** GitHub scopes: identity + email + repo (repo enables cloning private repos). */
+export const GITHUB_SCOPES: readonly string[] = ['read:user', 'user:email', 'repo'];
+/** Supported sign-in providers, in display order. */
+export type AuthProviderKind = 'google' | 'github';
+export const AUTH_PROVIDERS: readonly AuthProviderKind[] = ['google', 'github'];
 /** Command id shown on the status bar item / command palette for the account menu. */
 export const ACCOUNT_MENU_COMMAND = 'sunday.account.showMenu';
 /** Status bar priority — matches the sidecar health item (~100), right side. */
@@ -45,6 +54,7 @@ export interface SundaySessionInfo {
 /** UI state derived from the VS Code auth session (+ optional Sunday session). */
 export interface AccountState {
   signedIn: boolean;
+  provider?: AuthProviderKind;
   email?: string;
   plan: string;
 }
@@ -63,10 +73,12 @@ export function normalizePlan(raw: string | undefined): string {
 export function deriveAccountState(
   session: vscode.AuthenticationSession | undefined,
   sundaySession?: SundaySessionInfo | undefined,
+  provider?: AuthProviderKind,
 ): AccountState {
   const email = session?.account?.label || sundaySession?.email;
   return {
     signedIn: Boolean(session),
+    ...(provider ? { provider } : {}),
     ...(email ? { email } : {}),
     plan: normalizePlan(sundaySession?.plan),
   };
@@ -75,30 +87,42 @@ export function deriveAccountState(
 /** Status bar text for the account state. */
 export function accountStatusBarLabel(state: AccountState): string {
   if (!state.signedIn) return '$(sign-in) Sign in to Sunday';
-  return `$(account) ${state.email ?? 'Sunday account'} · ${state.plan}`;
+  const via = state.provider === 'github' ? ' · GitHub' : '';
+  return `$(account) ${state.email ?? 'Sunday account'} · ${state.plan}${via}`;
 }
 
 /** Status bar hover tooltip for the account state. */
 export function accountStatusBarTooltip(state: AccountState): string {
-  if (!state.signedIn) return 'Sign in to your Sunday account (Google)';
-  return `Sunday account — ${state.email ?? 'signed in'} · Plan: ${state.plan}`;
+  if (!state.signedIn) return 'Sign in to your Sunday account (Google or GitHub)';
+  const via = state.provider ? ` via ${state.provider === 'github' ? 'GitHub' : 'Google'}` : '';
+  return `Sunday account — ${state.email ?? 'signed in'}${via} · Plan: ${state.plan}`;
 }
 
 /** Discriminant for identifying account quick-pick items (pure + testable). */
-export type AccountPickAction = 'sign-in' | 'email-info' | 'sign-out' | 'close';
+export type AccountPickAction =
+  | 'sign-in-google'
+  | 'sign-in-github'
+  | 'email-info'
+  | 'sign-out'
+  | 'close';
 
 /** A quick-pick row in the account menu, tagged by kind. */
 export interface AccountPickItem extends vscode.QuickPickItem {
   action: AccountPickAction;
 }
 
-/** Signed-out menu: a single "Sign in with Google" row. */
+/** Signed-out menu: "Sign in with Google" and "Sign in with GitHub" rows. */
 export function buildSignedOutPickItems(): AccountPickItem[] {
   return [
     {
-      action: 'sign-in',
+      action: 'sign-in-google',
       label: '$(sign-in) Sign in with Google',
-      description: 'Sign in to your Sunday account',
+      description: '200 free AI requests/day via the Sunday hosted gateway',
+    },
+    {
+      action: 'sign-in-github',
+      label: '$(github) Sign in with GitHub',
+      description: 'Also enables one-click repo import',
     },
   ];
 }
@@ -126,8 +150,17 @@ export function buildSignedInPickItems(state: AccountState): AccountPickItem[] {
 }
 
 /** Action the signed-out menu pick resolves to. */
-export function signedOutPickAction(pick: AccountPickItem | undefined): 'signIn' | 'none' {
-  return pick?.action === 'sign-in' ? 'signIn' : 'none';
+export function signedOutPickAction(
+  pick: AccountPickItem | undefined,
+): 'signInGoogle' | 'signInGitHub' | 'none' {
+  switch (pick?.action) {
+    case 'sign-in-google':
+      return 'signInGoogle';
+    case 'sign-in-github':
+      return 'signInGitHub';
+    default:
+      return 'none';
+  }
 }
 
 /** Action the signed-in menu pick resolves to. */
@@ -153,18 +186,30 @@ export interface AccountViewDeps {
   onSignedOut?: () => void;
 }
 
-async function getGoogleSession(
+async function getAuthSession(
+  provider: AuthProviderKind,
   createIfNone: boolean,
 ): Promise<vscode.AuthenticationSession | undefined> {
+  const providerId = provider === 'github' ? GITHUB_PROVIDER_ID : GOOGLE_PROVIDER_ID;
+  const scopes = provider === 'github' ? [...GITHUB_SCOPES] : [...GOOGLE_SCOPES];
   try {
-    return await vscode.authentication.getSession(GOOGLE_PROVIDER_ID, [...GOOGLE_SCOPES], {
-      createIfNone,
-    });
+    return await vscode.authentication.getSession(providerId, scopes, { createIfNone });
   } catch {
     // Provider not installed/available (e.g. plain upstream VS Code without
-    // the bundled auth extension) — treat as signed out.
+    // the bundled auth extensions) — treat as signed out.
     return undefined;
   }
+}
+
+/** Return the first active session across providers (Google preferred). */
+async function getAnySession(): Promise<
+  { session: vscode.AuthenticationSession; provider: AuthProviderKind } | undefined
+> {
+  for (const provider of AUTH_PROVIDERS) {
+    const session = await getAuthSession(provider, false);
+    if (session) return { session, provider };
+  }
+  return undefined;
 }
 
 /**
@@ -212,11 +257,12 @@ export function registerAccountStatusBar(
 
   const refresh = async (): Promise<void> => {
     try {
-      const [session, sunday] = await Promise.all([
-        getGoogleSession(false),
-        getSundaySessionInfo(),
-      ]);
-      state = deriveAccountState(session, sunday);
+      const found = await getAnySession();
+      // Sunday session info (plan badge) is only available via the Google
+      // auth extension today; GitHub sessions fall back to the Basic default.
+      const sunday =
+        found?.provider === 'google' ? await getSundaySessionInfo() : undefined;
+      state = deriveAccountState(found?.session, sunday, found?.provider);
     } catch (err) {
       // Never break activation on auth failures; stay in the signed-out UI.
       log(`account: refresh failed: ${(err as Error).message}`);
@@ -225,9 +271,10 @@ export function registerAccountStatusBar(
     render();
   };
 
-  const signIn = async (): Promise<void> => {
+  const signIn = async (provider: AuthProviderKind): Promise<void> => {
+    const providerName = provider === 'github' ? 'GitHub' : 'Google';
     try {
-      await getGoogleSession(true);
+      await getAuthSession(provider, true);
       // onDidChangeSessions normally refreshes the UI; refresh here too in
       // case the provider does not fire the event.
       await refresh();
@@ -235,24 +282,32 @@ export function registerAccountStatusBar(
     } catch (err) {
       void vscode.window.showErrorMessage(
         `Sunday sign-in failed: ${(err as Error).message}. ` +
-          'Make sure the Google authentication provider is installed.',
+          `Make sure the ${providerName} authentication provider is installed.`,
       );
     }
   };
 
   const signOut = async (): Promise<void> => {
     try {
-      // `vscode.authentication` has no public session-removal API, so sign-out
-      // is delegated to the auth extension's own command when present.
-      const commands = await vscode.commands.getCommands(true);
-      if (!commands.includes(GOOGLE_SIGN_OUT_COMMAND)) {
+      if (state.provider === 'google') {
+        // `vscode.authentication` has no public session-removal API, so Google
+        // sign-out is delegated to the auth extension's own command when present.
+        const commands = await vscode.commands.getCommands(true);
+        if (!commands.includes(GOOGLE_SIGN_OUT_COMMAND)) {
+          void vscode.window.showInformationMessage(
+            'Sign-out is not available in this build. ' +
+              'Use the Accounts menu (bottom-left) to sign out of Google.',
+          );
+          return;
+        }
+        await vscode.commands.executeCommand(GOOGLE_SIGN_OUT_COMMAND);
+      } else {
+        // GitHub (built-in provider): no programmatic sign-out API either.
         void vscode.window.showInformationMessage(
-          'Sign-out is not available in this build. ' +
-            'Use the Accounts menu (bottom-left) to sign out of Google.',
+          'Use the Accounts menu (bottom-left) to sign out of GitHub.',
         );
         return;
       }
-      await vscode.commands.executeCommand(GOOGLE_SIGN_OUT_COMMAND);
       await refresh();
       deps.onSignedOut?.();
     } catch (err) {
@@ -266,7 +321,9 @@ export function registerAccountStatusBar(
         buildSignedOutPickItems(),
         { title: 'Sunday Account', placeHolder: 'Sign in to your Sunday account' },
       );
-      if (signedOutPickAction(pick) === 'signIn') await signIn();
+      const action = signedOutPickAction(pick);
+      if (action === 'signInGoogle') await signIn('google');
+      else if (action === 'signInGitHub') await signIn('github');
       return;
     }
     const pick = await vscode.window.showQuickPick<AccountPickItem>(
@@ -280,7 +337,9 @@ export function registerAccountStatusBar(
     void showMenu();
   });
   const sessionSub = vscode.authentication.onDidChangeSessions((e) => {
-    if (e.provider.id === GOOGLE_PROVIDER_ID) void refresh();
+    if (e.provider.id === GOOGLE_PROVIDER_ID || e.provider.id === GITHUB_PROVIDER_ID) {
+      void refresh();
+    }
   });
 
   render();
