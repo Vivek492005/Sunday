@@ -151,6 +151,16 @@
         "category": "Sunday",
         "command": "sunday.usage.show",
         "title": "Show Usage Dashboard"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.sync.upload",
+        "title": "Sync: Upload Sessions (Encrypted)"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.sync.download",
+        "title": "Sync: Download Sessions (Encrypted)"
       }
     ],
     "keybindings": [
@@ -217,6 +227,11 @@
           "type": "string",
           "default": "",
           "description": "Hosted Sunday gateway base URL for the usage dashboard and session sync. Empty = SUNDAY_API_URL env, then the built-in default."
+        },
+        "sunday.sync.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt-in: end-to-end encrypted session sync (sunday.sync.upload / download). The encryption passphrase is asked each time and never stored. Default off."
         },
         "sunday.orchestration.parallel": {
           "default": false,

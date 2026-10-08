@@ -38,6 +38,7 @@ import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
 import { registerUsageCommands } from './usage/usagePanel.js';
+import { registerSyncCommands } from './sync.js';
 import { registerProactiveMode } from './proactiveMode.js';
 import { registerAgentsMd } from './agentsMd.js';
 import { registerStyleInfer } from './styleInfer.js';
@@ -645,6 +646,9 @@ export async function activate(
   context.subscriptions.push(registerSwarmWebview(context));
   // Group D2: Sunday Usage dashboard (`sunday.usage.show`).
   context.subscriptions.push(registerUsageCommands(context, { log }));
+  // Group D3: end-to-end encrypted session sync (`sunday.sync.upload` /
+  // `sunday.sync.download`). Opt-in via `sunday.sync.enabled`.
+  for (const d of registerSyncCommands({ context, log })) context.subscriptions.push(d);
   context.subscriptions.push(registerProactiveMode(context));
 
   // -- Personalization (Group B): AGENTS.md watcher + style inference -------

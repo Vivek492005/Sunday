@@ -62,8 +62,14 @@ export class GatewayAuthError extends Error {
 }
 
 /** Minimal fetch shape (injectable for tests). */
+export interface GatewayFetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
 export interface GatewayFetch {
-  (url: string, init?: { headers?: Record<string, string> }): Promise<{
+  (url: string, init?: GatewayFetchInit): Promise<{
     ok: boolean;
     status: number;
     json(): Promise<unknown>;
