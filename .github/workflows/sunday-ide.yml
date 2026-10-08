@@ -152,6 +152,7 @@ jobs:
           $hits = git grep -n -E $pattern -- packages scripts docs packaging branding .github `
             ':!packages/skills/src/memory.ts' `
             ':!packages/skills/src/memory.test.ts' `
+            ':!packages/skills/src/second-brain.test.ts' `
             ':!packages/sundayd/src/agent-tools.test.ts' `
             ':!packages/mcp/src/mcp.test.ts' 2>$null
           if ($LASTEXITCODE -gt 1) {
