@@ -29,6 +29,8 @@ import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
 import { SocialVerifier, type SocialIdentity } from './social-auth.js';
 import { DailyQuota } from './quota.js';
+import { UpdateChecker, type UpdatePlatform } from './updates.js';
+import { AccountsService, basicEntitlements } from './accounts.js';
 import {
   ApiError,
   chatCompletionObject,
@@ -43,6 +45,10 @@ const VERSION = '0.1.0';
 export interface ServerDeps {
   router?: Router;
   registry?: ProviderRegistry;
+  /** Override the accounts data dir (tests use a tmp dir; default is <pkg>/data). */
+  dataDir?: string;
+  /** fetch impl for Google token verification (tests inject a mock). */
+  accountsFetch?: typeof fetch;
 }
 
 export class HostedGatewayServer {
@@ -50,11 +56,15 @@ export class HostedGatewayServer {
   private readonly limiter: KeyRateLimiter;
   /** S8: per-IP backstop against sock-puppet farms (per-key limits multiply). */
   private readonly ipLimiter: IpRateLimiter;
+  /** Phase 9.a: stricter per-IP limit on /auth/* (login endpoints are abuse magnets). */
+  private readonly authIpLimiter: IpRateLimiter;
   private readonly audit: AuditLog;
   private readonly router: Router;
   private readonly registry: ProviderRegistry;
   private readonly social: SocialVerifier;
   private readonly quota: DailyQuota;
+  private readonly accounts: AccountsService;
+  private readonly updates: UpdateChecker;
   private server: Server | undefined;
 
   constructor(
@@ -67,6 +77,7 @@ export class HostedGatewayServer {
       tokensPerMinute: config.tokensPerMinute,
     });
     this.ipLimiter = new IpRateLimiter({ requestsPerMinute: 300 });
+    this.authIpLimiter = new IpRateLimiter({ requestsPerMinute: 20 });
     this.audit = new AuditLog(config.auditLog);
     // S8: restrict the server registry to paid upstream providers only.
     // The default registry includes `sunday:` (self-loop burning quota) and
@@ -75,6 +86,11 @@ export class HostedGatewayServer {
     this.router = deps.router ?? new Router(this.registry, 'openrouter:meta-llama/llama-3.3-70b-instruct');
     this.social = new SocialVerifier(this.config.oauthProviders);
     this.quota = new DailyQuota(config.dailyQuota);
+    this.accounts = new AccountsService(config.sessionSecret, {
+      dataDir: deps.dataDir,
+      fetchFn: deps.accountsFetch,
+    });
+    this.updates = new UpdateChecker();
   }
 
   async listen(): Promise<void> {
@@ -149,6 +165,22 @@ export class HostedGatewayServer {
     });
   }
 
+  /** Read a JSON object body (empty body -> {}); throws 400 on invalid JSON. */
+  private async parseJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+    const raw = await this.readBody(req, this.config.maxBodyBytes);
+    if (raw.length === 0) return {};
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw.toString('utf8'));
+    } catch {
+      throw new ApiError(400, 'invalid_json', 'request body must be valid JSON');
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new ApiError(400, 'invalid_json', 'request body must be a JSON object');
+    }
+    return parsed as Record<string, unknown>;
+  }
+
   private clientIp(req: IncomingMessage): string {
     // No X-Forwarded-For trust: the gateway is expected to run behind the
     // operator's own TLS terminator, and trusting client-supplied headers
@@ -172,6 +204,16 @@ export class HostedGatewayServer {
     let error: string | undefined;
 
     try {
+      const isHealth = method === 'GET' && path === '/health';
+      // Update checks are public reads (must work for signed-out users),
+      // still covered by the per-IP limiter above.
+      const isUpdateCheck = method === 'GET' && path === '/updates/check';
+      // Phase 9.a accounts endpoints: unauthenticated by design (they ARE
+      // the login flow), but under a stricter per-IP limit.
+      const isAuthRoute =
+        method === 'POST' &&
+        (path === '/auth/session' || path === '/auth/refresh' || path === '/auth/logout');
+
       // 1. IP allowlist.
       if (!ipAllowed(ip, this.config.ipAllowlist)) {
         status = 403;
@@ -180,20 +222,27 @@ export class HostedGatewayServer {
 
       // S8: per-IP backstop (before auth — even unauthenticated floods count).
       // Skipped for /health so load-balancer probes never trip it.
-      if (!(method === 'GET' && path === '/health') && !this.ipLimiter.tryAdmit(ip)) {
+      if (!isHealth && !this.ipLimiter.tryAdmit(ip)) {
         status = 429;
         res.setHeader('Retry-After', '60');
         throw new ApiError(429, 'ip_rate_limited', 'too many requests from this IP');
       }
 
-      // 2/3. Auth (skipped for /health) + body.
-      // Two modes: GitHub OAuth token (per-user free tier) or static
-      // gateway API key (operator/testing). GitHub mode is tried first
-      // when enabled; a valid GitHub token always wins.
-      const isHealth = method === 'GET' && path === '/health';
+      // Phase 9.a: /auth/* gets its own stricter bucket (20 req/min/IP).
+      if (isAuthRoute && !this.authIpLimiter.tryAdmit(ip)) {
+        status = 429;
+        res.setHeader('Retry-After', '60');
+        throw new ApiError(429, 'auth_rate_limited', 'too many auth attempts from this IP');
+      }
+
+      // 2/3. Auth (skipped for /health, /updates/check, and /auth/*) + body.
+      // Modes, tried in order: GitHub OAuth token (per-user free tier),
+      // static gateway API key, then Sunday session JWT (Phase 9.a).
+      // A valid credential of any mode always wins.
       let key: { id: string } | undefined;
       let socialIdentity: SocialIdentity | undefined;
-      if (!isHealth) {
+      let sessionUserId: string | undefined;
+      if (!isHealth && !isUpdateCheck && !isAuthRoute) {
         const secret = KeyStore.extractBearer(req.headers.authorization);
 
         if (this.config.socialAuth && secret) {
@@ -208,26 +257,96 @@ export class HostedGatewayServer {
           keyId = socialIdentity.key;
         } else {
           const found = this.keys.verify(secret);
-          if (!found) {
-            status = 401;
-            keyId = secret ? 'invalid' : 'none';
-            res.setHeader('WWW-Authenticate', 'Bearer');
-            throw new ApiError(
-              401,
-              'unauthorized',
-              this.config.socialAuth
-                ? 'valid social login token or gateway API key required'
-                : 'valid Bearer API key required',
-            );
+          if (found) {
+            key = found;
+            keyId = keyFingerprint(found.secret);
+          } else {
+            // Phase 9.a: Sunday session JWT. Namespaced like social ids so a
+            // user id can never collide with a gateway API key id.
+            const userId = secret ? this.accounts.verifySessionToken(secret) : undefined;
+            if (userId) {
+              sessionUserId = userId;
+              key = { id: `sess:${userId}` };
+              keyId = key.id;
+            } else {
+              status = 401;
+              keyId = secret ? 'invalid' : 'none';
+              res.setHeader('WWW-Authenticate', 'Bearer');
+              throw new ApiError(
+                401,
+                'unauthorized',
+                this.config.socialAuth
+                  ? 'valid social login token, Sunday session token, or gateway API key required'
+                  : 'valid Bearer API key or Sunday session token required',
+              );
+            }
           }
-          key = found;
-          keyId = keyFingerprint(found.secret);
         }
       }
 
       if (method === 'GET' && path === '/health') {
         status = 200;
         this.sendJson(res, 200, { ok: true, version: VERSION });
+        return;
+      }
+
+      if (isUpdateCheck) {
+        const query = (req.url ?? '').split('?')[1] ?? '';
+        const params = new URLSearchParams(query);
+        const platformParam = params.get('platform');
+        const current = params.get('current') ?? '';
+        const platform: UpdatePlatform | null =
+          platformParam === 'win32' || platformParam === 'darwin' || platformParam === 'linux'
+            ? platformParam
+            : null;
+        if (!platform || !current) {
+          status = 400;
+          throw new ApiError(
+            400,
+            'invalid_update_query',
+            'query must include platform=win32|darwin|linux and current=<version>',
+          );
+        }
+        const result = await this.updates.check(platform, current);
+        status = 200;
+        this.sendJson(res, 200, result);
+        return;
+      }
+
+      // Phase 9.a accounts endpoints (unauthenticated; per-IP limited above).
+      if (isAuthRoute) {
+        const body = await this.parseJsonBody(req);
+        if (path === '/auth/session') {
+          const created = await this.accounts.createSession(body.google_access_token);
+          status = 200;
+          this.sendJson(res, 200, created);
+          return;
+        }
+        if (path === '/auth/refresh') {
+          const rotated = this.accounts.rotateRefreshToken(body.refresh_token);
+          status = 200;
+          this.sendJson(res, 200, rotated);
+          return;
+        }
+        // path === '/auth/logout'
+        this.accounts.logout(
+          body.refresh_token,
+          KeyStore.extractBearer(req.headers.authorization),
+        );
+        status = 200;
+        this.sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // Phase 9.a: requires a valid Sunday session JWT specifically (the
+      // middleware also records which auth mode was used in sessionUserId).
+      if (method === 'GET' && path === '/me/entitlements') {
+        if (!sessionUserId) {
+          status = 401;
+          throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
+        }
+        status = 200;
+        this.sendJson(res, 200, basicEntitlements());
         return;
       }
 
