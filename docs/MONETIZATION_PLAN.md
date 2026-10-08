@@ -797,4 +797,29 @@ See §5.2 — identical shape, served directly from the `entitlements` table of 
 
 ---
 
-*End of `Sunday-monetization-plan.md` v1.0*
+### A.5 Plan templates (Phase 9.b, implemented)
+
+Plan templates live in `packages/hosted-gateway/data/plans.json` (versioned,
+`version: 1`). The gateway computes a user's served entitlements from their
+plan's template via `computeEntitlements()` in
+`packages/hosted-gateway/src/entitlements.ts`. Prices are illustrative —
+tune once real managed-provider costs are known.
+
+| Plan | Price (illustrative) | Managed req/day | Max agents | Parallel | Browser agent | Index cap |
+|---|---|---|---|---|---|---|
+| Basic | ₹0 | 200 | 1 | no | no | 100 MB |
+| Smart | ₹499/mo | 300 | 2 | no | 5 sessions/day | 500 MB |
+| Pro | ₹1499/mo | 1500 | 4 | yes | 50 sessions/day | 2000 MB |
+
+**Client contract:** `packages/ext-agent/src/entitlements/types.ts`. Client
+code checks entitlement keys (`getEntitlements()`), never plan names. Cache:
+1h `valid_until`, 72h grace window when the backend is unreachable, then a
+Basic-equivalent fallback with managed routes disabled. The gateway
+re-checks entitlements server-side on every managed request, so a stale or
+tampered client cache can only hide UI — never bypass limits.
+
+**Admin testing:** `POST /admin/users/:id/plan` (gateway, `SUNDAY_ADMIN_KEY`
+required) recomputes entitlements from the plan template. For testing gating
+before billing exists — not for production use.
+
+*End of `Sunday-monetization-plan.md` v1.0 (Phase 9.b appendix added)*
