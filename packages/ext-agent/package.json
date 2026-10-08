@@ -154,11 +154,6 @@
       },
       {
         "category": "Sunday",
-        "command": "sunday.missionControl",
-        "title": "Open Mission Control"
-      },
-      {
-        "category": "Sunday",
         "command": "sunday.admin.setPlan",
         "title": "Sunday Admin: Set User Plan…"
       },
