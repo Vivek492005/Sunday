@@ -1,6 +1,7 @@
 // Unit tests for githubRepos.ts — pure functions + mocked GitHub API.
 // No real network calls; the vscode API is never touched here.
 import { describe, it, expect, vi } from 'vitest';
+import * as path from 'node:path';
 
 vi.mock('vscode', () => ({}));
 
@@ -76,7 +77,7 @@ describe('repoPickLabel / repoPickDetail', () => {
 describe('defaultCloneDir', () => {
   it('puts repos under ~/Sunday-repos/<name>', () => {
     const dir = defaultCloneDir('my-app');
-    expect(dir.endsWith(`Sunday-repos${'/'}my-app`)).toBe(true);
+    expect(dir.endsWith(`Sunday-repos${path.sep}my-app`)).toBe(true);
   });
 });
 
