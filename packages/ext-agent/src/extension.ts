@@ -61,10 +61,12 @@ import {
   sourceLabel,
   type SundaySessionLike,
 } from './entitlements/entitlementsCache.js';
+import { setEntitlementsProvider } from './entitlements/provider.js';
 import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
 import { registerBestOfN } from './bestOfNView.js';
 import { registerArtifacts } from './artifacts/artifactsPanel.js';
-import { registerSchedulerCommands } from './scheduler.js';
+import { registerSchedulerCommands, makeSchedulerSource } from './scheduler.js';
+import { registerMissionControl } from './mission-control/missionControl.js';
 import { defaultAdminPlanDeps, registerAdminPlanCommand } from './adminPlan.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
@@ -805,6 +807,10 @@ export async function activate(
     },
     log,
   });
+  // Register the cache as the global entitlements provider so the gated
+  // touchpoints (Task 7: model picker, orchestrator caps, browser toggle,
+  // index cap) read from it. Without this, all gates fail open by design.
+  setEntitlementsProvider(entitlements);
 
   // -- Sunday Account status bar UI shell (Phase 9.a: minimal, no billing) ---
   context.subscriptions.push(
@@ -831,6 +837,27 @@ export async function activate(
 
   // -- A5: scheduled tasks -------------------------------------------------------
   registerSchedulerCommands(context, { getBridge: getBridgeForCommands, log });
+
+  // -- A4: mission control -------------------------------------------------------
+  // Aggregates orchestrator runs, browser sessions, cloud tasks (A1) and
+  // scheduled tasks (A5). Browser sessions are owned by the browser panel
+  // webview (no session-list RPC exists), so that section starts empty
+  // until a host-queryable session API lands.
+  registerMissionControl(context, {
+    getBridge: getBridgeForCommands,
+    makeCloudTaskClient: defaultCloudTaskDeps(log).makeClient,
+    scheduler: makeSchedulerSource({ getBridge: getBridgeForCommands, log }),
+    getOrchestrationRunIds: () => {
+      const rid = managerPanel?.getActiveRunId() ?? managerProvider?.getActiveRunId();
+      return rid ? [rid] : [];
+    },
+    getBrowserSessions: () => [],
+    closeBrowserSession: async () => {
+      await vscode.commands.executeCommand('sunday.browserView.focus');
+      vscode.window.showInformationMessage('Close the browser session from the Agent Browser panel.');
+    },
+    log,
+  });
 
   // -- Admin plan toggle (Phase 9.b, Task 8) ----------------------------------
   // Testing-only: set a user's plan on the hosted gateway (x-admin-key from
