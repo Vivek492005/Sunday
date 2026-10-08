@@ -37,10 +37,12 @@ interface GitHubRelease {
   body: string | null;
   published_at: string | null;
   prerelease: boolean;
+  draft?: boolean;
   assets: GitHubAsset[];
 }
 
 const GITHUB_LATEST_URL = 'https://api.github.com/repos/Vivek492005/Sunday/releases/latest';
+const GITHUB_RELEASES_URL = 'https://api.github.com/repos/Vivek492005/Sunday/releases?per_page=10';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -99,8 +101,22 @@ export function findPlatformAsset(
   return assets.find(match) ?? null;
 }
 
+/**
+ * Normalize a GitHub release tag to a comparable version string.
+ * Handles: `v1.0.0`, `ide-v1.0.0-beta.1`, `1.0.0-beta.2`.
+ * Strips any `ide-` prefix and leading `v`.
+ */
+export function normalizeTag(tag: string): string {
+  return tag.trim().replace(/^ide-/i, '').replace(/^v/i, '');
+}
+
+/** True when a version string looks like a beta/prerelease. */
+export function isBetaVersion(version: string): boolean {
+  return /beta|alpha|rc/i.test(normalizeTag(version));
+}
+
 export class UpdateChecker {
-  private cached: { at: number; release: GitHubRelease } | null = null;
+  private cached: { at: number; channel: string; release: GitHubRelease } | null = null;
   private readonly fetchImpl: FetchImpl;
   private readonly now: () => number;
 
@@ -109,9 +125,11 @@ export class UpdateChecker {
     this.now = opts.now ?? Date.now;
   }
 
-  private async fetchLatestRelease(): Promise<GitHubRelease> {
+  private async fetchLatestRelease(includePrerelease: boolean): Promise<GitHubRelease> {
     const now = this.now();
-    if (this.cached && now - this.cached.at < CACHE_TTL_MS) {
+    // Cache is per-channel: beta and stable have separate entries.
+    const cacheKey = includePrerelease ? 'beta' : 'stable';
+    if (this.cached && this.cached.channel === cacheKey && now - this.cached.at < CACHE_TTL_MS) {
       return this.cached.release;
     }
     // Retry once: Render's shared egress IPs can hit GitHub rate limits transiently.
@@ -120,7 +138,8 @@ export class UpdateChecker {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
-        const res = await this.fetchImpl(GITHUB_LATEST_URL, {
+        const url = includePrerelease ? GITHUB_RELEASES_URL : GITHUB_LATEST_URL;
+        const res = await this.fetchImpl(url, {
           headers: {
             Accept: 'application/vnd.github+json',
             // GitHub API requires a User-Agent.
@@ -133,11 +152,23 @@ export class UpdateChecker {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(`github api status ${res.status}`);
-        const release = (await res.json()) as GitHubRelease;
-        if (typeof release.tag_name !== 'string' || !Array.isArray(release.assets)) {
-          throw new Error('unexpected github api shape');
+        let release: GitHubRelease;
+        if (includePrerelease) {
+          // /releases returns newest-first; pick the first non-draft with assets.
+          const releases = (await res.json()) as GitHubRelease[];
+          if (!Array.isArray(releases)) throw new Error('unexpected github api shape');
+          const found = releases.find(
+            (r) => r && typeof r.tag_name === 'string' && !r.draft && Array.isArray(r.assets),
+          );
+          if (!found) throw new Error('no releases found');
+          release = found;
+        } else {
+          release = (await res.json()) as GitHubRelease;
+          if (typeof release.tag_name !== 'string' || !Array.isArray(release.assets)) {
+            throw new Error('unexpected github api shape');
+          }
         }
-        this.cached = { at: now, release };
+        this.cached = { at: now, channel: cacheKey, release };
         return release;
       } catch (err) {
         lastErr = err;
@@ -150,7 +181,11 @@ export class UpdateChecker {
     throw lastErr instanceof Error ? lastErr : new Error('github fetch failed');
   }
 
-  async check(platform: UpdatePlatform, current: string): Promise<UpdateCheckResult> {
+  async check(
+    platform: UpdatePlatform,
+    current: string,
+    channel: 'stable' | 'beta' = 'stable',
+  ): Promise<UpdateCheckResult> {
     const base: UpdateCheckResult = {
       updateAvailable: false,
       current,
@@ -159,20 +194,23 @@ export class UpdateChecker {
       releaseNotes: null,
       publishedAt: null,
     };
+    // Beta users get prereleases; stable users never do.
+    // Auto-detect: if the client is already on a beta, use the beta channel.
+    const useBeta = channel === 'beta' || isBetaVersion(current);
     let release: GitHubRelease;
     try {
-      release = await this.fetchLatestRelease();
+      release = await this.fetchLatestRelease(useBeta);
     } catch {
       // Never expose upstream error text to callers.
       return { ...base, error: 'update_check_failed' };
     }
-    const latest = release.tag_name.replace(/^v/i, '');
+    const latest = normalizeTag(release.tag_name);
     base.latest = latest;
     base.releaseNotes = release.body ?? null;
     base.publishedAt = release.published_at ?? null;
     // Prereleases never trigger an update on the stable channel.
-    if (release.prerelease) return base;
-    if (compareVersions(current, latest) >= 0) return base;
+    if (release.prerelease && !useBeta) return base;
+    if (compareVersions(normalizeTag(current), latest) >= 0) return base;
     const asset = findPlatformAsset(release.assets, platform);
     if (!asset) return base;
     return { ...base, updateAvailable: true, downloadUrl: asset.browser_download_url };

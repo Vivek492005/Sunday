@@ -454,7 +454,12 @@ export class HostedGatewayServer {
             'query must include platform=win32|darwin|linux and current=<version>',
           );
         }
-        const result = await this.updates.check(platform, current);
+        // Optional channel=stable|beta. Defaults to stable, but auto-detects beta
+        // from the client's current version (e.g. 1.0.0-beta.1 -> beta channel).
+        const channelParam = params.get('channel');
+        const channel: 'stable' | 'beta' =
+          channelParam === 'beta' ? 'beta' : 'stable';
+        const result = await this.updates.check(platform, current, channel);
         status = 200;
         this.sendJson(res, 200, result);
         return;
