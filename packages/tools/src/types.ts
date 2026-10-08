@@ -14,6 +14,12 @@ export interface ToolContext {
    * `run_terminal` reads this — other tools ignore it.
    */
   sandbox?: SandboxConfig;
+  /**
+   * LLM completion for `generate_command`. Stamped by the host (like
+   * `sandbox`); given a prompt, resolves with the model's raw text reply.
+   * Only `generate_command` reads this — other tools ignore it.
+   */
+  complete?: (prompt: string) => Promise<string>;
 }
 
 export interface ToolResult {

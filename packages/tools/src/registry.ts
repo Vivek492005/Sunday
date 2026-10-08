@@ -1,6 +1,7 @@
 import type { ToolDefinition } from '@sunday/protocol';
 import { editFileTool, listDirTool, readFileTool, writeFileTool } from './fs-tools.js';
 import { gitDiffTool, gitLogTool, gitStatusTool } from './git.js';
+import { generateCommandTool } from './gen-command.js';
 import { ghPrCreateTool, ghPrReviewTool } from './pr.js';
 import { runTerminalTool } from './terminal.js';
 import { searchTool } from './search.js';
@@ -70,6 +71,7 @@ export function createDefaultTools(): Tool[] {
     gitLogTool,
     ghPrCreateTool,
     ghPrReviewTool,
+    generateCommandTool,
   ];
 }
 
