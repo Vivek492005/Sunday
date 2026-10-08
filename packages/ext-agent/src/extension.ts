@@ -828,12 +828,25 @@ export async function activate(
   // user who is just editing files). Only milestone celebrations (7/14/30d,
   // max 1/day) and the 8 PM at-risk nudge may notify in passive mode; full
   // quest/achievement/XP UI unlocks in active mode (after AI agent use).
-  context.subscriptions.push(registerStreakEngagement(context, { log }));
+  //
+  // HARDENING (Beta.2 black-screen fix): the engagement module must NEVER be
+  // able to break extension activation. Wrapped in try/catch so any
+  // unexpected error here is logged and skipped, not fatal.
+  try {
+    context.subscriptions.push(registerStreakEngagement(context, { log }));
+  } catch (err) {
+    log(`streak engagement skipped (non-fatal): ${(err as Error).message}`);
+  }
 
   // -- GitHub: sign-in + one-click repo import ----------------------------------
   // Uses the built-in `github` auth provider (Device Flow); no Sunday-specific
   // OAuth app needed. See githubRepos.ts for the conflict rationale.
-  context.subscriptions.push(registerGitHubCommands(context, { log }));
+  // HARDENING: same as above — never let this break activation.
+  try {
+    context.subscriptions.push(registerGitHubCommands(context, { log }));
+  } catch (err) {
+    log(`github commands skipped (non-fatal): ${(err as Error).message}`);
+  }
 
   // -- A1: cloud async tasks ---------------------------------------------------
   // Submit/list commands + 30s completion polling (silent unless enabled).
