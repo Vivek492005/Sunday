@@ -265,6 +265,33 @@ export class HostBridge {
     return this.call('bestofn/run', params, 30 * 60 * 1000);
   }
 
+  // -- scheduled tasks (Group A, A5) --------------------------------------------
+
+  schedulerList(): Promise<MethodResult<'scheduler/list'>> {
+    return this.call('scheduler/list', {}, 15000);
+  }
+
+  schedulerCreate(params: MethodParams<'scheduler/create'>): Promise<MethodResult<'scheduler/create'>> {
+    return this.call('scheduler/create', params, 15000);
+  }
+
+  schedulerUpdate(params: MethodParams<'scheduler/update'>): Promise<MethodResult<'scheduler/update'>> {
+    return this.call('scheduler/update', params, 15000);
+  }
+
+  schedulerDelete(params: MethodParams<'scheduler/delete'>): Promise<MethodResult<'scheduler/delete'>> {
+    return this.call('scheduler/delete', params, 15000);
+  }
+
+  schedulerStatus(): Promise<MethodResult<'scheduler/status'>> {
+    return this.call('scheduler/status', {}, 15000);
+  }
+
+  schedulerRunNow(params: MethodParams<'scheduler/run-now'>): Promise<MethodResult<'scheduler/run-now'>> {
+    // A run executes a full agent turn — allow minutes.
+    return this.call('scheduler/run-now', params, 10 * 60 * 1000);
+  }
+
   /** Subscribe to `orchestrate/event` notifications. Returns an unsubscribe fn. */
   onOrchestrateEvent(listener: (n: OrchestrationEvent) => void): () => void {
     this.orchestrateListeners.add(listener);

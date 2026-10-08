@@ -34,6 +34,9 @@ import { registerTerminalExplain } from './terminalExplain.js';
 import { registerDesignToCode } from './design-to-code.js';
 import { registerOnboardRepo } from './onboarding/index.js';
 import { registerOrchestrationCommands } from './orchestrationCommands.js';
+import { getCachedView } from './entitlements/provider.js';
+import { BROWSER_PLAN_MESSAGE, browserAllowedByView } from './entitlements/browserGating.js';
+import { canUseBrowserAgent } from './entitlements/types.js';
 import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
@@ -61,6 +64,7 @@ import {
 import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
 import { registerBestOfN } from './bestOfNView.js';
 import { registerArtifacts } from './artifacts/artifactsPanel.js';
+import { registerSchedulerCommands } from './scheduler.js';
 import { defaultAdminPlanDeps, registerAdminPlanCommand } from './adminPlan.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
@@ -121,6 +125,25 @@ export async function activate(
     log(`MCP secret pre-resolution failed: ${(err as Error).message}`);
   }
 
+  // Task 7 (Gated touchpoints): the browser agent is plan-gated. Only
+  // stamp SUNDAY_BROWSER_ENABLED when the user opted in AND the cached
+  // entitlements allow the browser agent. Fail OPEN when entitlements are
+  // unknown (provider not registered / no cache yet) — the panel and the
+  // daemon re-check before doing anything.
+  const browserEnabledForSidecar = (): boolean => {
+    if (!vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)) {
+      return false;
+    }
+    const view = getCachedView(log);
+    if (view && !canUseBrowserAgent(view)) {
+      log(
+        'browser: sunday.browser.enabled is on but the plan excludes the browser agent — browserd will not start',
+      );
+      return false;
+    }
+    return true;
+  };
+
   const manager = new SidecarManager({
     extensionDir: context.extensionPath,
     clientVersion: version,
@@ -136,9 +159,11 @@ export async function activate(
       [DAEMON_BOOT_TOKEN_ENV]: daemonBootToken,
       // Agent browser opt-in (Browser Agent UI phase): sundayd only enables
       // browserd when this is '1'. Applies on the next sidecar (re)start.
-      ...(vscode.workspace.getConfiguration('sunday').get<boolean>('browser.enabled', false)
-        ? { [BROWSER_ENABLED_ENV]: '1' }
-        : {}),
+      // Task 7: the browser agent is plan-gated — a plan without the
+      // browser agent never starts browserd, even with the opt-in on.
+      // Fail OPEN when entitlements are unknown (no cache yet); the panel
+      // and the daemon re-check before doing anything.
+      ...(browserEnabledForSidecar() ? { [BROWSER_ENABLED_ENV]: '1' } : {}),
       // Local model (Ollama) for ghost-text completions: sundayd tries the
       // `ollama` provider first (3s timeout) and silently falls back to the
       // API provider chain on any failure. Applies on the next sidecar (re)start.
@@ -324,6 +349,8 @@ export async function activate(
     getBridge: () => bridge,
     ensureBridge,
     getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    // Task 7: local daily counter for the managed-model picker gate.
+    globalState: context.globalState,
     log,
   });
 
@@ -522,6 +549,12 @@ export async function activate(
       void vscode.commands.executeCommand('sunday.browserView.focus');
     }),
     vscode.commands.registerCommand('sunday.browser.takeover', async () => {
+      // Task 7: plan-gated — don't even attempt the handover (which would
+      // start the sidecar) when the plan excludes the browser agent.
+      if (!browserAllowedByView(getCachedView(log))) {
+        vscode.window.showInformationMessage(`Sunday: ${BROWSER_PLAN_MESSAGE}.`);
+        return;
+      }
       void vscode.commands.executeCommand('sunday.browserView.focus');
       const b = await getBridgeForCommands();
       if (!b || !browserProvider) return;
@@ -738,7 +771,7 @@ export async function activate(
     log,
   });
   // Group B4: agent mode status bar + `sunday.mode.set` (per-workspace
-  // persistence; stamped into the sidecar env above).
+  // persistence; stamped into the sidecar env below).
   registerAgentModes(context, { log });
 
   // -- Entitlements cache (Task 6) -------------------------------------------
@@ -795,6 +828,9 @@ export async function activate(
 
   // -- A3: artifacts panel -----------------------------------------------------
   registerArtifacts(context, { log });
+
+  // -- A5: scheduled tasks -------------------------------------------------------
+  registerSchedulerCommands(context, { getBridge: getBridgeForCommands, log });
 
   // -- Admin plan toggle (Phase 9.b, Task 8) ----------------------------------
   // Testing-only: set a user's plan on the hosted gateway (x-admin-key from

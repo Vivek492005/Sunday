@@ -139,6 +139,21 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.schedule.create",
+        "title": "Create Schedule\u2026"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.schedule.list",
+        "title": "List Scheduled Tasks"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.schedule.delete",
+        "title": "Delete Schedule\u2026"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.admin.setPlan",
         "title": "Sunday Admin: Set User Plan…"
       },
@@ -282,6 +297,13 @@
           "default": false,
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 \u2014 stays off until the parallel benchmark passes.",
           "type": "boolean"
+        },
+        "sunday.orchestration.maxParallel": {
+          "default": 3,
+          "description": "Requested max concurrent feature agents when sunday.orchestration.parallel is on. Always clamped to your plan's agent limit.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
         },
         "sunday.backgroundAgents.enabled": {
           "default": false,
