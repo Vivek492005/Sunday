@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ErrorCode, type ChatEvent, type ContentPart, type ToolCall } from '@sunday/protocol';
 import { ProviderRegistry, Router, type RelayAttempt } from '@sunday/gateway';
 import type { SandboxConfig, ToolRegistry } from '@sunday/tools';
+import { canUseTool, modeDenialMessage, type AgentMode } from '@sunday/tools';
 import { redactSecrets } from '@sunday/skills';
 import { PolicyGate } from './policy.js';
 import { wrapUntrustedToolOutput } from './untrusted.js';
@@ -28,6 +29,12 @@ export interface AgentLoopOptions {
    * when mode !== 'off'. Undefined = host execution (current behavior).
    */
   sandbox?: SandboxConfig;
+  /**
+   * Group B4: agent mode (auto/architect/implementer/reviewer). Restricted
+   * modes deny tools outside their allowlist in executeCall with a
+   * mode-specific message. Undefined = auto (no gating).
+   */
+  agentMode?: AgentMode;
 }
 
 export interface TurnEvents {
@@ -67,6 +74,7 @@ export class AgentLoop {
   private readonly defaultModel: string;
   private readonly maxIterations: number;
   private readonly sandbox: SandboxConfig | undefined;
+  private readonly agentMode: AgentMode | undefined;
 
   constructor(
     private readonly deps: AgentLoopDeps,
@@ -78,6 +86,7 @@ export class AgentLoop {
     this.defaultModel = opts.defaultModel ?? DEFAULT_MODEL;
     this.maxIterations = opts.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.sandbox = opts.sandbox;
+    this.agentMode = opts.agentMode;
   }
 
   async runTurn(
@@ -189,6 +198,17 @@ export class AgentLoop {
       return {
         toolCallId: call.id,
         content: [{ type: 'text', text: `Policy denied tool call '${call.name}': ${decision.reason}` }],
+        isError: true,
+      };
+    }
+    // Group B4: agent-mode gating — restricted modes (architect/reviewer)
+    // deny tools outside their allowlist with a mode-specific message,
+    // before any other dispatch. The denial is fed back to the model as a
+    // tool error so it can adapt.
+    if (this.agentMode !== undefined && !canUseTool(this.agentMode, call.name)) {
+      return {
+        toolCallId: call.id,
+        content: [{ type: 'text', text: modeDenialMessage(this.agentMode, call.name) }],
         isError: true,
       };
     }

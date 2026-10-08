@@ -44,6 +44,7 @@ import { registerProactiveMode } from './proactiveMode.js';
 import { registerAgentsMd } from './agentsMd.js';
 import { registerStyleInfer } from './styleInfer.js';
 import { registerInitProject } from './templates/initProject.js';
+import { AGENT_MODE_ENV, getAgentMode, registerAgentModes } from './modes.js';
 import { STYLE_AUTOINFER_ENV } from '@sunday/context';
 import {
   registerAccountStatusBar,
@@ -160,6 +161,10 @@ export async function activate(
       ...(vscode.workspace.getConfiguration('sunday.style').get<boolean>('autoInfer', true)
         ? {}
         : { [STYLE_AUTOINFER_ENV]: '0' }),
+      // Group B4: agent mode (auto/architect/implementer/reviewer), persisted
+      // per workspace in workspaceState. The daemon enforces it in the agent
+      // loop's tool-dispatch path. Applies on the next sidecar (re)start.
+      [AGENT_MODE_ENV]: getAgentMode(context.workspaceState),
       ...mcpSecretEnv,
     }),
   });
@@ -668,6 +673,9 @@ export async function activate(
     templatesDir: path.join(context.extensionPath, 'templates'),
     log,
   });
+  // Group B4: agent mode status bar + `sunday.mode.set` (per-workspace
+  // persistence; stamped into the sidecar env above).
+  registerAgentModes(context, { log });
 
   // -- Entitlements cache (Task 6) -------------------------------------------
   // Client-side cache for GET /me/entitlements with a 72h grace window (see

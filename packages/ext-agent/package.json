@@ -154,6 +154,11 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.mode.set",
+        "title": "Set Agent Mode…"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.designToCode",
         "title": "Generate Component from Design Image\u2026"
       },

@@ -20,6 +20,7 @@ import {
   type RouterPolicyConfig,
 } from '@sunday/gateway';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 import { ToolRegistry, createDefaultRegistry as createDefaultTools, type SandboxConfig } from '@sunday/tools';
@@ -35,6 +36,7 @@ import {
 } from './trust.js';
 import { workspaceSecrets } from './workspace-secrets.js';
 import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
+import { AGENT_MODE_ENV, parseAgentMode, type AgentMode } from '@sunday/tools';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
 import { CloudTaskRunner } from './task-runner.js';
@@ -235,6 +237,12 @@ export class SundayDaemon {
   private readonly contextHandlers: DaemonContextHandlers | undefined;
   /** A1: background poller for cloud async tasks (no-op unless enabled). */
   private readonly cloudTaskRunner: CloudTaskRunner;
+  /**
+   * Group B4: agent mode for this daemon's loops (auto/architect/
+   * implementer/reviewer). Stamped by the extension via SUNDAY_AGENT_MODE
+   * at spawn; standalone/CLI boots read the env directly. Defaults to auto.
+   */
+  private readonly agentMode: AgentMode;
   /** Phase 4: dynamically registered method handlers (manager methods).
    *  Wired via `registerManagerMethods(daemon)` in manager.ts. */
   private readonly extraHandlers = new Map<string, (params: unknown) => Promise<unknown>>();
@@ -257,6 +265,9 @@ export class SundayDaemon {
     this.sessions = new SessionStore(opts.sessionsDir ?? defaultSessionsDir());
     this.tools = opts.tools ?? createDefaultTools();
     this.providers = opts.providers ?? createDefaultProviders();
+    // Group B4: agent mode from the environment (the extension stamps
+    // SUNDAY_AGENT_MODE at spawn). Invalid values fall back to auto.
+    this.agentMode = parseAgentMode(process.env[AGENT_MODE_ENV]);
     // Phase 3: without a policy the router never fails over, so the visible
     // Relay would be dead code in production. Default: registry order with
     // failover on rate-limit (429s), Relay surfaced on chat/event via the
@@ -320,7 +331,7 @@ export class SundayDaemon {
               : { turnId, sessionId, event },
           ),
       },
-      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
+      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode },
     );
     this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
@@ -398,7 +409,7 @@ export class SundayDaemon {
     const loop = new AgentLoop(
       { tools: opts.tools, providers: this.providers },
       { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
-      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
+      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode },
     );
     await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal, temperature: opts.temperature });
   }
@@ -429,6 +440,16 @@ export class SundayDaemon {
     this.transport.notify('background/event', event);
   }
 
+  /** A5: emit a `scheduler/event` notification to connected clients. */
+  notifyScheduler(event: unknown): void {
+    this.transport.notify('scheduler/event', event);
+  }
+
+  /** A5: schedules dir for the task scheduler (under the daemon's userDir). */
+  getSchedulerDir(): string {
+    return join(this.userDir, '.sunday', 'schedules');
+  }
+
   /**
    * Part A: prepend the skills/rules/memory system prompt to a fresh
    * session. Always injected — at minimum the INJECTION_GUARD (§15.4), so
@@ -440,6 +461,7 @@ export class SundayDaemon {
       const prompt = await buildSessionSystemPrompt({
         workspaceDir: s.cwd ?? process.cwd(),
         userDir: this.userDir,
+        agentMode: this.agentMode,
       });
       s.messages.push({ role: 'system', content: prompt });
     } catch (e) {
@@ -494,12 +516,12 @@ export class SundayDaemon {
   }
 
   /**
-   * A1: execute one background prompt through the agent pipeline (used by
-   * the cloud task runner and the task scheduler). Runs an ephemeral
+   * A1/A5: execute one background prompt through the agent pipeline (used
+   * by the cloud task runner and the task scheduler). Runs an ephemeral
    * sub-agent turn and returns the streamed assistant text. Tool approvals
    * flow through the shared PolicyGate like any sub-agent turn.
    */
-  private async runBackgroundPrompt(prompt: string): Promise<string> {
+  async runBackgroundPrompt(prompt: string): Promise<string> {
     let out = '';
     await this.runSubAgent({
       title: 'background task',

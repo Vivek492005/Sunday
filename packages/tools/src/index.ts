@@ -14,3 +14,4 @@ export * from './gen-command.js';
 export * from './artifact.js';
 export * from './registry.js';
 export * from './scopes.js';
+export * from './modes.js';

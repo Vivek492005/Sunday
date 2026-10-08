@@ -29,6 +29,7 @@ import {
   saveStyle,
   STYLE_AUTOINFER_ENV,
 } from '@sunday/context';
+import { modeSystemPromptSuffix, type AgentMode } from '@sunday/tools';
 
 /** Re-exported for consumers that already import from here. */
 export { STYLE_AUTOINFER_ENV };
@@ -41,6 +42,8 @@ export interface SystemPromptData {
   agentsMd?: string;
   /** One-line code-style summary; ''/undefined when disabled or undetectable. */
   codeStyle?: string;
+  /** Group B4: agent mode; appends the mode's working-agreement suffix. */
+  agentMode?: AgentMode;
 }
 
 export interface SystemPromptOptions {
@@ -48,6 +51,8 @@ export interface SystemPromptOptions {
   workspaceDir?: string;
   /** Home dir for user skills/rules/memory. Defaults to os.homedir(). */
   userDir?: string;
+  /** Group B4: agent mode for the session's system prompt. */
+  agentMode?: AgentMode;
 }
 
 /** Cap per injected section so a huge memory file can't blow the context. */
@@ -114,7 +119,7 @@ export async function collectSystemPromptData(
   } catch {
     codeStyle = '';
   }
-  return { skills, rules, memory, agentsMd, codeStyle };
+  return { skills, rules, memory, agentsMd, codeStyle, agentMode: opts.agentMode };
 }
 
 /**
@@ -179,6 +184,12 @@ export function buildSystemPrompt(data: SystemPromptData): string {
   // Group B2: one-line style summary so the agent matches house style.
   if (data.codeStyle) {
     sections.push(['## Code style', '', data.codeStyle].join('\n'));
+  }
+
+  // Group B4: agent-mode working agreement (empty for auto).
+  if (data.agentMode) {
+    const suffix = modeSystemPromptSuffix(data.agentMode);
+    if (suffix) sections.push(suffix);
   }
 
   return sections.join('\n\n');
