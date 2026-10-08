@@ -88,9 +88,13 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const secretStore: SecretStore = {
-      get: (key) => context.secrets.get(key),
-      store: (key, value) => context.secrets.store(key, value),
-      delete: (key) => context.secrets.delete(key),
+      get: async (key) => context.secrets.get(key),
+      store: async (key, value) => {
+        await context.secrets.store(key, value);
+      },
+      delete: async (key) => {
+        await context.secrets.delete(key);
+      },
     };
     this.sundaySession = new SundaySessionManager(
       secretStore,
@@ -165,8 +169,6 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
       expiresAt: Date.now() + tokens.expiresIn * 1000,
     };
 
-    const sessions = await this.loadSessions();
-    // One Google account per IDE (matches the hosted-gateway free tier model).
     const next = [session];
     await this.saveSessions(next);
 
@@ -230,7 +232,7 @@ export class GoogleAuthProvider implements vscode.AuthenticationProvider {
 
   private async loopbackFlow(
     clientId: string,
-    scopes: readonly string,
+    scopes: readonly string[],
   ): Promise<{ code: string; redirectUri: string; codeVerifier: string }> {
     // PKCE (RFC 7636) — required for loopback clients.
     const codeVerifier = crypto.randomBytes(32).toString('base64url');

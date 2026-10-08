@@ -47,7 +47,6 @@
     "pretest": "npm run typecheck"
   },
   "devDependencies": {
-    "@types/vscode": "^1.140.0",
     "@types/node": "^20.0.0",
     "esbuild": "^0.21.0",
     "typescript": "^5.6.0"
