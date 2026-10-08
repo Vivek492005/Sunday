@@ -32,6 +32,7 @@ import { AuditLog } from './audit.js';
 import { ipAllowed, normalizeIp } from './ip-allowlist.js';
 import { SocialVerifier, type SocialIdentity } from './social-auth.js';
 import { DailyQuota } from './quota.js';
+import { UsageMeter } from './usage.js';
 import { UpdateChecker, type UpdatePlatform } from './updates.js';
 import { AccountsService, basicEntitlements } from './accounts.js';
 import {
@@ -66,6 +67,8 @@ export class HostedGatewayServer {
   private readonly registry: ProviderRegistry;
   private readonly social: SocialVerifier;
   private readonly quota: DailyQuota;
+  /** D2: in-memory usage metering for GET /me/usage (see usage.ts). */
+  private readonly usage: UsageMeter;
   private readonly accounts: AccountsService;
   private readonly updates: UpdateChecker;
   private server: Server | undefined;
@@ -89,6 +92,7 @@ export class HostedGatewayServer {
     this.router = deps.router ?? new Router(this.registry, 'openrouter:meta-llama/llama-3.3-70b-instruct');
     this.social = new SocialVerifier(this.config.oauthProviders);
     this.quota = new DailyQuota(config.dailyQuota);
+    this.usage = new UsageMeter();
     this.accounts = new AccountsService(config.sessionSecret, {
       dataDir: deps.dataDir,
       fetchFn: deps.accountsFetch,
@@ -353,6 +357,21 @@ export class HostedGatewayServer {
         return;
       }
 
+      // D2: usage dashboard. Session-auth only, like /me/entitlements — a
+      // gateway API key is a shared operator credential and must not see
+      // per-user metered data.
+      if (method === 'GET' && path === '/me/usage') {
+        if (!sessionUserId) {
+          status = 401;
+          throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
+        }
+        status = 200;
+        // Metering is keyed by the same namespaced rate-limit key used in
+        // recordUsage below (`sess:<userId>` for session auth).
+        this.sendJson(res, 200, this.usage.snapshot(`sess:${sessionUserId}`));
+        return;
+      }
+
       if (method === 'GET' && path === '/v1/models') {
         const models = await this.registry.listModels().catch(() => []);
         status = 200;
@@ -425,7 +444,9 @@ export class HostedGatewayServer {
           });
 
           if (chatReq.stream) {
-            await this.streamSse(res, chatReq.model, routed.stream, requestId);
+            const streamedChars = await this.streamSse(res, chatReq.model, routed.stream, requestId);
+            completionTokensEst = Math.max(1, Math.ceil(streamedChars / 4));
+            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst);
           } else {
             const { text, finishReason } = await this.collectText(routed.stream);
             completionTokensEst = Math.max(1, Math.ceil(text.length / 4));
@@ -437,6 +458,7 @@ export class HostedGatewayServer {
               completionTokens: completionTokensEst,
               finishReason,
             }));
+            this.recordUsage(key!.id, chatReq.model, promptTokensEst, completionTokensEst);
           }
         } finally {
           clearTimeout(timeout);
@@ -491,8 +513,9 @@ export class HostedGatewayServer {
     model: string,
     stream: AsyncIterable<ChatChunk>,
     requestId: string,
-  ): Promise<void> {
+  ): Promise<number> {
     const id = `chatcmpl-${requestId}`;
+    let streamedChars = 0;
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
@@ -501,6 +524,7 @@ export class HostedGatewayServer {
     try {
       for await (const c of stream) {
         if (c.type === 'text-delta') {
+          streamedChars += c.delta.length;
           res.write(sseChunkObject({ model, id, delta: c.delta }));
         } else if (c.type === 'done') {
           const fr = c.finishReason === 'tool_calls' ? 'stop' : c.finishReason;
@@ -511,6 +535,20 @@ export class HostedGatewayServer {
       res.write('data: [DONE]\n\n');
     } finally {
       res.end();
+    }
+    return streamedChars;
+  }
+
+  /**
+   * D2: feed the usage meter. Called for every completed chat completion
+   * (streaming and non-streaming). Best-effort — metering must never break
+   * response handling, so failures are swallowed.
+   */
+  private recordUsage(userKey: string, model: string, tokensIn: number, tokensOut: number): void {
+    try {
+      this.usage.record(userKey, model, tokensIn, tokensOut);
+    } catch {
+      /* metering is advisory */
     }
   }
 }
