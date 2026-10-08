@@ -326,6 +326,10 @@ export class AccountsService {
     }
     // Pin the algorithm: never accept `none` or anything but HS256.
     if (header.alg !== 'HS256' || header.typ !== 'JWT') return undefined;
+    // Token-type separation: admin gateway tokens (iss=sunday-admin) are
+    // verified by AdminService only — they must never validate as user
+    // sessions here, even though the HMAC secret is shared.
+    if (payload.iss !== undefined && payload.iss !== null) return undefined;
 
     const expected = createHmac('sha256', this.sessionSecret)
       .update(`${h}.${p}`, 'utf8')

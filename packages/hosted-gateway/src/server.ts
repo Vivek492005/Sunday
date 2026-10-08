@@ -36,6 +36,7 @@ import { UsageMeter } from './usage.js';
 import { MAX_SYNC_BLOB_BYTES, SyncStore } from './sync.js';
 import { UpdateChecker, type UpdatePlatform } from './updates.js';
 import { AccountsService, defaultDataDir } from './accounts.js';
+import { AdminService, emailHash } from './admin-auth.js';
 import { AgentTaskStore, publicTask, validateTaskInput } from './agent-tasks.js';
 import {
   computeEntitlements,
@@ -87,6 +88,11 @@ export class HostedGatewayServer {
   private readonly ipLimiter: IpRateLimiter;
   /** Phase 9.a: stricter per-IP limit on /auth/* (login endpoints are abuse magnets). */
   private readonly authIpLimiter: IpRateLimiter;
+  /**
+   * Separate admin gateway: even stricter per-IP limit on POST /admin/login
+   * (5 req/min) — brute-force backstop on top of the /auth/* bucket.
+   */
+  private readonly adminLoginIpLimiter: IpRateLimiter;
   /** A1: per-IP limit on /agent/* (task queue is a new abuse surface). */
   private readonly agentIpLimiter: IpRateLimiter;
   private readonly audit: AuditLog;
@@ -102,6 +108,12 @@ export class HostedGatewayServer {
    */
   private readonly syncStore: SyncStore;
   private readonly accounts: AccountsService;
+  /**
+   * Separate admin login gateway (allowlist-based, SUNDAY_ADMIN_EMAILS).
+   * Admin sessions bypass user-level restrictions (account-switch limit,
+   * daily quota) but never webhook signatures or x-admin-key checks.
+   */
+  private readonly adminAuth: AdminService;
   /** Phase 9.b: plan templates from data/plans.json (loaded once at startup). */
   private readonly plans: PlansFile;
   private readonly updates: UpdateChecker;
@@ -120,6 +132,8 @@ export class HostedGatewayServer {
     });
     this.ipLimiter = new IpRateLimiter({ requestsPerMinute: 300 });
     this.authIpLimiter = new IpRateLimiter({ requestsPerMinute: 20 });
+    // Separate admin gateway: 5 req/min/IP on POST /admin/login.
+    this.adminLoginIpLimiter = new IpRateLimiter({ requestsPerMinute: 5 });
     // A1: 60 req/min/IP on the task queue — generous for polling, tight
     // enough to make queue-flooding expensive.
     this.agentIpLimiter = new IpRateLimiter({ requestsPerMinute: 60 });
@@ -146,6 +160,28 @@ export class HostedGatewayServer {
       dataDir: deps.dataDir,
       fetchFn: deps.accountsFetch,
       plans: this.plans,
+    });
+    // Separate admin login gateway. Audit hook hashes admin emails before
+    // they reach the audit sink (never plaintext). Fail-closed when
+    // SUNDAY_ADMIN_EMAILS is unset: AdminService rejects every login.
+    this.adminAuth = new AdminService(config.sessionSecret, config.adminEmails ?? [], {
+      dataDir: deps.dataDir,
+      fetchFn: deps.accountsFetch,
+      onAudit: (e) => {
+        this.audit.write({
+          ts: e.ts,
+          requestId: `admin-${randomUUID().slice(0, 8)}`,
+          ip: e.ip,
+          method: 'POST',
+          path: '/admin/login',
+          keyId: `admin:${e.emailHash}`,
+          status: e.httpStatus,
+          latencyMs: 0,
+          promptTokensEst: 0,
+          completionTokensEst: 0,
+          error: e.success ? undefined : e.reason,
+        });
+      },
     });
     this.agentTasks = new AgentTaskStore(deps.dataDir ?? defaultDataDir());
     this.updates = new UpdateChecker();
@@ -274,10 +310,21 @@ export class HostedGatewayServer {
       // still covered by the per-IP limiter above.
       const isUpdateCheck = method === 'GET' && path === '/updates/check';
       // Phase 9.a accounts endpoints: unauthenticated by design (they ARE
-      // the login flow), but under a stricter per-IP limit.
+      // the login flow), but under a stricter per-IP limit. The separate
+      // admin gateway's POST /admin/login rides the same bucket (it is a
+      // login flow too) plus its own stricter 5/min bucket below.
+      const isAdminLoginRoute = method === 'POST' && path === '/admin/login';
       const isAuthRoute =
         method === 'POST' &&
-        (path === '/auth/session' || path === '/auth/refresh' || path === '/auth/logout');
+        (path === '/auth/session' ||
+          path === '/auth/refresh' ||
+          path === '/auth/logout' ||
+          path === '/admin/login');
+      // Admin session endpoints: authenticated by admin JWT (requireAdmin),
+      // NOT by the x-admin-key used for /admin/users/:id/plan.
+      const isAdminSessionRoute =
+        (method === 'GET' && path === '/admin/me') ||
+        (method === 'POST' && (path === '/admin/logout' || path === '/admin/refresh'));
       // Phase 9.b admin plan toggle: authenticated via x-admin-key, not
       // Bearer, so it skips the Bearer auth block below (it keeps the
       // top-level per-IP limiter, which already ran for this route).
@@ -307,6 +354,14 @@ export class HostedGatewayServer {
         throw new ApiError(429, 'auth_rate_limited', 'too many auth attempts from this IP');
       }
 
+      // Separate admin gateway: dedicated 5 req/min/IP bucket on POST
+      // /admin/login — brute-force backstop on top of the /auth/* bucket.
+      if (isAdminLoginRoute && !this.adminLoginIpLimiter.tryAdmit(ip)) {
+        status = 429;
+        res.setHeader('Retry-After', '60');
+        throw new ApiError(429, 'admin_login_rate_limited', 'too many admin login attempts from this IP');
+      }
+
       // 2/3. Auth (skipped for /health, /updates/check, and /auth/*) + body.
       // Modes, tried in order: GitHub OAuth token (per-user free tier),
       // static gateway API key, then Sunday session JWT (Phase 9.a).
@@ -314,14 +369,31 @@ export class HostedGatewayServer {
       let key: { id: string } | undefined;
       let socialIdentity: SocialIdentity | undefined;
       let sessionUserId: string | undefined;
+      // Separate admin gateway: admin JWTs (iss=sunday-admin, role=admin)
+      // authenticate here and bypass user-level restrictions below
+      // (account-switch limit is structural — /admin/login never invokes it;
+      // daily quota is skipped explicitly at the quota check).
+      let isAdminSession = false;
+      let adminEmail: string | undefined;
       if (!isHealth && !isUpdateCheck && !isAuthRoute && !isAdminRoute) {
         const secret = KeyStore.extractBearer(req.headers.authorization);
 
-        if (this.config.socialAuth && secret) {
+        // Admin sessions first: distinct issuer + role claim, verified by
+        // AdminService (stateful — revoked sessions fail here).
+        const admin = secret ? this.adminAuth.verifyAdminToken(secret) : undefined;
+        if (admin) {
+          isAdminSession = true;
+          adminEmail = admin.email;
+          // Namespaced key id; the email hash (not the email) reaches logs.
+          key = { id: `admin:${emailHash(admin.email).slice(0, 8)}` };
+          keyId = key.id;
+        } else if (this.config.socialAuth && secret) {
           socialIdentity = (await this.social.verify(secret)) ?? undefined;
         }
 
-        if (socialIdentity) {
+        if (admin) {
+          // Admin session: authenticated — skip all other modes below.
+        } else if (socialIdentity) {
           // Per-user identity: rate-limit key becomes the namespaced user id.
           key = { id: socialIdentity.key };
           // M2: log only the namespaced key, never the label (Google emails /
@@ -388,6 +460,16 @@ export class HostedGatewayServer {
       // Phase 9.a accounts endpoints (unauthenticated; per-IP limited above).
       if (isAuthRoute) {
         const body = await this.parseJsonBody(req);
+        // Separate admin gateway: allowlist-gated OAuth login. Every attempt
+        // (success and failure) is audit-logged by AdminService with the
+        // email hashed — never plaintext.
+        if (path === '/admin/login') {
+          const idToken = typeof body.idToken === 'string' ? body.idToken : body.id_token;
+          const result = await this.adminAuth.login(idToken, body.provider, ip);
+          status = 200;
+          this.sendJson(res, 200, result);
+          return;
+        }
         if (path === '/auth/session') {
           const created = await this.accounts.createSession(body.google_access_token, {
             machineId: typeof body.machine_id === 'string' ? body.machine_id : undefined,
@@ -407,6 +489,35 @@ export class HostedGatewayServer {
           body.refresh_token,
           KeyStore.extractBearer(req.headers.authorization),
         );
+        status = 200;
+        this.sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // Separate admin gateway: session endpoints. Authenticated by admin
+      // JWT via requireAdmin (NOT by x-admin-key — that's the plan-toggle).
+      // 401 when the Bearer token is not a live admin session.
+      if (isAdminSessionRoute) {
+        const bearer = KeyStore.extractBearer(req.headers.authorization);
+        if (!isAdminSession) {
+          status = 401;
+          res.setHeader('WWW-Authenticate', 'Bearer');
+          throw new ApiError(401, 'admin_unauthorized', 'valid admin session required');
+        }
+        const body = method === 'POST' ? await this.parseJsonBody(req) : {};
+        if (path === '/admin/me') {
+          status = 200;
+          this.sendJson(res, 200, this.adminAuth.me(bearer));
+          return;
+        }
+        if (path === '/admin/refresh') {
+          const rotated = this.adminAuth.rotateAdminRefresh(body.refresh_token);
+          status = 200;
+          this.sendJson(res, 200, rotated);
+          return;
+        }
+        // path === '/admin/logout' — revokes refresh token + access session.
+        this.adminAuth.logoutAdmin(body.refresh_token, bearer);
         status = 200;
         this.sendJson(res, 200, { ok: true });
         return;
@@ -672,7 +783,9 @@ export class HostedGatewayServer {
         promptTokensEst = chatReq.promptTokensEst;
 
         // 4b. Daily free-tier quota (social-identified users only).
-        if (socialIdentity) {
+        // Admin sessions bypass explicitly (defense in depth — admin
+        // tokens never produce a socialIdentity anyway).
+        if (socialIdentity && !isAdminSession) {
           const q = this.quota.tryConsume(socialIdentity.key);
           res.setHeader('X-Quota-Limit', String(q.limit));
           res.setHeader('X-Quota-Remaining', String(q.remaining));

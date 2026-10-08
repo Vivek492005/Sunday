@@ -72,6 +72,15 @@ export interface HostedGatewayConfig {
    * closed). Never logged; compared with timingSafeEqual.
    */
   adminKey?: string;
+  /**
+   * Admin allowlist for POST /admin/login (separate admin gateway).
+   * Env: SUNDAY_ADMIN_EMAILS (comma-separated emails). Empty/unset means
+   * admin login is disabled entirely (fail closed) — there is no default
+   * admin. Never logged in plaintext. Optional in the interface so test
+   * configs that predate the field keep compiling; the server treats a
+   * missing value as [].
+   */
+  adminEmails?: string[];
 }
 
 interface FileConfig {
@@ -147,6 +156,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
   // (403) when it is unset, so a missing key is never a boot error.
   const adminKey = env.SUNDAY_ADMIN_KEY?.trim() || undefined;
 
+  // Separate admin login gateway: allowlist from SUNDAY_ADMIN_EMAILS.
+  // Empty/unset -> AdminService fails closed on every login attempt.
+  const adminEmails = list(env.SUNDAY_ADMIN_EMAILS).map((e) => e.toLowerCase());
+
   return {
     port: num(env.SUNDAY_HOSTED_PORT, num(env.PORT, 8080)),
     host: env.SUNDAY_HOSTED_HOST?.trim() || '127.0.0.1',
@@ -166,5 +179,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     dailyQuota: num(env.SUNDAY_HOSTED_DAILY_QUOTA, 200),
     sessionSecret,
     adminKey,
+    adminEmails,
   };
 }
