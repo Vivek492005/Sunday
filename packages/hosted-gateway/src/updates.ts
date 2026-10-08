@@ -114,27 +114,36 @@ export class UpdateChecker {
     if (this.cached && now - this.cached.at < CACHE_TTL_MS) {
       return this.cached.release;
     }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await this.fetchImpl(GITHUB_LATEST_URL, {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          // GitHub API requires a User-Agent.
-          'User-Agent': 'sunday-hosted-gateway',
-        },
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`github api status ${res.status}`);
-      const release = (await res.json()) as GitHubRelease;
-      if (typeof release.tag_name !== 'string' || !Array.isArray(release.assets)) {
-        throw new Error('unexpected github api shape');
+    // Retry once: Render's shared egress IPs can hit GitHub rate limits transiently.
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await this.fetchImpl(GITHUB_LATEST_URL, {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            // GitHub API requires a User-Agent.
+            'User-Agent': 'sunday-hosted-gateway',
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`github api status ${res.status}`);
+        const release = (await res.json()) as GitHubRelease;
+        if (typeof release.tag_name !== 'string' || !Array.isArray(release.assets)) {
+          throw new Error('unexpected github api shape');
+        }
+        this.cached = { at: now, release };
+        return release;
+      } catch (err) {
+        lastErr = err;
+        // Log server-side only — never expose upstream details to clients.
+        console.error(`[updates] GitHub fetch attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
+      } finally {
+        clearTimeout(timeout);
       }
-      this.cached = { at: now, release };
-      return release;
-    } finally {
-      clearTimeout(timeout);
     }
+    throw lastErr instanceof Error ? lastErr : new Error('github fetch failed');
   }
 
   async check(platform: UpdatePlatform, current: string): Promise<UpdateCheckResult> {
