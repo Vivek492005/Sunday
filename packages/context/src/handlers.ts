@@ -21,6 +21,8 @@ export interface ContextIndexResult {
   files: number;
   chunks: number;
   skipped: number;
+  /** True when indexing stopped at the byte cap (partial index by design). */
+  capped: boolean;
 }
 
 export interface ContextSearchResult {
@@ -110,8 +112,11 @@ export function createContextHandlers(workspaceRoot: string = process.cwd()): Co
       const p = asRecord(params);
       const ws = resolveRoot(reqString(p, 'workspaceRoot'), 'workspaceRoot');
       const force = optBoolean(p, 'force') ?? false;
-      const stats = buildIndex(ws, { force });
-      return { files: stats.files, chunks: stats.chunks, skipped: stats.skipped };
+      // Task 7: entitlement-aware callers pass their plan's byte cap; the
+      // indexer defaults to 100 MB when it's absent.
+      const maxBytes = optBoundedInt(p, 'maxBytes', 1, Number.MAX_SAFE_INTEGER);
+      const stats = buildIndex(ws, { force, ...(maxBytes === undefined ? {} : { maxBytes }) });
+      return { files: stats.files, chunks: stats.chunks, skipped: stats.skipped, capped: stats.capped };
     },
     'context/search': async (params: unknown): Promise<ContextSearchResult> => {
       const p = asRecord(params);

@@ -153,10 +153,19 @@ describe('context methods', () => {
       CONTEXT_METHODS['context/index'].params.parse({ workspaceRoot: '/tmp/ws', force: true }),
     ).toEqual({ workspaceRoot: '/tmp/ws', force: true });
     expect(
-      CONTEXT_METHODS['context/index'].result.parse({ files: 2, chunks: 5, skipped: 1 }),
-    ).toEqual({ files: 2, chunks: 5, skipped: 1 });
+      CONTEXT_METHODS['context/index'].params.parse({
+        workspaceRoot: '/tmp/ws',
+        maxBytes: 500 * 1024 * 1024,
+      }),
+    ).toEqual({ workspaceRoot: '/tmp/ws', maxBytes: 500 * 1024 * 1024 });
+    expect(
+      CONTEXT_METHODS['context/index'].result.parse({ files: 2, chunks: 5, skipped: 1, capped: false }),
+    ).toEqual({ files: 2, chunks: 5, skipped: 1, capped: false });
     expect(() =>
       CONTEXT_METHODS['context/index'].params.parse({ workspaceRoot: '/tmp/ws', force: 'x' }),
+    ).toThrow();
+    expect(() =>
+      CONTEXT_METHODS['context/index'].params.parse({ workspaceRoot: '/tmp/ws', maxBytes: 0 }),
     ).toThrow();
   });
 

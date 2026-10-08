@@ -125,6 +125,25 @@ describe('chatClient reducer', () => {
     expect(s.selectedModel).toBe('groq:llama');
   });
 
+  it('applyModelsList/selectModel never select a plan-gated (disabled) model', () => {
+    let s = createInitialState();
+    s = applyModelsList(s, [
+      { id: 'sunday:flash', provider: 'sunday', label: 'Flash', disabled: true, hint: 'Daily limit reached — upgrade' },
+      { id: 'groq:llama', provider: 'groq', label: 'Llama' },
+    ]);
+    // First model is gated → the selectable one is picked instead.
+    expect(s.selectedModel).toBe('groq:llama');
+    // Programmatic selection of a gated model is ignored.
+    s = selectModel(s, 'sunday:flash');
+    expect(s.selectedModel).toBe('groq:llama');
+    // A refresh that gates the current selection moves it to a live model.
+    s = applyModelsList(s, [
+      { id: 'sunday:flash', provider: 'sunday', label: 'Flash' },
+      { id: 'groq:llama', provider: 'groq', label: 'Llama', disabled: true, hint: 'Daily limit reached — upgrade' },
+    ]);
+    expect(s.selectedModel).toBe('sunday:flash');
+  });
+
   it('applyTurnState tracks the active turn', () => {
     let s = createInitialState();
     s = applyTurnState(s, 'turn-9');

@@ -2,7 +2,7 @@
 // command (goal prompt, parallel flag from config, progress, manager focus),
 // and stopAll (confirm dialog, orchestrate/stop). `vscode` is mocked;
 // HostBridge is a manual mock. No DOM, no network, no real VS Code.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const registered = new Map<string, (...args: any[]) => unknown>();
@@ -45,6 +45,10 @@ import {
   registerOrchestrationCommands,
   type OrchestrationCommandDeps,
 } from './orchestrationCommands.js';
+import {
+  resetEntitlementsProviderForTests,
+  setEntitlementsProvider,
+} from './entitlements/provider.js';
 import type { HostBridge } from './hostBridge.js';
 
 function makeBridge() {
@@ -125,6 +129,7 @@ describe('sunday.orchestration.run', () => {
       goal: 'ship dark mode',
       workspaceRoot: '/fake/cwd',
       parallel: true,
+      maxParallel: 3,
     });
     expect(deps.openManagerView).toHaveBeenCalledTimes(1);
     expect(mocks.window.withProgress).toHaveBeenCalledTimes(1);
@@ -142,6 +147,7 @@ describe('sunday.orchestration.run', () => {
       goal: 'goal',
       workspaceRoot: '/fake/cwd',
       parallel: false,
+      maxParallel: 3,
     });
   });
 
@@ -220,6 +226,115 @@ describe('sunday.orchestration.stopAll', () => {
     await stopAllRegistered()();
     expect(mocks.window.showInformationMessage).toHaveBeenCalledWith(
       'Sunday orchestration already finished.',
+    );
+  });
+});
+
+describe('sunday.orchestration.run entitlement gates (Task 7)', () => {
+  function setView(entitlements: Record<string, boolean | number | string>) {
+    const view = {
+      user_id: 'u-test',
+      plan: 'basic',
+      status: 'active',
+      renews_at: null,
+      entitlements: {
+        'managed_models.enabled': true,
+        'managed_models.daily_requests': 200,
+        'orchestration.max_feature_agents': 1,
+        'orchestration.parallel': false,
+        'browser_agent.enabled': false,
+        'browser_agent.daily_sessions': 0,
+        'codebase_index.max_repo_mb': 100,
+        'autocomplete.managed_route': false,
+        'scheduler.priority_class': 'standard',
+        'support.tier': 'community',
+        ...entitlements,
+      },
+      cached_at: new Date().toISOString(),
+      valid_until: new Date().toISOString(),
+    };
+    setEntitlementsProvider({
+      getEntitlements: async () => ({ view: view as any, source: 'fresh' as const }),
+      getCachedSync: () => view as any,
+      refresh: async () => ({ view: view as any, source: 'fresh' as const }),
+      clear: () => undefined,
+    });
+  }
+
+  function mockConfig(values: Record<string, unknown>) {
+    mocks.workspace.getConfiguration.mockReturnValue({
+      get: (key: string, def: unknown) => (key in values ? values[key] : def),
+    });
+  }
+
+  beforeEach(() => {
+    resetEntitlementsProviderForTests();
+  });
+
+  afterEach(() => {
+    resetEntitlementsProviderForTests();
+  });
+
+  it('clamps the pool to max_feature_agents and notes the cap', async () => {
+    mocks.window.showInputBox.mockResolvedValueOnce('goal');
+    mockConfig({ 'orchestration.parallel': true, 'orchestration.maxParallel': 8 });
+    setView({ 'orchestration.max_feature_agents': 2, 'orchestration.parallel': true });
+    const { deps, bridge } = makeDeps();
+    registerOrchestrationCommands(makeContext(), deps);
+    await runRegistered()();
+    expect(bridge.orchestrateRun).toHaveBeenCalledWith({
+      goal: 'goal',
+      workspaceRoot: '/fake/cwd',
+      parallel: true,
+      maxParallel: 2,
+      entitlementCaps: { maxFeatureAgents: 2, parallelAllowed: true },
+    });
+    expect(mocks.window.showInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Capped at 2 agents on your plan'),
+    );
+  });
+
+  it('forces parallel off when the plan denies it, even when requested', async () => {
+    mocks.window.showInputBox.mockResolvedValueOnce('goal');
+    mockConfig({ 'orchestration.parallel': true, 'orchestration.maxParallel': 4 });
+    setView({ 'orchestration.max_feature_agents': 2, 'orchestration.parallel': false });
+    const { deps, bridge } = makeDeps();
+    registerOrchestrationCommands(makeContext(), deps);
+    await runRegistered()();
+    expect(bridge.orchestrateRun).toHaveBeenCalledWith({
+      goal: 'goal',
+      workspaceRoot: '/fake/cwd',
+      parallel: false,
+      maxParallel: 2,
+      entitlementCaps: { maxFeatureAgents: 2, parallelAllowed: false },
+    });
+  });
+
+  it('fails open when the entitlements read throws', async () => {
+    mocks.window.showInputBox.mockResolvedValueOnce('goal');
+    mockConfig({ 'orchestration.parallel': true, 'orchestration.maxParallel': 5 });
+    setEntitlementsProvider({
+      getEntitlements: async () => {
+        throw new Error('gateway down');
+      },
+      getCachedSync: () => undefined,
+      refresh: async () => {
+        throw new Error('gateway down');
+      },
+      clear: () => undefined,
+    });
+    const { deps, bridge } = makeDeps();
+    registerOrchestrationCommands(makeContext(), deps);
+    await runRegistered()();
+    // No caps forwarded, requested values pass through, no cap note.
+    expect(bridge.orchestrateRun).toHaveBeenCalledWith({
+      goal: 'goal',
+      workspaceRoot: '/fake/cwd',
+      parallel: true,
+      maxParallel: 5,
+    });
+    expect(mocks.window.showInformationMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining('Capped at'),
     );
   });
 });

@@ -62,6 +62,20 @@ export const runParamsSchema = planParamsSchema.extend({
   parallel: z.boolean().optional(),
   /** Max concurrent units when parallel is true. */
   maxParallel: z.number().int().min(1).max(MAX_PLAN_UNITS).optional(),
+  /**
+   * Task 7 entitlement caps, computed client-side from the user's
+   * entitlements view. The runner re-applies them (defence in depth) so a
+   * stale or optimistic client can't exceed the plan's agent limits.
+   * Absent = entitlements unknown → the runner fails open.
+   */
+  entitlementCaps: z
+    .object({
+      /** Cap on concurrent feature agents (`orchestration.max_feature_agents`). */
+      maxFeatureAgents: z.number().int().min(1),
+      /** Whether the plan allows parallel mode at all (`orchestration.parallel`). */
+      parallelAllowed: z.boolean(),
+    })
+    .optional(),
 });
 export type RunParams = z.infer<typeof runParamsSchema>;
 

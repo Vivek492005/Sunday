@@ -8,6 +8,11 @@
 // with a mocked `vscode` module.
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
+import { getEntitlementsView } from './entitlements/provider.js';
+import {
+  DEFAULT_MAX_PARALLEL,
+  resolveOrchestrationCaps,
+} from './entitlements/orchestrationGating.js';
 
 export const ORCHESTRATION_RUN_COMMAND = 'sunday.orchestration.run';
 export const ORCHESTRATION_STOP_ALL_COMMAND = 'sunday.orchestration.stopAll';
@@ -15,6 +20,8 @@ export const ORCHESTRATION_OPEN_MANAGER_COMMAND = 'sunday.orchestration.openMana
 
 /** Config key for the parallel-agents default (ADR-17: sequential default). */
 export const ORCHESTRATION_PARALLEL_CONFIG_KEY = 'orchestration.parallel';
+/** Config key for the requested parallel pool size (clamped by the plan's agent limit). */
+export const ORCHESTRATION_MAX_PARALLEL_CONFIG_KEY = 'orchestration.maxParallel';
 
 /** View id of the Sunday Manager webview (mirrors ManagerViewProvider). */
 export const MANAGER_VIEW_FOCUS_COMMAND = 'sunday.managerView.focus';
@@ -50,6 +57,13 @@ function readParallelConfig(): boolean {
   return vscode.workspace.getConfiguration('sunday').get<boolean>(ORCHESTRATION_PARALLEL_CONFIG_KEY, false);
 }
 
+function readMaxParallelConfig(): number {
+  const v = vscode.workspace
+    .getConfiguration('sunday')
+    .get<number>(ORCHESTRATION_MAX_PARALLEL_CONFIG_KEY, DEFAULT_MAX_PARALLEL);
+  return typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : DEFAULT_MAX_PARALLEL;
+}
+
 export async function runOrchestration(deps: OrchestrationCommandDeps): Promise<void> {
   const goal = await vscode.window.showInputBox({
     title: 'Sunday: Run orchestration',
@@ -65,9 +79,19 @@ export async function runOrchestration(deps: OrchestrationCommandDeps): Promise<
   }
   const bridge = await deps.getBridge();
   if (!bridge) return;
-  const parallel = readParallelConfig();
+  // Task 7 gate: clamp the parallel pool to the plan's agent limit and
+  // force sequential mode when the plan denies parallel — even when the
+  // plan's paths don't overlap. Fail open on any entitlement problem.
+  const requestedParallel = readParallelConfig();
+  const requestedMaxParallel = readMaxParallelConfig();
+  const caps = resolveOrchestrationCaps({
+    requestedParallel,
+    requestedMaxParallel,
+    view: await getEntitlementsView(deps.log),
+  });
   deps.log(
-    `orchestration: run requested (parallel=${parallel}) for goal "${goal.trim().slice(0, 80)}"`,
+    `orchestration: run requested (parallel=${caps.parallel}, maxParallel=${caps.maxParallel}` +
+      `${caps.capped ? `, ${caps.capNote}` : ''}) for goal "${goal.trim().slice(0, 80)}"`,
   );
   deps.openManagerView();
   try {
@@ -77,12 +101,22 @@ export async function runOrchestration(deps: OrchestrationCommandDeps): Promise<
         title: 'Sunday: running orchestration…',
         cancellable: false,
       },
-      () => bridge.orchestrateRun({ goal: goal.trim(), workspaceRoot, parallel }),
+      () =>
+        bridge.orchestrateRun({
+          goal: goal.trim(),
+          workspaceRoot,
+          parallel: caps.parallel,
+          maxParallel: caps.maxParallel,
+          // Forwarded so the daemon re-enforces the caps server-side
+          // (omitted when entitlements are unknown — the runner fails open).
+          ...(caps.entitlementCaps ? { entitlementCaps: caps.entitlementCaps } : {}),
+        }),
     );
     const merged = res.units.filter((u) => u.status === 'merged').length;
     vscode.window.showInformationMessage(
       `Sunday orchestration finished: ${merged}/${res.units.length} units merged` +
-        (res.mergedSha ? ` (${res.mergedSha.slice(0, 12)}).` : '.'),
+        (res.mergedSha ? ` (${res.mergedSha.slice(0, 12)}).` : '.') +
+        (caps.capNote ? ` ${caps.capNote}.` : ''),
     );
   } catch (err) {
     deps.log(`orchestration: run failed: ${(err as Error).message}`);

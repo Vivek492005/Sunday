@@ -42,9 +42,27 @@ describe('createContextHandlers', () => {
   it('context/index builds the index and returns stats', async () => {
     const h = createContextHandlers(root);
     const res = await h['context/index']({ workspaceRoot: root });
-    expect(res).toEqual({ files: 2, chunks: 2, skipped: 0 });
+    expect(res).toEqual({ files: 2, chunks: 2, skipped: 0, capped: false });
     const forced = await h['context/index']({ workspaceRoot: root, force: true });
-    expect(forced).toEqual({ files: 2, chunks: 2, skipped: 0 });
+    expect(forced).toEqual({ files: 2, chunks: 2, skipped: 0, capped: false });
+  });
+
+  it('context/index honours maxBytes and reports capped', async () => {
+    const h = createContextHandlers(root);
+    // maxBytes smaller than any single file → nothing indexed, capped.
+    const res = await h['context/index']({ workspaceRoot: root, force: true, maxBytes: 1 });
+    expect(res.capped).toBe(true);
+    expect(res.files).toBe(0);
+    // Generous cap → full index, not capped.
+    const full = await h['context/index']({ workspaceRoot: root, force: true, maxBytes: 1_000_000_000 });
+    expect(full).toMatchObject({ files: 2, capped: false });
+  });
+
+  it('context/index rejects a non-positive maxBytes', async () => {
+    const h = createContextHandlers(root);
+    await expect(h['context/index']({ workspaceRoot: root, maxBytes: 0 })).rejects.toThrow(
+      /maxBytes must be an integer/,
+    );
   });
 
   it('context/search round-trips through map → index → search', async () => {

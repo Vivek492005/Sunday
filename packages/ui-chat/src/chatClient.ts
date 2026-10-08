@@ -47,6 +47,13 @@ export interface ModelView {
   id: string;
   provider: string;
   label: string;
+  /**
+   * Task 7: plan-gated model — listed but not selectable (e.g. the daily
+   * managed-model quota is spent). Rendered greyed with `hint`.
+   */
+  disabled?: boolean;
+  /** Human-readable reason for `disabled` (e.g. "Daily limit reached — upgrade"). */
+  hint?: string;
 }
 
 /** Extension → webview. */
@@ -247,16 +254,24 @@ export function applyEvent(state: ChatState, notif: ChatEventNotificationWire): 
 }
 
 export function applyModelsList(state: ChatState, models: ModelView[]): ChatState {
-  const stillValid = state.selectedModel !== undefined && models.some((m) => m.id === state.selectedModel);
+  // Task 7: a plan-gated (disabled) model is never auto-selected — prefer
+  // the first selectable model, falling back to the raw first entry only
+  // when every model is gated.
+  const current = models.find((m) => m.id === state.selectedModel);
+  const stillValid = current !== undefined && !current.disabled;
   return {
     ...state,
     models,
-    selectedModel: stillValid ? state.selectedModel : models[0]?.id,
+    selectedModel: stillValid
+      ? state.selectedModel
+      : (models.find((m) => !m.disabled)?.id ?? models[0]?.id),
   };
 }
 
 export function selectModel(state: ChatState, modelId: string): ChatState {
-  if (!state.models.some((m) => m.id === modelId)) return state;
+  const target = state.models.find((m) => m.id === modelId);
+  // Unknown or plan-gated ids are ignored — the picker can't select them.
+  if (!target || target.disabled) return state;
   return { ...state, selectedModel: modelId };
 }
 

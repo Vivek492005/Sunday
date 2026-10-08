@@ -34,11 +34,14 @@ export const CONTEXT_METHODS = {
     params: z.object({
       workspaceRoot: z.string().min(1),
       force: z.boolean().optional(),
+      /** Task 7: plan-derived byte cap for the index (defaults to 100 MB server-side). */
+      maxBytes: z.number().int().positive().optional(),
     }),
     result: z.object({
       files: z.number().int().nonnegative(),
       chunks: z.number().int().nonnegative(),
       skipped: z.number().int().nonnegative(),
+      capped: z.boolean(),
     }),
   },
   'context/search': {

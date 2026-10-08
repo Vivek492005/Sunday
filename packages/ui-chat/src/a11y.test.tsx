@@ -93,6 +93,25 @@ describe('ModelPill a11y', () => {
     );
     expect(html).toContain('aria-label="Model"');
   });
+
+  it('renders plan-gated models greyed, disabled, with the upgrade hint', () => {
+    const html = renderToStaticMarkup(
+      <ModelPill
+        models={[
+          { id: 'sunday:flash', label: 'Sunday Flash', provider: 'sunday', disabled: true, hint: 'Daily limit reached — upgrade' },
+          { id: 'groq:llama', label: 'Groq Llama', provider: 'groq' },
+        ]}
+        selected="groq:llama"
+        onSelect={() => undefined}
+      />,
+    );
+    expect(html).toContain('disabled=""');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('Sunday Flash — Daily limit reached — upgrade');
+    expect(html).toContain('title="sunday — Daily limit reached — upgrade"');
+    // The selectable model stays a plain option.
+    expect(html).toContain('title="groq"');
+  });
 });
 
 describe('StopButton a11y', () => {

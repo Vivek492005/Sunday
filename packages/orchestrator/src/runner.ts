@@ -80,9 +80,53 @@ export interface RunOrchestrationOptions {
   parallel?: boolean;
   /** Pool size for parallel mode. Default 3. */
   maxParallel?: number;
+  /**
+   * Task 7 entitlement caps (client-computed from the user's entitlements
+   * view, forwarded via the `entitlementCaps` RPC param). When present the
+   * runner clamps parallel mode and the pool size to the plan's limits
+   * (defence in depth — a stale or optimistic client can't exceed them).
+   * Absent = entitlements unknown → fail open, no clamping.
+   */
+  entitlementCaps?: { maxFeatureAgents: number; parallelAllowed: boolean };
   /** Run-state persistence. Defaults to ~/.sunday/orchestrations. Tests MUST
    *  pass a temp-dir store. */
   store?: FileOrchestrationStateStore;
+}
+
+/** Default pool size for parallel mode (when the caller doesn't ask for one). */
+export const DEFAULT_RUNNER_MAX_PARALLEL = 3;
+
+export interface AppliedEntitlementCaps {
+  parallel: boolean;
+  maxParallel: number;
+  /** One-line note appended to the plan artifact when the pool was capped. */
+  capNote?: string;
+}
+
+/**
+ * Apply entitlement caps to a parallel-mode request (pure, testable).
+ * - `!parallelAllowed` → force `parallel: false`, even when the plan's
+ *   paths don't overlap (the overlap gate alone must not enable it).
+ * - `maxParallel = min(requested, maxFeatureAgents)`; a reduction appends
+ *   the one-line cap note for the plan artifact.
+ * - `caps` undefined → fail open: the request passes through unchanged.
+ */
+export function applyEntitlementCaps(
+  input: { parallel: boolean; maxParallel?: number },
+  caps: { maxFeatureAgents: number; parallelAllowed: boolean } | undefined,
+): AppliedEntitlementCaps {
+  if (!caps) {
+    return { parallel: input.parallel, maxParallel: input.maxParallel ?? DEFAULT_RUNNER_MAX_PARALLEL };
+  }
+  const maxAgents = Math.max(1, Math.floor(caps.maxFeatureAgents));
+  const requested = Math.max(1, Math.floor(input.maxParallel ?? DEFAULT_RUNNER_MAX_PARALLEL));
+  const maxParallel = Math.min(requested, maxAgents);
+  return {
+    parallel: input.parallel && caps.parallelAllowed,
+    maxParallel,
+    capNote:
+      maxParallel < requested ? `Capped at ${maxParallel} agents on your plan` : undefined,
+  };
 }
 
 /** Cap the diff handed to the verifier so one giant slice can't blow the
@@ -556,9 +600,11 @@ async function runOrchestrationParallel(
     plan: { units: PlannedUnit[]; totalBudget: number };
     modelRef: string;
     runController: AbortController;
+    /** Task 7: appended to the plan artifact when the pool was entitlement-capped. */
+    capNote?: string;
   },
 ): Promise<OrchestrationRunResult> {
-  const { goal, workspaceRoot, plan, modelRef, runController } = args;
+  const { goal, workspaceRoot, plan, modelRef, runController, capNote } = args;
 
   // Overlap gate: parallel mode REFUSES overlapping plans. validatePlanUnits
   // already ran checkUnitsOverlap (fail-fast `plan-overlap`), and the planner
@@ -568,7 +614,7 @@ async function runOrchestrationParallel(
 
   const store = opts.store ?? getDefaultOrchestrationStore();
   await store.init();
-  const maxParallel = Math.min(Math.max(opts.maxParallel ?? 3, 1), plan.units.length);
+  const maxParallel = Math.min(Math.max(opts.maxParallel ?? DEFAULT_RUNNER_MAX_PARALLEL, 1), plan.units.length);
   const runId = randomUUID();
   const nowIso = (): string => new Date().toISOString();
   const state: OrchestrationRunState = {
@@ -601,7 +647,8 @@ async function runOrchestrationParallel(
   notify(
     '',
     'planned',
-    `${plan.units.length} unit(s) · parallel mode (pool of ${maxParallel}) · estimated ~${plan.totalBudget} model requests (budget surfaced before delegation, ADR-18)`,
+    `${plan.units.length} unit(s) · parallel mode (pool of ${maxParallel}) · estimated ~${plan.totalBudget} model requests (budget surfaced before delegation, ADR-18)` +
+      (capNote ? ` · ${capNote}` : ''),
   );
 
   const entry: ActiveRunEntry = {
@@ -978,14 +1025,28 @@ export async function runOrchestration(
     ? { units: supplied, totalBudget: estimateTotalBudget(supplied) }
     : await planGoal(host, { goal: parsed.data.goal, workspaceRoot: parsed.data.workspaceRoot, model: parsed.data.model, signal: runController.signal });
 
-  if (opts.parallel ?? false) {
-    return runOrchestrationParallel(host, opts, {
-      goal: parsed.data.goal,
-      workspaceRoot: parsed.data.workspaceRoot,
-      plan,
-      modelRef,
-      runController,
-    });
+  // Task 7: re-apply the client's entitlement caps (defence in depth).
+  // Fail open when caps are absent — the IDE already clamped, and the
+  // gateway owns the real quota for managed models. `parallel: false` is
+  // forced BEFORE the mode branch so a denied plan can never enter the
+  // parallel path, even when the plan's paths don't overlap.
+  const gated = applyEntitlementCaps(
+    { parallel: opts.parallel ?? false, maxParallel: opts.maxParallel },
+    opts.entitlementCaps,
+  );
+  if (gated.parallel) {
+    return runOrchestrationParallel(
+      host,
+      { ...opts, parallel: gated.parallel, maxParallel: gated.maxParallel },
+      {
+        goal: parsed.data.goal,
+        workspaceRoot: parsed.data.workspaceRoot,
+        plan,
+        modelRef,
+        runController,
+        capNote: gated.capNote,
+      },
+    );
   }
 
   const runId = randomUUID();

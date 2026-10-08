@@ -16,6 +16,18 @@ import {
   buildVoiceConfigMessage,
   VOICE_UNSUPPORTED_MESSAGE,
 } from './voice.js';
+import { getEntitlementsView } from './entitlements/provider.js';
+import {
+  gateModelList,
+  isManagedModel,
+  modelSelectionBlock,
+  type GatedModel,
+} from './entitlements/modelGating.js';
+import {
+  readUsedToday,
+  recordManagedRequest,
+  type MementoLike,
+} from './entitlements/usage.js';
 
 export const CHAT_VIEW_TYPE = 'sunday.chatView';
 
@@ -28,6 +40,8 @@ export interface ChatViewDeps {
   ensureBridge: () => Promise<HostBridge>;
   /** cwd for a fresh session (first workspace folder). */
   getCwd: () => string | undefined;
+  /** Extension global state (local daily managed-model usage counter). */
+  globalState: MementoLike;
   log: (msg: string) => void;
 }
 
@@ -71,6 +85,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private activeTurnId: string | undefined;
   private detachBridge: (() => void) | undefined;
   private readonly disposables: vscode.Disposable[] = [];
+  /**
+   * Last entitlement-gated model list sent to the webview. Used to validate
+   * the model chosen in `sunday/chat/send` — selecting a greyed/excluded
+   * model shows an info message instead of calling the model.
+   */
+  private gatedModels: GatedModel[] = [];
 
   constructor(private readonly deps: ChatViewDeps) {}
 
@@ -186,6 +206,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async handleSend(text: string, images: ImageAttachment[], model?: string): Promise<void> {
     const t = text.trim();
     if (!t && images.length === 0) return;
+    // Task 7 gate: a plan-gated model selection never reaches the model —
+    // show the upgrade/info message instead. Fail open when the list was
+    // never fetched (empty gated list).
+    const block = modelSelectionBlock(this.gatedModels, model);
+    if (block) {
+      vscode.window.showInformationMessage(`Sunday: ${block}`);
+      this.deps.log(`chat view: blocked send with gated model "${model}"`);
+      return;
+    }
     const bridge = await this.deps.ensureBridge();
     if (!this.sessionId) {
       const { session } = await bridge.sessionCreate({ cwd: this.deps.getCwd() });
@@ -200,6 +229,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const { turnId } = await bridge.chatSend({ sessionId: this.sessionId, message, model });
     this.activeTurnId = turnId;
     this.post({ type: 'sunday/chat/state', activeTurn: turnId });
+    // Track managed-model usage for the daily-limit grey-out in the model
+    // picker. Local approximation only — the gateway enforces the real
+    // quota server-side. Never let counter failures break the send path.
+    if (model && this.gatedModels.some((m) => m.id === model && isManagedModel(m))) {
+      try {
+        await recordManagedRequest(this.deps.globalState);
+      } catch (err) {
+        this.deps.log(`chat view: usage counter failed: ${(err as Error).message}`);
+      }
+    }
   }
 
   private async handleCancel(): Promise<void> {
@@ -218,7 +257,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async handleModelsGet(): Promise<void> {
     const bridge = await this.deps.ensureBridge();
     const { models } = await bridge.modelsList();
-    this.post({ type: 'sunday/models/list', models });
+    // Task 7 gate: exclude managed models the plan doesn't include, or grey
+    // them out when the local daily counter says the quota is spent. Fail
+    // open on any entitlement problem — the gateway enforces server-side.
+    let gated: GatedModel[];
+    try {
+      const view = await getEntitlementsView(this.deps.log);
+      gated = gateModelList(models, view, readUsedToday(this.deps.globalState));
+    } catch (err) {
+      this.deps.log(`chat view: model gating failed, failing open: ${(err as Error).message}`);
+      gated = models.map((m) => ({ ...m }));
+    }
+    this.gatedModels = gated;
+    this.post({
+      type: 'sunday/models/list',
+      models: gated.map(({ id, provider, label, disabled, hint }) => ({
+        id,
+        provider,
+        label,
+        ...(disabled ? { disabled, hint } : {}),
+      })),
+    });
   }
 
   /**

@@ -75,6 +75,7 @@ export function createOrchestrationHandlers(
         plan: p.data.plan,
         parallel: p.data.parallel,
         maxParallel: p.data.maxParallel,
+        entitlementCaps: p.data.entitlementCaps,
       });
       return def.result.parse(result);
     },

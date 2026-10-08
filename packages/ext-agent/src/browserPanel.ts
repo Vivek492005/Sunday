@@ -12,6 +12,8 @@
 import * as crypto from 'node:crypto';
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
+import { getCachedView } from './entitlements/provider.js';
+import { BROWSER_PLAN_MESSAGE, browserAllowedByView } from './entitlements/browserGating.js';
 
 export const BROWSER_VIEW_TYPE = 'sunday.browserView';
 
@@ -66,10 +68,32 @@ export class BrowserViewProvider implements vscode.WebviewViewProvider {
 
   /** Take over browser control (used by the `sunday.browser.takeover` command). */
   async takeOver(): Promise<void> {
+    this.throwIfBrowserGated();
     const bridge = await this.deps.ensureBridge();
     await bridge.browserPanelTakeover();
     this.deps.log('browser view: user took over browser control');
     await this.refreshState();
+  }
+
+  /**
+   * Task 7 gate: the browser agent is plan-gated. Uses the cached
+   * entitlements (sync UI path) and FAILS OPEN when unknown — the daemon
+   * re-checks before doing anything.
+   */
+  private browserEntitlementAllows(): boolean {
+    try {
+      return browserAllowedByView(getCachedView(this.deps.log));
+    } catch (err) {
+      this.deps.log(`browser view: entitlement check failed, failing open: ${(err as Error).message}`);
+      return true;
+    }
+  }
+
+  /** Throw the upsell message when the plan excludes the browser agent. */
+  private throwIfBrowserGated(): void {
+    if (!this.browserEntitlementAllows()) {
+      throw new Error(BROWSER_PLAN_MESSAGE);
+    }
   }
 
   dispose(): void {
@@ -138,6 +162,22 @@ export class BrowserViewProvider implements vscode.WebviewViewProvider {
   // -- state -------------------------------------------------------------------
 
   private async refreshState(): Promise<void> {
+    // Task 7 gate: a plan without the browser agent sees the disabled
+    // panel state (with the upsell tooltip) — never touch the bridge, so
+    // browserd is never started for a gated plan.
+    if (!this.browserEntitlementAllows()) {
+      this.control = 'unknown';
+      this.post({
+        type: 'sunday/browser/state',
+        state: {
+          control: this.control,
+          url: this.currentUrl,
+          entitlementDisabled: true,
+          error: BROWSER_PLAN_MESSAGE,
+        },
+      });
+      return;
+    }
     const bridge = this.deps.getBridge();
     if (!bridge) {
       this.control = 'unknown';
@@ -165,6 +205,13 @@ export class BrowserViewProvider implements vscode.WebviewViewProvider {
   private async onMessage(msg: unknown): Promise<void> {
     const m = msg as { type?: unknown; url?: unknown } & Record<string, unknown>;
     if (!m || typeof m.type !== 'string') return;
+    // Task 7 gate: block every browser action for a gated plan — the panel
+    // shows the disabled state instead, and browserd is never started.
+    // ('ready' just re-renders state, which gates itself in refreshState.)
+    if (m.type !== 'sunday/browser/ready' && !this.browserEntitlementAllows()) {
+      this.postError(BROWSER_PLAN_MESSAGE);
+      return;
+    }
     try {
       switch (m.type) {
         case 'sunday/browser/ready':
@@ -291,26 +338,35 @@ const vscodeApi = acquireVsCodeApi();
 const post = (type, extra) => vscodeApi.postMessage(Object.assign({ type }, extra || {}));
 const $ = (id) => document.getElementById(id);
 // -- state machine -------------------------------------------------------------
-// control: 'agent' | 'user' | 'unknown'; disabled: browserd opt-in is off.
+// control: 'agent' | 'user' | 'unknown'; disabled: browserd opt-in is off;
+// entitlementDisabled: the plan doesn't include the browser agent (Task 7).
 // Take over is only meaningful while the agent holds control; Resume only
 // while the user holds it. Everything is inert until the daemon reports.
-const state = { control: 'unknown', disabled: false, hasSession: false };
+const state = { control: 'unknown', disabled: false, entitlementDisabled: false, entitlementMessage: '', hasSession: false };
 function render() {
+  const blocked = state.disabled || state.entitlementDisabled;
   const badge = $('controlBadge');
   badge.textContent = state.control === 'agent' ? 'agent control'
     : state.control === 'user' ? 'YOU have control' : 'control: unknown';
   badge.className = 'badge' + (state.control === 'agent' ? ' agent' : state.control === 'user' ? ' user' : '');
-  $('takeover').disabled = state.disabled || state.control !== 'agent';
-  $('resume').disabled = state.disabled || state.control !== 'user';
-  $('open').disabled = state.disabled;
-  $('reload').disabled = state.disabled || !state.hasSession;
-  $('close').disabled = state.disabled || !state.hasSession;
-  $('shotBtn').disabled = state.disabled || !state.hasSession;
+  $('takeover').disabled = blocked || state.control !== 'agent';
+  $('resume').disabled = blocked || state.control !== 'user';
+  $('open').disabled = blocked;
+  $('reload').disabled = blocked || !state.hasSession;
+  $('close').disabled = blocked || !state.hasSession;
+  $('shotBtn').disabled = blocked || !state.hasSession;
   const banner = $('banner');
-  if (state.disabled) {
+  banner.innerHTML = '';
+  if (state.entitlementDisabled) {
+    // Task 7: plan-gated — disabled panel with the upsell tooltip.
+    const tip = state.entitlementMessage || 'Browser agent requires a Smart plan or higher';
+    const div = document.createElement('div');
+    div.className = 'notice';
+    div.title = tip;
+    div.textContent = tip + ' — upgrade your plan to use the agent browser.';
+    banner.appendChild(div);
+  } else if (state.disabled) {
     banner.innerHTML = '<div class="notice">Agent browser is disabled. Set <b>sunday.browser.enabled</b> to true and restart the sidecar to use it.</div>';
-  } else {
-    banner.innerHTML = '';
   }
   if (state.control === 'user') {
     banner.innerHTML += '<div class="notice">You have control of the browser — agent browser actions are paused until you resume.</div>';
@@ -342,9 +398,11 @@ window.addEventListener('message', (event) => {
       const s = msg.state || {};
       state.control = s.control === 'agent' || s.control === 'user' ? s.control : 'unknown';
       state.disabled = typeof s.error === 'string' && s.error.indexOf('browser is disabled') !== -1;
+      state.entitlementDisabled = s.entitlementDisabled === true;
+      state.entitlementMessage = state.entitlementDisabled && typeof s.error === 'string' ? s.error : '';
       state.hasSession = !!s.url;
       if (s.url) $('url').value = s.url;
-      if (s.error && !state.disabled) showError(s.error);
+      if (s.error && !state.disabled && !state.entitlementDisabled) showError(s.error);
       render();
       break;
     }

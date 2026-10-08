@@ -44,6 +44,31 @@ export interface BuildIndexStats {
   skipped: number;
   /** Chunks reused from the previous index without re-chunking. */
   reused: number;
+  /** True when indexing stopped early because the byte cap was reached —
+   *  the index is partial BY DESIGN; callers must surface the cap message
+   *  (see formatIndexCapMessage) rather than failing silently. */
+  capped: boolean;
+  /** The byte cap that was enforced for this build. */
+  maxBytes: number;
+}
+
+/**
+ * Default index byte cap (100 MB) when the caller supplies no
+ * entitlement-derived limit. Matches the ext-agent fallback in
+ * `entitlements/indexGating.ts` so both sides agree when entitlements are
+ * unavailable.
+ */
+export const DEFAULT_INDEX_MAX_BYTES = 100 * 1024 * 1024;
+
+const BYTES_PER_MB = 1024 * 1024;
+
+/**
+ * Clear, non-silent status message for a capped build — e.g.
+ * "Indexing stopped at 500 MB — your plan's limit".
+ */
+export function formatIndexCapMessage(maxBytes: number): string {
+  const mb = Math.max(1, Math.round(maxBytes / BYTES_PER_MB));
+  return `Indexing stopped at ${mb} MB — your plan's limit`;
 }
 
 /** `~/.sunday`, overridable via SUNDAY_HOME (tests). */
@@ -146,8 +171,17 @@ export function isCredentialFile(relPath: string): boolean {
  * Build (or incrementally refresh) the workspace index. Files whose
  * `size`+`mtimeMs` match the previous index keep their chunks untouched;
  * `force` re-chunks everything. Returns aggregate stats.
+ *
+ * Task 7: `opts.maxBytes` caps the total bytes accepted into the index
+ * (entitlement-derived; defaults to 100 MB). When the next file would push
+ * past the cap, indexing STOPS and `stats.capped` is set — the index is
+ * saved as-is (a valid partial index) and the caller surfaces
+ * `formatIndexCapMessage(maxBytes)` so the limit is never silent.
  */
-export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}): BuildIndexStats {
+export function buildIndex(
+  workspaceRoot: string,
+  opts: { force?: boolean; maxBytes?: number } = {},
+): BuildIndexStats {
   const root = path.resolve(workspaceRoot);
   let st: fs.Stats;
   try {
@@ -160,6 +194,10 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
   const prev = opts.force ? null : loadIndex(root);
   const prevByPath = new Map<string, IndexedFile>();
   for (const f of prev?.files ?? []) prevByPath.set(f.path, f);
+
+  const maxBytes = opts.maxBytes ?? DEFAULT_INDEX_MAX_BYTES;
+  let acceptedBytes = 0;
+  let capped = false;
 
   // The repo map already applies .gitignore and skips .git/node_modules.
   const map = buildRepoMap(root);
@@ -178,6 +216,11 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
     }
     const prevEntry = prevByPath.get(entry.path);
     if (prevEntry && prevEntry.size === fst.size && prevEntry.mtimeMs === fst.mtimeMs) {
+      if (acceptedBytes + prevEntry.size > maxBytes) {
+        capped = true;
+        break;
+      }
+      acceptedBytes += prevEntry.size;
       files.push(prevEntry);
       reused += prevEntry.chunks.length;
       continue;
@@ -210,6 +253,12 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
       skipped++;
       continue;
     }
+    // Task 7: stop at the plan's byte cap instead of silently producing a
+    // partial index. `capped` + `formatIndexCapMessage` tell the caller.
+    if (acceptedBytes + fst.size > maxBytes) {
+      capped = true;
+      break;
+    }
     let text: string;
     try {
       text = fs.readFileSync(abs, 'utf8');
@@ -217,6 +266,7 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
       skipped++;
       continue;
     }
+    acceptedBytes += fst.size;
     files.push({ path: entry.path, size: fst.size, mtimeMs: fst.mtimeMs, chunks: chunkText(text, entry.path) });
   }
 
@@ -233,5 +283,7 @@ export function buildIndex(workspaceRoot: string, opts: { force?: boolean } = {}
     chunks: files.reduce((n, f) => n + f.chunks.length, 0),
     skipped,
     reused,
+    capped,
+    maxBytes,
   };
 }

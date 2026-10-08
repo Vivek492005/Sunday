@@ -21,6 +21,11 @@ vi.mock('vscode', () => ({
 }));
 
 import { ChatViewProvider, resolveChatDistDir } from './chatView.js';
+import {
+  resetEntitlementsProviderForTests,
+  setEntitlementsProvider,
+} from './entitlements/provider.js';
+import { usageKeyFor } from './entitlements/usage.js';
 import type { HostBridge } from './hostBridge.js';
 
 type MockBridge = ReturnType<typeof makeBridge>;
@@ -80,14 +85,22 @@ function makeExtLayout() {
 
 function makeProvider(bridge: ReturnType<typeof makeBridge>, extensionPath: string) {
   const logs: string[] = [];
+  const store = new Map<string, unknown>();
   const provider = new ChatViewProvider({
     extensionPath,
     getBridge: () => asBridge(bridge),
     ensureBridge: async () => asBridge(bridge),
     getCwd: () => '/fake/cwd',
+    globalState: {
+      get: <T,>(key: string) => store.get(key) as T | undefined,
+      update: async (key: string, value: unknown) => {
+        if (value === undefined) store.delete(key);
+        else store.set(key, value);
+      },
+    },
     log: (m) => logs.push(m),
   });
-  return { provider, logs };
+  return { provider, logs, store };
 }
 
 describe('resolveChatDistDir', () => {
@@ -265,11 +278,19 @@ describe('ChatViewProvider', () => {
   it('notifyBridgeChanged re-subscribes when the bridge instance changes', () => {
     let current = bridge;
     const logs: string[] = [];
+    const store = new Map<string, unknown>();
     const provider = new ChatViewProvider({
       extensionPath,
       getBridge: () => asBridge(current),
       ensureBridge: async () => asBridge(current),
       getCwd: () => undefined,
+      globalState: {
+        get: <T,>(key: string) => store.get(key) as T | undefined,
+        update: async (key: string, value: unknown) => {
+          if (value === undefined) store.delete(key);
+          else store.set(key, value);
+        },
+      },
       log: (m) => logs.push(m),
     });
     const { view } = makeWebview();
@@ -282,5 +303,152 @@ describe('ChatViewProvider', () => {
     expect(replacement.listeners.size).toBe(1);
     provider.dispose();
     expect(replacement.listeners.size).toBe(0);
+  });
+});
+
+describe('ChatViewProvider model gating (Task 7)', () => {
+  let root: string;
+  let extensionPath: string;
+  let bridge: ReturnType<typeof makeBridge>;
+
+  const MODELS = [
+    { id: 'sunday:flash', provider: 'sunday', label: 'Sunday Flash' },
+    { id: 'groq:llama', provider: 'groq', label: 'Groq Llama' },
+  ];
+
+  function setView(entitlements: Record<string, boolean | number | string>) {
+    const view = {
+      user_id: 'u-test',
+      plan: 'basic',
+      status: 'active',
+      renews_at: null,
+      entitlements: {
+        'managed_models.enabled': true,
+        'managed_models.daily_requests': 200,
+        'orchestration.max_feature_agents': 1,
+        'orchestration.parallel': false,
+        'browser_agent.enabled': false,
+        'browser_agent.daily_sessions': 0,
+        'codebase_index.max_repo_mb': 100,
+        'autocomplete.managed_route': false,
+        'scheduler.priority_class': 'standard',
+        'support.tier': 'community',
+        ...entitlements,
+      },
+      cached_at: new Date().toISOString(),
+      valid_until: new Date().toISOString(),
+    };
+    setEntitlementsProvider({
+      getEntitlements: async () => ({ view: view as any, source: 'fresh' as const }),
+      getCachedSync: () => view as any,
+      refresh: async () => ({ view: view as any, source: 'fresh' as const }),
+      clear: () => undefined,
+    });
+  }
+
+  beforeEach(() => {
+    ({ root, extensionPath } = makeExtLayout());
+    bridge = makeBridge();
+    bridge.modelsList = vi.fn(async () => ({ models: MODELS }));
+    resetEntitlementsProviderForTests();
+    return () => {
+      fs.rmSync(root, { recursive: true, force: true });
+      resetEntitlementsProviderForTests();
+    };
+  });
+
+  function lastModelsList(webview: { postMessage: any }) {
+    const calls = (webview.postMessage as any).mock.calls.map((c: any[]) => c[0]);
+    return calls.filter((m: any) => m?.type === 'sunday/models/list').pop();
+  }
+
+  it("excludes managed models from 'sunday/models/list' when the plan denies them", async () => {
+    setView({ 'managed_models.enabled': false });
+    const { provider } = makeProvider(bridge, extensionPath);
+    const { view, webview, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/models/get' });
+    await flush();
+    expect(lastModelsList(webview).models.map((m: any) => m.id)).toEqual(['groq:llama']);
+    provider.dispose();
+  });
+
+  it("greys managed models with the upgrade hint when the daily limit is reached", async () => {
+    setView({ 'managed_models.enabled': true, 'managed_models.daily_requests': 3 });
+    const { provider, store } = makeProvider(bridge, extensionPath);
+    store.set(usageKeyFor(new Date()), 3);
+    const { view, webview, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/models/get' });
+    await flush();
+    const models = lastModelsList(webview).models;
+    const managed = models.find((m: any) => m.id === 'sunday:flash');
+    const byok = models.find((m: any) => m.id === 'groq:llama');
+    expect(managed.disabled).toBe(true);
+    expect(managed.hint).toContain('Daily limit reached');
+    expect(byok.disabled).toBeUndefined();
+    provider.dispose();
+  });
+
+  it("shows an info message instead of calling the model for a greyed selection", async () => {
+    setView({ 'managed_models.enabled': true, 'managed_models.daily_requests': 1 });
+    const vscode = await import('vscode');
+    const { provider, store } = makeProvider(bridge, extensionPath);
+    store.set(usageKeyFor(new Date()), 1);
+    const { view, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/models/get' });
+    await flush();
+    (vscode.window.showInformationMessage as any).mockClear();
+    await handlers[0]({ type: 'sunday/chat/send', text: 'hi', model: 'sunday:flash' });
+    await flush();
+    expect(bridge.chatSend).not.toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledTimes(1);
+    const msg = (vscode.window.showInformationMessage as any).mock.calls[0][0];
+    expect(msg).toContain('Daily limit reached');
+    provider.dispose();
+  });
+
+  it('records managed-model usage after a successful send', async () => {
+    setView({ 'managed_models.enabled': true, 'managed_models.daily_requests': 200 });
+    const { provider, store } = makeProvider(bridge, extensionPath);
+    const { view, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/models/get' });
+    await flush();
+    await handlers[0]({ type: 'sunday/chat/send', text: 'hi', model: 'sunday:flash' });
+    await flush();
+    expect(bridge.chatSend).toHaveBeenCalledTimes(1);
+    expect(store.get(usageKeyFor(new Date()))).toBe(1);
+    // BYOK models don't touch the counter
+    await handlers[0]({ type: 'sunday/chat/send', text: 'again', model: 'groq:llama' });
+    await flush();
+    expect(store.get(usageKeyFor(new Date()))).toBe(1);
+    provider.dispose();
+  });
+
+  it('fails open (lists everything) when the entitlements read throws', async () => {
+    setEntitlementsProvider({
+      getEntitlements: async () => {
+        throw new Error('gateway down');
+      },
+      getCachedSync: () => {
+        throw new Error('gateway down');
+      },
+      refresh: async () => {
+        throw new Error('gateway down');
+      },
+      clear: () => undefined,
+    });
+    const { provider } = makeProvider(bridge, extensionPath);
+    const { view, webview, handlers } = makeWebview();
+    provider.resolveWebviewView(view as any);
+    await handlers[0]({ type: 'sunday/models/get' });
+    await flush();
+    expect(lastModelsList(webview).models.map((m: any) => m.id)).toEqual([
+      'sunday:flash',
+      'groq:llama',
+    ]);
+    provider.dispose();
   });
 });

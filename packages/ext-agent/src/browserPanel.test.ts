@@ -8,6 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('vscode', () => ({}));
 
 import { BROWSER_FRAME_POLL_MS, BrowserViewProvider } from './browserPanel.js';
+import { BROWSER_PLAN_MESSAGE } from './entitlements/browserGating.js';
+import {
+  resetEntitlementsProviderForTests,
+  setEntitlementsProvider,
+} from './entitlements/provider.js';
 import type { HostBridge } from './hostBridge.js';
 
 /** Flush pending microtasks/promises under fake timers (never hits the 500ms poll tick). */
@@ -334,6 +339,151 @@ describe('BrowserViewProvider', () => {
     expect(lastMessageOfType(webview, 'sunday/browser/state')).toEqual({
       type: 'sunday/browser/state',
       state: { control: 'user', url: '' },
+    });
+    provider.dispose();
+  });
+});
+
+describe('BrowserViewProvider entitlement gate (Task 7)', () => {
+  function setView(browserEnabled: boolean) {
+    const view = {
+      user_id: 'u-test',
+      plan: 'basic',
+      status: 'active',
+      renews_at: null,
+      entitlements: {
+        'managed_models.enabled': true,
+        'managed_models.daily_requests': 200,
+        'orchestration.max_feature_agents': 1,
+        'orchestration.parallel': false,
+        'browser_agent.enabled': browserEnabled,
+        'browser_agent.daily_sessions': 0,
+        'codebase_index.max_repo_mb': 100,
+        'autocomplete.managed_route': false,
+        'scheduler.priority_class': 'standard',
+        'support.tier': 'community',
+      },
+      cached_at: new Date().toISOString(),
+      valid_until: new Date().toISOString(),
+    };
+    setEntitlementsProvider({
+      getEntitlements: async () => ({ view: view as any, source: 'cache' as const }),
+      getCachedSync: () => view as any,
+      refresh: async () => ({ view: view as any, source: 'cache' as const }),
+      clear: () => undefined,
+    });
+  }
+
+  beforeEach(() => {
+    resetEntitlementsProviderForTests();
+  });
+
+  afterEach(() => {
+    resetEntitlementsProviderForTests();
+  });
+
+  it('posts the entitlement-disabled state and never touches the bridge when gated', async () => {
+    setView(false);
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    const { view, webview } = makeWebviewView();
+    provider.resolveWebviewView(view as any);
+    await flush();
+    // No bridge call at all — browserd must not start for a gated plan.
+    expect(bridge.browserPanelControl).not.toHaveBeenCalled();
+    expect(lastMessageOfType(webview, 'sunday/browser/state')).toEqual({
+      type: 'sunday/browser/state',
+      state: {
+        control: 'unknown',
+        url: '',
+        entitlementDisabled: true,
+        error: BROWSER_PLAN_MESSAGE,
+      },
+    });
+    provider.dispose();
+  });
+
+  it('blocks browser actions with the upsell message instead of opening', async () => {
+    setView(false);
+    const bridge = makeBridge();
+    const { provider, logs } = makeProvider(bridge);
+    const { view, webview, sendToProvider } = makeWebviewView();
+    provider.resolveWebviewView(view as any);
+    await flush();
+    sendToProvider({ type: 'sunday/browser/open', url: 'https://example.com' });
+    await flush();
+    expect(bridge.browserPanelOpen).not.toHaveBeenCalled();
+    expect(lastMessageOfType(webview, 'sunday/browser/error')).toMatchObject({
+      type: 'sunday/browser/error',
+      message: BROWSER_PLAN_MESSAGE,
+    });
+    expect(logs.some((m) => m.includes('browser view'))).toBe(true);
+    provider.dispose();
+  });
+
+  it('takeOver throws the upsell message when gated (command safety net)', async () => {
+    setView(false);
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    await expect(provider.takeOver()).rejects.toThrow(BROWSER_PLAN_MESSAGE);
+    expect(bridge.browserPanelTakeover).not.toHaveBeenCalled();
+    provider.dispose();
+  });
+
+  it('fails open when no entitlements are cached yet', async () => {
+    // No provider registered at all — the panel behaves as before.
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    const { view, webview } = makeWebviewView();
+    provider.resolveWebviewView(view as any);
+    await flush();
+    expect(bridge.browserPanelControl).toHaveBeenCalled();
+    expect(lastMessageOfType(webview, 'sunday/browser/state')).toEqual({
+      type: 'sunday/browser/state',
+      state: { control: 'agent', url: '' },
+    });
+    provider.dispose();
+  });
+
+  it('works normally when the plan includes the browser agent', async () => {
+    setView(true);
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    const { view, webview, sendToProvider } = makeWebviewView();
+    provider.resolveWebviewView(view as any);
+    await flush();
+    sendToProvider({ type: 'sunday/browser/open', url: 'https://example.com' });
+    await flush();
+    expect(bridge.browserPanelOpen).toHaveBeenCalledWith('https://example.com');
+    expect(lastMessageOfType(webview, 'sunday/browser/opened')).toMatchObject({
+      type: 'sunday/browser/opened',
+      url: 'https://example.com',
+    });
+    provider.dispose();
+  });
+
+  it('fails open when the cached read throws', async () => {
+    setEntitlementsProvider({
+      getEntitlements: async () => {
+        throw new Error('gateway down');
+      },
+      getCachedSync: () => {
+        throw new Error('cache corrupt');
+      },
+      refresh: async () => {
+        throw new Error('gateway down');
+      },
+      clear: () => undefined,
+    });
+    const bridge = makeBridge();
+    const { provider } = makeProvider(bridge);
+    const { view, webview } = makeWebviewView();
+    provider.resolveWebviewView(view as any);
+    await flush();
+    expect(bridge.browserPanelControl).toHaveBeenCalled();
+    expect(lastMessageOfType(webview, 'sunday/browser/state')).toEqual({
+      type: 'sunday/browser/state',
+      state: { control: 'agent', url: '' },
     });
     provider.dispose();
   });

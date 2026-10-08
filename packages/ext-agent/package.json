@@ -139,21 +139,6 @@
       },
       {
         "category": "Sunday",
-        "command": "sunday.schedule.create",
-        "title": "Create Schedule\u2026"
-      },
-      {
-        "category": "Sunday",
-        "command": "sunday.schedule.list",
-        "title": "List Scheduled Tasks"
-      },
-      {
-        "category": "Sunday",
-        "command": "sunday.schedule.delete",
-        "title": "Delete Schedule\u2026"
-      },
-      {
-        "category": "Sunday",
         "command": "sunday.admin.setPlan",
         "title": "Sunday Admin: Set User Plan…"
       },

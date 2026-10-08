@@ -7,6 +7,8 @@ import {
   loadIndex,
   indexFilePath,
   chunkText,
+  formatIndexCapMessage,
+  DEFAULT_INDEX_MAX_BYTES,
   CHUNK_LINES,
   CHUNK_OVERLAP,
 } from './indexer.js';
@@ -117,5 +119,51 @@ describe('buildIndex', () => {
 
   it('throws for a missing root', () => {
     expect(() => buildIndex(path.join(root, 'nope'))).toThrow();
+  });
+});
+
+describe('buildIndex byte cap (Task 7)', () => {
+  it('stops at maxBytes with capped=true and saves a valid partial index', () => {
+    // a.ts (~3.4KB) is accepted; b.py would push past the tiny cap.
+    const aSize = fs.statSync(path.join(root, 'a.ts')).size;
+    const stats = buildIndex(root, { maxBytes: aSize + 10 });
+    expect(stats.capped).toBe(true);
+    expect(stats.maxBytes).toBe(aSize + 10);
+    expect(stats.files).toBe(1);
+    const loaded = loadIndex(root);
+    expect(loaded?.files.map((f) => f.path)).toEqual(['a.ts']);
+  });
+
+  it('does not cap when the repo fits in maxBytes', () => {
+    const stats = buildIndex(root, { maxBytes: 50 * 1024 * 1024 });
+    expect(stats.capped).toBe(false);
+    expect(stats.files).toBe(2);
+    expect(stats.maxBytes).toBe(50 * 1024 * 1024);
+  });
+
+  it('defaults to a 100 MB cap when maxBytes is absent', () => {
+    expect(DEFAULT_INDEX_MAX_BYTES).toBe(100 * 1024 * 1024);
+    const stats = buildIndex(root);
+    expect(stats.maxBytes).toBe(DEFAULT_INDEX_MAX_BYTES);
+    expect(stats.capped).toBe(false);
+  });
+
+  it('formats the plan-limit message', () => {
+    expect(formatIndexCapMessage(500 * 1024 * 1024)).toBe(
+      'Indexing stopped at 500 MB — your plan\'s limit',
+    );
+    expect(formatIndexCapMessage(100 * 1024 * 1024)).toBe(
+      'Indexing stopped at 100 MB — your plan\'s limit',
+    );
+  });
+
+  it('counts reused bytes toward the cap on incremental builds', () => {
+    const full = buildIndex(root);
+    expect(full.capped).toBe(false);
+    // Shrink the cap below the already-indexed total: the refresh stops
+    // immediately instead of silently keeping a stale over-cap index.
+    const total = full.files === 2 ? fs.statSync(path.join(root, 'a.ts')).size : 0;
+    const again = buildIndex(root, { maxBytes: total });
+    expect(again.capped).toBe(true);
   });
 });
