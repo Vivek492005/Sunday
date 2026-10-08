@@ -22,6 +22,7 @@ import {
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserPanelMethods } from './browser-panel.js';
 import { registerBestOfNMethods } from './bestofn-methods.js';
+import { registerSchedulerMethods } from './scheduler.js';
 import { registerBrowserWalkthroughTools } from './browser-walkthrough.js';
 import { EnvSecretResolver, createSundaydTools } from './agent-tools.js';
 import { registerMcpMethods, type McpHubResolver } from './mcp-methods.js';
@@ -216,6 +217,17 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
   registerBestOfNMethods({
     addMethod: (name, handler) => daemon.registerMethod(name, handler),
     host: daemon.getOrchestratorHost(),
+    log: (m) => console.error(`[sundayd] ${m}`),
+  });
+
+  // Group A, A5: scheduled tasks (`scheduler/*` RPC + 60s firing loop).
+  // Prompts execute through the daemon's background-prompt pipeline; the
+  // IDE is notified via `scheduler/event`.
+  registerSchedulerMethods({
+    addMethod: (name, handler) => daemon.registerMethod(name, handler),
+    schedulesDir: daemon.getSchedulerDir(),
+    execute: (prompt) => daemon.runBackgroundPrompt(prompt),
+    notify: (event) => daemon.notifyScheduler(event),
     log: (m) => console.error(`[sundayd] ${m}`),
   });
 
