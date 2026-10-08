@@ -113,6 +113,26 @@
         "category": "Sunday"
       },
       {
+        "command": "sunday.account.refreshEntitlements",
+        "title": "Refresh Sunday Entitlements",
+        "category": "Sunday"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.cloudTask.submit",
+        "title": "Submit Cloud Task\u2026"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.cloudTask.list",
+        "title": "List Cloud Tasks"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.admin.setPlan",
+        "title": "Sunday Admin: Set User Plan…"
+      },
+      {
         "category": "Sunday",
         "command": "sunday.checkForUpdates",
         "title": "Check for Updates"
@@ -126,6 +146,11 @@
         "category": "Sunday",
         "command": "sunday.onboardRepo",
         "title": "Onboard This Repository\u2026"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.usage.show",
+        "title": "Show Usage Dashboard"
       }
     ],
     "keybindings": [
@@ -188,6 +213,11 @@
           "default": "en-US",
           "description": "BCP 47 language tag for voice dictation (Web Speech API), e.g. en-US, hi-IN. Default en-US."
         },
+        "sunday.gateway.url": {
+          "type": "string",
+          "default": "",
+          "description": "Hosted Sunday gateway base URL for the usage dashboard and session sync. Empty = SUNDAY_API_URL env, then the built-in default."
+        },
         "sunday.orchestration.parallel": {
           "default": false,
           "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 \u2014 stays off until the parallel benchmark passes.",
@@ -236,6 +266,21 @@
           ],
           "default": "stable",
           "description": "Update channel for Sunday IDE releases."
+        },
+        "sunday.cloudTasks.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Poll the hosted gateway for queued cloud agent tasks and run them in the background (A1)."
+        },
+        "sunday.cloudTasks.gatewayUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Hosted gateway base URL for cloud tasks. Empty = SUNDAY_API_URL env, else the default Sunday gateway."
+        },
+        "sunday.admin.key": {
+          "type": "string",
+          "default": "",
+          "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only — NOT for production. Never commit a real key here; prefer workspace settings over user settings."
         }
       },
       "title": "Sunday"

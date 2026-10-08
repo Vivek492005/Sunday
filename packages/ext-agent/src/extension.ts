@@ -37,9 +37,24 @@ import { registerOrchestrationCommands } from './orchestrationCommands.js';
 import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
+import { registerUsageCommands } from './usage/usagePanel.js';
 import { registerProactiveMode } from './proactiveMode.js';
-import { registerAccountStatusBar } from './accountView.js';
+import { registerAgentsMd } from './agentsMd.js';
+import { registerStyleInfer } from './styleInfer.js';
+import { registerInitProject } from './templates/initProject.js';
+import { STYLE_AUTOINFER_ENV } from '@sunday/context';
+import {
+  registerAccountStatusBar,
+  GOOGLE_AUTH_EXTENSION_ID,
+  GOOGLE_SIGN_OUT_COMMAND,
+} from './accountView.js';
+import {
+  createEntitlementsCache,
+  sourceLabel,
+  type SundaySessionLike,
+} from './entitlements/entitlementsCache.js';
 import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
+import { defaultAdminPlanDeps, registerAdminPlanCommand } from './adminPlan.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
 import { randomUUID } from 'node:crypto';
@@ -135,6 +150,12 @@ export async function activate(
         if (image) env[SANDBOX_DOCKER_IMAGE_ENV] = image;
         return env;
       })(),
+      // Group B2: style auto-inference (once per project, first session).
+      // Disabled by `sunday.style.autoInfer` (default true); applies on the
+      // next sidecar (re)start.
+      ...(vscode.workspace.getConfiguration('sunday.style').get<boolean>('autoInfer', true)
+        ? {}
+        : { [STYLE_AUTOINFER_ENV]: '0' }),
       ...mcpSecretEnv,
     }),
   });
@@ -622,10 +643,87 @@ export async function activate(
     log(`feature views (memory/rules) skipped: ${(err as Error).message}`);
   }
   context.subscriptions.push(registerSwarmWebview(context));
+  // Group D2: Sunday Usage dashboard (`sunday.usage.show`).
+  context.subscriptions.push(registerUsageCommands(context, { log }));
   context.subscriptions.push(registerProactiveMode(context));
 
+  // -- Personalization (Group B): AGENTS.md watcher + style inference -------
+  // Group B1: file watcher + `sunday.agentsMd.reload`; the daemon injects
+  // AGENTS.md into every session's system prompt (fresh per session).
+  registerAgentsMd(context, { getWorkspaceRoot: () => wsRoot, log });
+  // Group B2: manual re-run of style inference (`sunday.style.infer`).
+  registerStyleInfer(context, { getWorkspaceRoot: () => wsRoot, log });
+  // Group B3: new-project wizard (`sunday.initProject`). Templates ship in
+  // the vsix under `templates/` (see scripts/package-vsix.mjs).
+  registerInitProject(context, {
+    templatesDir: path.join(context.extensionPath, 'templates'),
+    log,
+  });
+
+  // -- Entitlements cache (Task 6) -------------------------------------------
+  // Client-side cache for GET /me/entitlements with a 72h grace window (see
+  // entitlements/types.ts — the contract Task 7 consumes). UI-only: the
+  // gateway re-checks entitlements server-side on every managed request, so a
+  // stale or tampered cache can never bypass limits.
+  const getSundaySessionForEntitlements = async (): Promise<SundaySessionLike | undefined> => {
+    try {
+      const ext = vscode.extensions.getExtension<{
+        getSundaySession?: () => Promise<SundaySessionLike | undefined>;
+      }>(GOOGLE_AUTH_EXTENSION_ID);
+      return (await ext?.exports?.getSundaySession?.()) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const entitlements = createEntitlementsCache({
+    globalState: context.globalState,
+    getSundaySession: getSundaySessionForEntitlements,
+    gatewayUrl: process.env.SUNDAY_API_URL?.trim().replace(/\/$/, '') || undefined,
+    onUnauthorized: async () => {
+      // 401 from /me/entitlements: the Sunday session JWT is dead — clear
+      // session state through the auth extension's own sign-out command
+      // (best-effort; the SundaySessionManager secret clear runs inside it).
+      try {
+        await vscode.commands.executeCommand(GOOGLE_SIGN_OUT_COMMAND);
+      } catch (err) {
+        log(`entitlements: sign-out on 401 failed: ${(err as Error).message}`);
+      }
+    },
+    log,
+  });
+
   // -- Sunday Account status bar UI shell (Phase 9.a: minimal, no billing) ---
-  context.subscriptions.push(registerAccountStatusBar(context, { log }));
+  context.subscriptions.push(
+    registerAccountStatusBar(context, {
+      log,
+      onSignedIn: () => entitlements.notifySignedIn(),
+      onSignedOut: () => entitlements.notifySignedOut(),
+    }),
+  );
+
+  // -- A1: cloud async tasks ---------------------------------------------------
+  // Submit/list commands + 30s completion polling (silent unless enabled).
+  registerCloudTaskCommands(context, defaultCloudTaskDeps(log));
+
+  // -- Admin plan toggle (Phase 9.b, Task 8) ----------------------------------
+  // Testing-only: set a user's plan on the hosted gateway (x-admin-key from
+  // the `sunday.admin.key` setting). Not for production use.
+  registerAdminPlanCommand(context, defaultAdminPlanDeps(log));
+
+  // Manual refresh command + delayed startup fetch (fire-and-forget, ~10s so
+  // it never slows launch).
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sunday.account.refreshEntitlements', async () => {
+      const { view, source } = await entitlements.refresh();
+      const plan = view.plan.charAt(0).toUpperCase() + view.plan.slice(1);
+      void vscode.window.showInformationMessage(
+        `Sunday entitlements: ${plan} plan (${sourceLabel(source)}).`,
+      );
+    }),
+  );
+  const entitlementsTimer = setTimeout(() => void entitlements.getEntitlements(), 10_000);
+  // NodeJS.Timeout has unref in the extension host; guard for test envs.
+  (entitlementsTimer as unknown as { unref?: () => void }).unref?.();
 
   // -- A1: cloud async tasks ---------------------------------------------------
   // Submit/list commands + 30s completion polling (silent unless enabled).

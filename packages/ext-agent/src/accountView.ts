@@ -147,6 +147,10 @@ export function signedInPickAction(pick: AccountPickItem | undefined): 'signOut'
 
 export interface AccountViewDeps {
   log?: (msg: string) => void;
+  /** Called after a successful sign-in (e.g. to refresh cached entitlements). */
+  onSignedIn?: () => void;
+  /** Called after a successful sign-out (e.g. to clear cached entitlements). */
+  onSignedOut?: () => void;
 }
 
 async function getGoogleSession(
@@ -227,6 +231,7 @@ export function registerAccountStatusBar(
       // onDidChangeSessions normally refreshes the UI; refresh here too in
       // case the provider does not fire the event.
       await refresh();
+      deps.onSignedIn?.();
     } catch (err) {
       void vscode.window.showErrorMessage(
         `Sunday sign-in failed: ${(err as Error).message}. ` +
@@ -249,6 +254,7 @@ export function registerAccountStatusBar(
       }
       await vscode.commands.executeCommand(GOOGLE_SIGN_OUT_COMMAND);
       await refresh();
+      deps.onSignedOut?.();
     } catch (err) {
       void vscode.window.showErrorMessage(`Sunday sign-out failed: ${(err as Error).message}`);
     }
