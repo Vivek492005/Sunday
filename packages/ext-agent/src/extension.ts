@@ -32,12 +32,14 @@ import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
 import { registerDesignToCode } from './design-to-code.js';
+import { registerOnboardRepo } from './onboarding/index.js';
 import { registerOrchestrationCommands } from './orchestrationCommands.js';
 import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
 import { registerProactiveMode } from './proactiveMode.js';
 import { registerAccountStatusBar } from './accountView.js';
+import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
 import { randomUUID } from 'node:crypto';
@@ -546,6 +548,8 @@ export async function activate(
   registerTerminalExplain(context, { ensureBridge, getCwd: partBCwd, log });
   // Workflow (Group C) — design-to-code.
   registerDesignToCode(context, { ensureBridge, getCwd: partBCwd, log });
+  // Workflow (Group C) — repo onboarding wizard.
+  registerOnboardRepo(context, { log });
 
   // Phase 8 — next-edit suggestions (experimental). Gated by
   // `sunday.nextEdit.enabled` (default false) and fully isolated from the
@@ -622,6 +626,10 @@ export async function activate(
 
   // -- Sunday Account status bar UI shell (Phase 9.a: minimal, no billing) ---
   context.subscriptions.push(registerAccountStatusBar(context, { log }));
+
+  // -- A1: cloud async tasks ---------------------------------------------------
+  // Submit/list commands + 30s completion polling (silent unless enabled).
+  registerCloudTaskCommands(context, defaultCloudTaskDeps(log));
 
   // -- Sunday auto-update ------------------------------------------------------
   // Checks the hosted gateway for new IDE releases. Manual via the

@@ -284,8 +284,10 @@
     }
   },
   "dependencies": {
+    "@sunday/context": "workspace:*",
     "@sunday/mcp": "workspace:*",
-    "@sunday/protocol": "workspace:*"
+    "@sunday/protocol": "workspace:*",
+    "@sunday/tools": "workspace:*"
   },
   "description": "Built-in extension: agent chat UI glue + tool executors needing the VS Code API. Talks JSON-RPC to the sundayd sidecar.",
   "devDependencies": {
