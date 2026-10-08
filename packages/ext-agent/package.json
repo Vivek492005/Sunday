@@ -116,6 +116,16 @@
         "category": "Sunday",
         "command": "sunday.checkForUpdates",
         "title": "Check for Updates"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.designToCode",
+        "title": "Generate Component from Design Image\u2026"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.onboardRepo",
+        "title": "Onboard This Repository\u2026"
       }
     ],
     "keybindings": [
@@ -136,6 +146,11 @@
         "sunday.sidecar.path": {
           "default": "",
           "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
+          "type": "string"
+        },
+        "sunday.designToCode.model": {
+          "default": "",
+          "description": "Vision-capable model for sunday.designToCode (e.g. openrouter:openai/gpt-4o). Empty = built-in default.",
           "type": "string"
         },
         "sunday.completion.debounceMs": {

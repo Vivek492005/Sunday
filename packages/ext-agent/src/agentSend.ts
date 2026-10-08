@@ -16,7 +16,7 @@
 // needed by the commit-message command, which needs the model's text back.
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
-import type { ChatEventNotification } from '@sunday/protocol';
+import type { ChatEventNotification, ContentPart } from '@sunday/protocol';
 
 export interface AgentSendDeps {
   /** Start the sidecar if needed and return the bridge. */
@@ -66,10 +66,11 @@ export class AgentSender {
   /**
    * Send a message and collect the turn's full text, resolving on `turn-end`
    * (or `turn-error` / timeout). The event subscription is attached before
-   * `chatSend` so no early `text-delta` is missed.
+   * `chatSend` so no early `text-delta` is missed. Accepts content parts so
+   * callers can attach images (design-to-code).
    */
   async sendAndCollect(
-    message: string,
+    message: string | ContentPart[],
     model: string | undefined,
     timeoutMs = COLLECT_TIMEOUT_MS,
   ): Promise<CollectedTurn> {

@@ -31,6 +31,7 @@ import { registerNextEdit } from './nextEdit.js';
 import { registerCodeActions } from './codeActions.js';
 import { registerGitCommitMessage } from './gitCommit.js';
 import { registerTerminalExplain } from './terminalExplain.js';
+import { registerDesignToCode } from './design-to-code.js';
 import { registerOrchestrationCommands } from './orchestrationCommands.js';
 import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
@@ -543,6 +544,8 @@ export async function activate(
   registerCodeActions(context, { ensureBridge, getCwd: partBCwd, log });
   registerGitCommitMessage(context, { ensureBridge, getCwd: partBCwd, log });
   registerTerminalExplain(context, { ensureBridge, getCwd: partBCwd, log });
+  // Workflow (Group C) — design-to-code.
+  registerDesignToCode(context, { ensureBridge, getCwd: partBCwd, log });
 
   // Phase 8 — next-edit suggestions (experimental). Gated by
   // `sunday.nextEdit.enabled` (default false) and fully isolated from the
