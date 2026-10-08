@@ -100,6 +100,8 @@ export interface DaemonSubAgentOptions {
   tools: ToolRegistry;
   maxIterations: number;
   signal?: AbortSignal;
+  /** A2: per-attempt sampling temperature (best-of-N variants). */
+  temperature?: number;
   onEvent: (event: ChatEvent) => void;
 }
 
@@ -398,7 +400,7 @@ export class SundayDaemon {
       { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
       { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox },
     );
-    await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal });
+    await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal, temperature: opts.temperature });
   }
 
   /** Phase 5: dispatch into the daemon's own method table (used by the

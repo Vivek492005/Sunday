@@ -55,6 +55,7 @@ import {
   type SundaySessionLike,
 } from './entitlements/entitlementsCache.js';
 import { defaultCloudTaskDeps, registerCloudTaskCommands } from './cloudTasks.js';
+import { registerBestOfN } from './bestOfNView.js';
 import { defaultAdminPlanDeps, registerAdminPlanCommand } from './adminPlan.js';
 import { UpdateService, type UpdateInfo } from './update/updateService.js';
 import { UpdateInstaller } from './update/installer.js';
@@ -708,6 +709,13 @@ export async function activate(
   // -- A1: cloud async tasks ---------------------------------------------------
   // Submit/list commands + 30s completion polling (silent unless enabled).
   registerCloudTaskCommands(context, defaultCloudTaskDeps(log));
+
+  // -- A2: best-of-N parallel attempts -----------------------------------------
+  registerBestOfN(context, {
+    getBridge: getBridgeForCommands,
+    getCwd: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    log,
+  });
 
   // -- Admin plan toggle (Phase 9.b, Task 8) ----------------------------------
   // Testing-only: set a user's plan on the hosted gateway (x-admin-key from

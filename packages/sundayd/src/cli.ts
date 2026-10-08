@@ -21,6 +21,7 @@ import {
 } from './orchestration-lifecycle.js';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserPanelMethods } from './browser-panel.js';
+import { registerBestOfNMethods } from './bestofn-methods.js';
 import { registerBrowserWalkthroughTools } from './browser-walkthrough.js';
 import { EnvSecretResolver, createSundaydTools } from './agent-tools.js';
 import { registerMcpMethods, type McpHubResolver } from './mcp-methods.js';
@@ -206,6 +207,16 @@ async function buildDaemon(extra: { transport?: ServerTransport; onShutdown?: ()
   registerBackgroundMethods({
     addMethod: (name, handler) => daemon.registerMethod(name, handler),
     getBackgroundHost: () => daemon.getOrchestratorHost(),
+  });
+
+  // Group A, A2: best-of-N parallel attempts (`bestofn/run`). Same
+  // one-directional pattern: the host is the daemon's orchestrator host
+  // (runSubAgent), typed structurally so daemon.ts never imports
+  // @sunday/orchestrator.
+  registerBestOfNMethods({
+    addMethod: (name, handler) => daemon.registerMethod(name, handler),
+    host: daemon.getOrchestratorHost(),
+    log: (m) => console.error(`[sundayd] ${m}`),
   });
 
   // Parallel Agents phase: durable run registry. The store +

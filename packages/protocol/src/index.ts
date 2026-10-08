@@ -18,6 +18,7 @@ export * from './browser.js';
 export * from './browser-panel.js';
 export * from './orchestrate.js';
 export * from './background.js';
+export * from './bestofn.js';
 export * from './mcp.js';
 export * from './policy.js';
 export * from './daemon-paths.js';
@@ -36,6 +37,7 @@ import { BROWSER_METHODS } from './browser.js';
 import { BROWSER_PANEL_METHODS } from './browser-panel.js';
 import { ORCHESTRATE_METHODS, ORCHESTRATE_NOTIFICATIONS } from './orchestrate.js';
 import { BACKGROUND_METHODS, BACKGROUND_NOTIFICATIONS } from './background.js';
+import { BESTOFN_METHODS } from './bestofn.js';
 import { MCP_METHODS } from './mcp.js';
 import { POLICY_METHODS } from './policy.js';
 import { DAEMON_METHODS } from './daemon.js';
@@ -53,6 +55,7 @@ export const METHODS = {
   ...BROWSER_PANEL_METHODS,
   ...ORCHESTRATE_METHODS,
   ...BACKGROUND_METHODS,
+  ...BESTOFN_METHODS,
   ...MCP_METHODS,
   ...POLICY_METHODS,
   ...DAEMON_METHODS,

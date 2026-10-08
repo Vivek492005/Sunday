@@ -129,6 +129,11 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.bestOfN.run",
+        "title": "Best-of-N: Run Parallel Attempts\u2026"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.admin.setPlan",
         "title": "Sunday Admin: Set User Plan…"
       },

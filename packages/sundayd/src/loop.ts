@@ -44,6 +44,8 @@ export interface TurnEvents {
 export interface RunTurnOptions {
   model?: string;
   signal?: AbortSignal;
+  /** A2: per-turn sampling temperature (best-of-N variants). */
+  temperature?: number;
 }
 
 interface PendingCall {
@@ -107,6 +109,8 @@ export class AgentLoop {
           messages: session.messages,
           tools: this.deps.tools.definitions(),
           signal: opts.signal,
+          // A2: undefined = provider default; best-of-N sets per attempt.
+          ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
         });
         if (routed.relay && !turnRelay) turnRelay = routed.relay;
         const stream = routed.stream;

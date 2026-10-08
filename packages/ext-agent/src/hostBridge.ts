@@ -254,6 +254,17 @@ export class HostBridge {
     return this.call('orchestrate/resolveConflict', { runId, resolutions }, 60000);
   }
 
+  // -- best-of-N (Group A, A2) --------------------------------------------------
+
+  /**
+   * Run N parallel variants of one goal. Generous timeout — N agent turns
+   * take minutes. Progress is not streamed; the comparison view polls on
+   * completion via the returned promise.
+   */
+  bestofnRun(params: MethodParams<'bestofn/run'>): Promise<MethodResult<'bestofn/run'>> {
+    return this.call('bestofn/run', params, 30 * 60 * 1000);
+  }
+
   /** Subscribe to `orchestrate/event` notifications. Returns an unsubscribe fn. */
   onOrchestrateEvent(listener: (n: OrchestrationEvent) => void): () => void {
     this.orchestrateListeners.add(listener);
