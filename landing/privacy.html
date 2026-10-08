@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy — Sunday</title>
+<meta name="description" content="Sunday's Privacy Policy: what data we collect, how we use it, and your rights." />
+<link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a href="index.html" class="vs-brand">
+      <img src="sunday-logo.jpg" alt="Sunday" width="28" height="28" />
+      <span>Sunday</span>
+    </a>
+    <nav class="vs-nav-links">
+      <a href="index.html#download">Download</a>
+      <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub ⧉</a>
+    </nav>
+  </div>
+</header>
+
+<main class="vs-legal">
+  <h1>Privacy Policy</h1>
+  <p class="vs-legal-updated">Last updated: October 8, 2026</p>
+
+  <p>Sunday is built local-first: the IDE on your machine collects <strong>no telemetry, no analytics, and no crash reports</strong> — nothing phones home. This policy explains the limited cases where data does leave your machine, what our hosted gateway stores, and your rights.</p>
+
+  <h2>1. Summary</h2>
+  <table class="vs-legal-table">
+    <tr><th></th><th>IDE on your machine</th><th>Hosted gateway (only if you sign in)</th></tr>
+    <tr><td>Telemetry / analytics</td><td><strong>None, ever</strong></td><td>None</td></tr>
+    <tr><td>Account data</td><td>None (BYOK needs no account)</td><td>OAuth profile: email, name, avatar</td></tr>
+    <tr><td>Your code / prompts</td><td>Never sent to Sunday</td><td>Sent to AI providers for inference; <strong>never stored by Sunday</strong></td></tr>
+    <tr><td>Usage metering</td><td>None</td><td>Request counts + token counts per day</td></tr>
+  </table>
+
+  <h2>2. Data we collect</h2>
+  <h3>2.1 When you use the IDE without signing in (BYOK / local models)</h3>
+  <p><strong>We collect nothing.</strong> Your API keys stay in your shell environment — Sunday never writes them to disk. Model requests go directly from your machine to your configured provider (OpenRouter, Groq, or a local server). No Sunday-operated server is involved.</p>
+
+  <h3>2.2 When you sign in to the hosted gateway</h3>
+  <p>To provide the free tier, we store the minimum necessary:</p>
+  <ul>
+    <li><strong>OAuth profile</strong> — when you sign in with GitHub, Google, or Microsoft, we receive and store your <strong>email address, display name, and avatar URL</strong>. We request identity scopes only — never access to your repos, drive, or other account data.</li>
+    <li><strong>OAuth tokens</strong> — your provider access token is verified live against the provider (short cache, never persisted). On sign-out we revoke <strong>both</strong> your access and refresh tokens.</li>
+    <li><strong>Sunday session</strong> — after sign-in we issue our own session token (1-hour JWT) and a refresh token (30 days, stored as a SHA-256 hash — we cannot recover the original).</li>
+    <li><strong>Usage metering</strong> — per request we record: timestamp, anonymized account key, model used, and <strong>token counts in/out</strong>. This enforces the 200-request daily quota and detects abuse.</li>
+  </ul>
+
+  <h3>2.3 What we never store</h3>
+  <ul>
+    <li><strong>Your prompts, AI responses, code, or file contents.</strong> The gateway's audit log records that a request happened — never what it contained.</li>
+    <li><strong>Your provider API keys</strong> (BYOK users) — they never touch our servers.</li>
+    <li><strong>Precise location, device fingerprints, or browsing behavior.</strong></li>
+  </ul>
+
+  <h3>2.4 Update checks</h3>
+  <p>If enabled, the IDE periodically asks the gateway whether a newer version exists. This check sends only your <strong>platform (Windows/macOS/Linux) and current version number</strong> — no personal data, no account identifier. You can disable it in settings (<code>sunday.update.checkOnStartup</code>) or check manually from the Help menu.</p>
+
+  <h2>3. How we use the data</h2>
+  <ul>
+    <li><strong>Authentication</strong> — verifying who you are (OAuth profile, session tokens).</li>
+    <li><strong>Quota enforcement</strong> — counting requests against the daily free-tier limit.</li>
+    <li><strong>Abuse prevention</strong> — rate limiting per IP/account, detecting quota circumvention.</li>
+    <li><strong>Service operation</strong> — debugging outages, which never requires reading your content (because we don't store it).</li>
+  </ul>
+  <p>We do <strong>not</strong> sell your data, use it for advertising, or train models on it.</p>
+
+  <h2>4. Where your data goes (third parties)</h2>
+  <p>When you use the hosted gateway, your inference requests are forwarded to our AI model providers — currently <strong>OpenRouter</strong> and <strong>Groq</strong>. Your prompt content is processed by these providers to generate a response; their handling of that data is governed by their own privacy policies. If a provider rate-limits us, your request may transparently fail over to another provider; this is always disclosed in the response metadata.</p>
+  <p>Other third parties:</p>
+  <ul>
+    <li><strong>OAuth providers</strong> (GitHub, Google, Microsoft) — handle the sign-in flow.</li>
+    <li><strong>Render</strong> — hosts the gateway infrastructure.</li>
+    <li><strong>GitHub</strong> — the update-check endpoint reads public release metadata; no personal data is sent.</li>
+  </ul>
+
+  <h2>5. Data retention</h2>
+  <table class="vs-legal-table">
+    <tr><th>Data</th><th>Retention</th><th>Deletion</th></tr>
+    <tr><td>Sunday session JWT</td><td>1 hour (automatic expiry)</td><td>Automatic</td></tr>
+    <tr><td>Refresh tokens</td><td>30 days, or on sign-out (immediate revocation)</td><td>Sign out, or they expire</td></tr>
+    <tr><td>OAuth profile</td><td>While your account exists</td><td>Delete your account (§7)</td></tr>
+    <tr><td>Usage metering (counts only)</td><td>90 days rolling</td><td>Automatic</td></tr>
+    <tr><td>Local IDE data</td><td>Sessions auto-purge after 30 days (configurable)</td><td>Delete files under <code>~/.sunday/</code> anytime</td></tr>
+  </table>
+
+  <h2>6. Cookies and tracking</h2>
+  <p>The IDE uses <strong>no cookies and no tracking</strong>. The gateway sets <strong>no tracking cookies</strong> — authentication uses bearer tokens, not cookies. This landing website is a static page with no analytics.</p>
+
+  <h2>7. Your rights</h2>
+  <p>Whether under India's DPDP Act, the GDPR, or as a matter of our own policy, you have the right to <strong>access, correct, delete, and export</strong> your personal data, and to <strong>withdraw consent</strong> at any time by signing out and using the IDE's BYOK/local mode, which needs no account at all.</p>
+  <p>To exercise these rights, open an issue at <a href="https://github.com/Vivek492005/Sunday/issues" target="_blank" rel="noopener">github.com/Vivek492005/Sunday/issues</a> with "Privacy request" in the title. We respond within 30 days.</p>
+
+  <h2>8. Security</h2>
+  <ul>
+    <li>Refresh tokens are SHA-256 hashed; session signing keys live in server environment, never in code or logs.</li>
+    <li>All gateway traffic is HTTPS; OAuth follows the PKCE loopback flow (RFC 8252) with no embedded client secrets.</li>
+    <li>Local data is written with restrictive permissions (0600/0700), and credential filenames are never indexed.</li>
+    <li>Outbound prompts pass through a secret redactor that strips API keys and tokens before they reach any AI provider.</li>
+  </ul>
+
+  <h2>9. Children</h2>
+  <p>Sunday is not directed at children under 13 (or the minimum age in your jurisdiction).</p>
+
+  <h2>10. Changes to this policy</h2>
+  <p>We will announce material changes in the GitHub repository and update the "Last updated" date above.</p>
+
+  <h2>11. Contact</h2>
+  <p>Privacy questions or requests: open an issue at <a href="https://github.com/Vivek492005/Sunday/issues" target="_blank" rel="noopener">github.com/Vivek492005/Sunday/issues</a> with "Privacy" in the title.</p>
+
+  <hr />
+  <p class="vs-legal-note">This policy covers the Sunday IDE and the hosted gateway at <code>sunday-final-ide.onrender.com</code>. BYOK/local-model usage involves no Sunday-operated servers.</p>
+</main>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav><a href="index.html">Home</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>

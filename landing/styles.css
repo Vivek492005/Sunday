@@ -167,6 +167,25 @@ a.vs-dl-option:hover { border-color: var(--sun); }
 [data-theme="light"] .vs-terminal { background: #1c1917; }
 [data-theme="light"] .vs-footer { color: #78716c; }
 
+/* ---------- Legal pages (privacy / terms) ---------- */
+.vs-legal { max-width: 820px; margin: 0 auto; padding: 64px 24px 90px; }
+.vs-legal h1 { font-size: clamp(32px, 4.5vw, 48px); color: #fff; letter-spacing: -1px; margin-bottom: 8px; }
+.vs-legal-updated { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+.vs-legal h2 { font-size: 24px; color: #fff; margin: 40px 0 14px; letter-spacing: -.3px; }
+.vs-legal h3 { font-size: 18px; color: var(--sun-h); margin: 24px 0 10px; }
+.vs-legal p, .vs-legal li { color: #c5c5d0; font-size: 16px; }
+.vs-legal p { margin-bottom: 14px; }
+.vs-legal ul { margin: 0 0 16px 22px; }
+.vs-legal li { margin-bottom: 8px; }
+.vs-legal code { background: #1e1e28; padding: 2px 7px; border-radius: 5px; font-family: var(--mono); font-size: 14px; color: var(--sun-h); }
+.vs-legal hr { border: none; border-top: 1px solid var(--line); margin: 40px 0 20px; }
+.vs-legal-note { color: var(--muted) !important; font-size: 14px !important; }
+.vs-legal-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14.5px; }
+.vs-legal-table th, .vs-legal-table td { border: 1px solid var(--line); padding: 10px 14px; text-align: left; vertical-align: top; }
+.vs-legal-table th { background: var(--card); color: #fff; font-weight: 600; }
+.vs-legal-table td { color: #c5c5d0; }
+@media (max-width: 900px) { .vs-legal { padding: 40px 20px 60px; } .vs-legal-table { font-size: 13px; } }
+
 /* Binary bg via JS */
 @media (max-width: 900px) {
   .vs-nav-links { display: none; }

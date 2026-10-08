@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Terms of Service — Sunday</title>
+<meta name="description" content="Sunday's Terms of Service for the hosted gateway free tier." />
+<link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a href="index.html" class="vs-brand">
+      <img src="sunday-logo.jpg" alt="Sunday" width="28" height="28" />
+      <span>Sunday</span>
+    </a>
+    <nav class="vs-nav-links">
+      <a href="index.html#download">Download</a>
+      <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub ⧉</a>
+    </nav>
+  </div>
+</header>
+
+<main class="vs-legal">
+  <h1>Terms of Service</h1>
+  <p class="vs-legal-updated">Last updated: October 8, 2026</p>
+
+  <p>These Terms govern your use of the Sunday IDE software and the optional Sunday hosted gateway service. By installing Sunday or using the hosted gateway, you agree to these Terms.</p>
+
+  <h2>1. What Sunday is</h2>
+  <p>Sunday is a <strong>free, open-source AI coding IDE</strong>, licensed under the <strong>Apache License 2.0</strong>. The full source code is available at <a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">github.com/Vivek492005/Sunday</a>. Your rights to the software itself are governed by the Apache-2.0 license, not by this document.</p>
+  <p>These Terms cover the <strong>optional hosted gateway</strong> (<code>sunday-final-ide.onrender.com</code>), a free service that provides AI model access without requiring you to configure your own API keys.</p>
+
+  <h2>2. Two ways to use Sunday</h2>
+  <ul>
+    <li><strong>Bring your own key (BYOK) / local models.</strong> Use Sunday entirely with your own provider API keys or a local model server. This requires <strong>no account, no sign-in</strong> — these Terms' gateway sections do not apply.</li>
+    <li><strong>Hosted gateway (zero-config).</strong> Sign in with GitHub, Google, or Microsoft and get free AI access (currently <strong>200 requests per day</strong>, resetting at UTC midnight). Sections 3–7 below apply.</li>
+  </ul>
+
+  <h2>3. Acceptable use of the hosted gateway</h2>
+  <ul>
+    <li><strong>No abuse.</strong> Do not circumvent rate limits or quotas (e.g. multiple accounts to pool quota), probe for vulnerabilities without permission, or use the service to harm, harass, or deceive.</li>
+    <li><strong>No reselling.</strong> You may not resell, repackage, or charge others for access to the hosted gateway.</li>
+    <li><strong>No unlawful content.</strong> Do not use the service to generate or distribute illegal content, including CSAM, malware, or instructions facilitating wrongdoing.</li>
+    <li><strong>Automated access.</strong> Scripted access is allowed within your quota; aggressive polling or denial-of-service behavior will be rate-limited or blocked.</li>
+  </ul>
+  <p>We may throttle, suspend, or terminate accounts that violate this section.</p>
+
+  <h2>4. Accounts</h2>
+  <p>You sign in with an existing GitHub, Google, or Microsoft account via OAuth. One person per account — sharing credentials to pool free-tier quota violates Section 3. Signing out revokes both your OAuth access and refresh tokens.</p>
+
+  <h2>5. Service availability — no SLA</h2>
+  <p>The hosted gateway is a <strong>best-effort free service</strong>:</p>
+  <ul>
+    <li>No uptime guarantees and no service-level agreement.</li>
+    <li>The free tier runs on shared infrastructure that may spin down when idle; the first request after idle may take up to ~60 seconds.</li>
+    <li>Quota limits, available models, and supported OAuth providers may change at any time.</li>
+    <li>The IDE itself (BYOK/local mode) is unaffected by gateway outages.</li>
+  </ul>
+
+  <h2>6. AI-generated output</h2>
+  <p>AI models can make mistakes. Code, text, or suggestions produced through Sunday should be reviewed before use, especially in production systems. We are not responsible for defects, security issues, or losses arising from AI-generated output you choose to use.</p>
+
+  <h2>7. Limitation of liability</h2>
+  <p>To the maximum extent permitted by law, the hosted gateway is provided <strong>"as is"</strong> without warranties of any kind. We are not liable for indirect, incidental, or consequential damages. Our total liability is limited to the amount you paid for the service — which, for the free tier, is zero.</p>
+
+  <h2>8. Termination</h2>
+  <p>You may stop using the service at any time by signing out (which revokes your tokens) — see the <a href="privacy.html">Privacy Policy</a> for data deletion. We may suspend or terminate your access for violations of these Terms.</p>
+
+  <h2>9. Changes to these Terms</h2>
+  <p>Material changes will be announced in the GitHub repository. Continued use of the hosted gateway after changes take effect constitutes acceptance.</p>
+
+  <h2>10. Contact</h2>
+  <p>Questions: open an issue at <a href="https://github.com/Vivek492005/Sunday/issues" target="_blank" rel="noopener">github.com/Vivek492005/Sunday/issues</a>.</p>
+
+  <hr />
+  <p class="vs-legal-note">The Sunday IDE software is © 2026 and licensed under Apache-2.0. These Terms apply only to the hosted gateway service described above.</p>
+</main>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav><a href="index.html">Home</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="https://github.com/Vivek492005/Sunday" target="_blank" rel="noopener">GitHub</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>
