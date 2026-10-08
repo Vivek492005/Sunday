@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import { SidecarManager, BROWSER_ENABLED_ENV, LOCAL_MODEL_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
@@ -36,6 +37,8 @@ import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
 import { registerProactiveMode } from './proactiveMode.js';
 import { registerAccountStatusBar } from './accountView.js';
+import { UpdateService, type UpdateInfo } from './update/updateService.js';
+import { UpdateInstaller } from './update/installer.js';
 import { randomUUID } from 'node:crypto';
 import { DAEMON_BOOT_TOKEN_ENV } from '@sunday/protocol';
 
@@ -616,6 +619,109 @@ export async function activate(
 
   // -- Sunday Account status bar UI shell (Phase 9.a: minimal, no billing) ---
   context.subscriptions.push(registerAccountStatusBar(context, { log }));
+
+  // -- Sunday auto-update ------------------------------------------------------
+  // Checks the hosted gateway for new IDE releases. Manual via the
+  // `sunday.checkForUpdates` command (Help menu); automatic once per
+  // session ~30s after startup when `sunday.update.checkOnStartup` is on.
+  const SUNDAY_GATEWAY_URL =
+    process.env.SUNDAY_API_URL?.trim().replace(/\/$/, '') ||
+    'https://sunday-final-ide.onrender.com';
+  const updateCfg = vscode.workspace.getConfiguration('sunday.update');
+  const updateCheckEnabled = updateCfg.get<boolean>('checkOnStartup', true);
+
+  const makeUpdateService = (): UpdateService => {
+    const installer = new UpdateInstaller({
+      platform: process.platform,
+      downloadFile: async (url, destPath, onProgress) => {
+        const res = await fetch(url);
+        if (!res.ok || !res.body) throw new Error(`download failed (HTTP ${res.status})`);
+        const total = Number(res.headers.get('content-length') ?? 0);
+        const file = fs.createWriteStream(destPath);
+        try {
+          let received = 0;
+          const reader = res.body.getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            received += value.byteLength;
+            if (total > 0) onProgress(Math.min(100, Math.round((received / total) * 100)));
+            await new Promise<void>((resolve, reject) =>
+              file.write(value, (err) => (err ? reject(err) : resolve())),
+            );
+          }
+        } finally {
+          await new Promise<void>((resolve) => file.close(() => resolve()));
+        }
+        const stat = await fs.promises.stat(destPath).catch(() => null);
+        if (!stat || stat.size === 0) throw new Error('downloaded file is empty');
+      },
+      tmpdir: () => os.tmpdir(),
+      spawnDetached: (cmd, args) => {
+        const child = spawn(cmd, args, { detached: true, stdio: 'ignore', shell: false });
+        child.unref();
+      },
+      quitIde: () => vscode.commands.executeCommand('workbench.action.quit').then(() => undefined),
+      openPath: (target) => vscode.env.openExternal(vscode.Uri.file(target)).then(() => undefined),
+      showInfoMessage: (msg, ...items) =>
+        vscode.window.showInformationMessage(msg, ...items).then((v) => v),
+      showErrorMessage: (msg) => vscode.window.showErrorMessage(msg).then(() => undefined),
+      withProgress: (title, task) =>
+        vscode.window
+          .withProgress(
+            { location: vscode.ProgressLocation.Notification, title, cancellable: false },
+            (progress) => task((pct) => progress.report({ increment: pct })),
+          )
+          .then(() => undefined),
+      log,
+    });
+    return new UpdateService({
+      fetchJson: async (url) => {
+        const res = await fetch(url, { headers: { 'User-Agent': 'sunday-ide' } });
+        if (!res.ok) throw new Error(`update check failed (HTTP ${res.status})`);
+        return res.json() as Promise<unknown>;
+      },
+      platform: process.platform,
+      currentVersion: version,
+      gatewayUrl: SUNDAY_GATEWAY_URL,
+      showInfoMessage: (msg, ...items) => vscode.window.showInformationMessage(msg, ...items),
+      showErrorMessage: (msg, ...items) => vscode.window.showErrorMessage(msg, ...items),
+      openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url)).then(() => undefined),
+      downloadAndInstall: (info: UpdateInfo) => installer.downloadAndInstall(info),
+      log,
+    });
+  };
+
+  const updateStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  updateStatusBar.command = 'sunday.checkForUpdates';
+  context.subscriptions.push(updateStatusBar);
+
+  const runUpdateCheck = async (manual: boolean): Promise<void> => {
+    const svc = makeUpdateService();
+    if (manual) {
+      await svc.checkForUpdates(true);
+      return;
+    }
+    // Auto-check: only surface the status bar affordance, never popups.
+    const info = await svc.fetchUpdateInfo();
+    if (info?.updateAvailable && info.latest) {
+      updateStatusBar.text = `$(arrow-down) Sunday v${info.latest} available`;
+      updateStatusBar.tooltip = 'Click to download and install the Sunday update';
+      updateStatusBar.show();
+    } else {
+      updateStatusBar.hide();
+    }
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sunday.checkForUpdates', () => runUpdateCheck(true)),
+  );
+  if (updateCheckEnabled) {
+    // Delayed so it never slows down launch; once per session.
+    const timer = setTimeout(() => void runUpdateCheck(false), 30_000);
+    // NodeJS.Timeout has unref in the extension host; guard for test envs.
+    (timer as unknown as { unref?: () => void }).unref?.();
+  }
 
   // -- smoke-test API ---------------------------------------------------------
   // Minimal hooks for the Electron smoke harness (scripts/smoke/). Not part of

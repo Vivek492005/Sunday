@@ -111,6 +111,11 @@
         "command": "sunday.account.showMenu",
         "title": "Show Sunday Account",
         "category": "Sunday"
+      },
+      {
+        "category": "Sunday",
+        "command": "sunday.checkForUpdates",
+        "title": "Check for Updates"
       }
     ],
     "keybindings": [
@@ -197,6 +202,20 @@
           "default": "",
           "description": "Container image for sunday.sandbox.mode=docker. Must be present locally (docker pull it once); empty = alpine:latest.",
           "type": "string"
+        },
+        "sunday.update.checkOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically check for Sunday IDE updates ~30s after startup (silent unless an update is available)."
+        },
+        "sunday.update.channel": {
+          "type": "string",
+          "enum": [
+            "stable",
+            "beta"
+          ],
+          "default": "stable",
+          "description": "Update channel for Sunday IDE releases."
         }
       },
       "title": "Sunday"
@@ -232,6 +251,14 @@
         {
           "id": "sunday.browserView",
           "name": "Agent Browser"
+        }
+      ]
+    },
+    "menus": {
+      "help": [
+        {
+          "command": "sunday.checkForUpdates",
+          "group": "z_sunday"
         }
       ]
     }
