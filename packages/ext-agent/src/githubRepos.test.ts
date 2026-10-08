@@ -31,8 +31,8 @@ const repo = (over: Partial<GitHubRepo> = {}): GitHubRepo => ({
 
 describe('buildCloneUrl', () => {
   it('embeds the token without logging it', () => {
-    const url = buildCloneUrl(repo(), 'ghp_secret123');
-    expect(url).toBe('https://ghp_secret123@github.com/octocat/hello-world.git');
+    const url = buildCloneUrl(repo(), 'test-fake-token-xyz');
+    expect(url).toBe('https://test-fake-token-xyz@github.com/octocat/hello-world.git');
     // The raw token must not appear anywhere except the URL itself — callers
     // must never log the returned string.
     expect(url).not.toContain('octocat/hello-world.git'.replace('/', '%2F'));
