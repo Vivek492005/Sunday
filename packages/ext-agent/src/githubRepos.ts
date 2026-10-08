@@ -213,7 +213,7 @@ function cloneRepo(
   cloneUrl: string,
   dir: string,
   progress: vscode.Progress<{ message?: string }>,
-  token: { cancelled: boolean },
+  token: { isCancellationRequested: boolean },
 ): Promise<CloneResult> {
   return new Promise((resolve) => {
     // `--progress` gives stderr updates; we surface a static message instead
@@ -226,13 +226,13 @@ function cloneRepo(
     let stderr = '';
     child.stderr?.on('data', (d: Buffer) => {
       stderr += d.toString();
-      if (token.cancelled) child.kill();
+      if (token.isCancellationRequested) child.kill();
     });
     child.on('error', (err) => {
       resolve({ ok: false, dir, error: `Could not start git: ${err.message}` });
     });
     child.on('close', (code) => {
-      if (token.cancelled) {
+      if (token.isCancellationRequested) {
         resolve({ ok: false, dir, error: 'Clone cancelled.' });
       } else if (code === 0) {
         resolve({ ok: true, dir });
