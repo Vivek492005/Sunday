@@ -18,7 +18,7 @@
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   createDefaultRegistry,
   Router,
@@ -33,8 +33,16 @@ import { ipAllowed, normalizeIp } from './ip-allowlist.js';
 import { SocialVerifier, type SocialIdentity } from './social-auth.js';
 import { DailyQuota } from './quota.js';
 import { UsageMeter } from './usage.js';
+import { MAX_SYNC_BLOB_BYTES, SyncStore } from './sync.js';
 import { UpdateChecker, type UpdatePlatform } from './updates.js';
-import { AccountsService, basicEntitlements } from './accounts.js';
+import { AccountsService, defaultDataDir } from './accounts.js';
+import { AgentTaskStore, publicTask, validateTaskInput } from './agent-tasks.js';
+import {
+  computeEntitlements,
+  loadPlans,
+  planOrBasic,
+  type PlansFile,
+} from './entitlements.js';
 import {
   ApiError,
   chatCompletionObject,
@@ -45,6 +53,20 @@ import {
 } from './openai-api.js';
 
 const VERSION = '0.1.0';
+
+/** POST /admin/users/:id/plan — Phase 9.b admin plan toggle (testing only). */
+const ADMIN_PLAN_ROUTE_RE = /^\/admin\/users\/([A-Za-z0-9_-]{1,64})\/plan$/;
+
+/**
+ * Constant-time string comparison for the admin key. Lengths must match
+ * first (timingSafeEqual throws on unequal lengths) — a wrong-length key
+ * simply fails closed.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  return ab.length === bb.length && timingSafeEqual(ab, bb);
+}
 
 export interface ServerDeps {
   router?: Router;
@@ -62,6 +84,8 @@ export class HostedGatewayServer {
   private readonly ipLimiter: IpRateLimiter;
   /** Phase 9.a: stricter per-IP limit on /auth/* (login endpoints are abuse magnets). */
   private readonly authIpLimiter: IpRateLimiter;
+  /** A1: per-IP limit on /agent/* (task queue is a new abuse surface). */
+  private readonly agentIpLimiter: IpRateLimiter;
   private readonly audit: AuditLog;
   private readonly router: Router;
   private readonly registry: ProviderRegistry;
@@ -69,8 +93,17 @@ export class HostedGatewayServer {
   private readonly quota: DailyQuota;
   /** D2: in-memory usage metering for GET /me/usage (see usage.ts). */
   private readonly usage: UsageMeter;
+  /**
+   * D3: per-user opaque sync-blob store. The server NEVER decrypts —
+   * see the security contract in sync.ts.
+   */
+  private readonly syncStore: SyncStore;
   private readonly accounts: AccountsService;
+  /** Phase 9.b: plan templates from data/plans.json (loaded once at startup). */
+  private readonly plans: PlansFile;
   private readonly updates: UpdateChecker;
+  /** A1: async agent task store (JSON file, 0600). */
+  private readonly agentTasks: AgentTaskStore;
   private server: Server | undefined;
 
   constructor(
@@ -84,6 +117,9 @@ export class HostedGatewayServer {
     });
     this.ipLimiter = new IpRateLimiter({ requestsPerMinute: 300 });
     this.authIpLimiter = new IpRateLimiter({ requestsPerMinute: 20 });
+    // A1: 60 req/min/IP on the task queue — generous for polling, tight
+    // enough to make queue-flooding expensive.
+    this.agentIpLimiter = new IpRateLimiter({ requestsPerMinute: 60 });
     this.audit = new AuditLog(config.auditLog);
     // S8: restrict the server registry to paid upstream providers only.
     // The default registry includes `sunday:` (self-loop burning quota) and
@@ -93,10 +129,22 @@ export class HostedGatewayServer {
     this.social = new SocialVerifier(this.config.oauthProviders);
     this.quota = new DailyQuota(config.dailyQuota);
     this.usage = new UsageMeter();
+    this.syncStore = new SyncStore(deps.dataDir);
+    // Phase 9.b: load plan templates once at startup. loadPlans() throws on
+    // a missing file, bad JSON, or schema violations — fail closed: the
+    // constructor throws, cli.ts prints the message and exits non-zero, so
+    // the gateway never boots with unknown/empty plan templates.
+    try {
+      this.plans = loadPlans(deps.dataDir ?? defaultDataDir());
+    } catch (err) {
+      throw new Error(`cannot start hosted gateway: ${(err as Error).message}`);
+    }
     this.accounts = new AccountsService(config.sessionSecret, {
       dataDir: deps.dataDir,
       fetchFn: deps.accountsFetch,
+      plans: this.plans,
     });
+    this.agentTasks = new AgentTaskStore(deps.dataDir ?? defaultDataDir());
     this.updates = new UpdateChecker();
   }
 
@@ -172,9 +220,16 @@ export class HostedGatewayServer {
     });
   }
 
-  /** Read a JSON object body (empty body -> {}); throws 400 on invalid JSON. */
-  private async parseJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-    const raw = await this.readBody(req, this.config.maxBodyBytes);
+  /**
+   * Read a JSON object body (empty body -> {}); throws 400 on invalid JSON.
+   * `maxBytes` overrides the configured body cap for routes with their own
+   * documented limit (e.g. the 5 MiB sync-blob cap).
+   */
+  private async parseJsonBody(
+    req: IncomingMessage,
+    maxBytes: number = this.config.maxBodyBytes,
+  ): Promise<Record<string, unknown>> {
+    const raw = await this.readBody(req, maxBytes);
     if (raw.length === 0) return {};
     let parsed: unknown;
     try {
@@ -220,6 +275,11 @@ export class HostedGatewayServer {
       const isAuthRoute =
         method === 'POST' &&
         (path === '/auth/session' || path === '/auth/refresh' || path === '/auth/logout');
+      // Phase 9.b admin plan toggle: authenticated via x-admin-key, not
+      // Bearer, so it skips the Bearer auth block below (it keeps the
+      // top-level per-IP limiter, which already ran for this route).
+      const adminPlanMatch = method === 'POST' ? ADMIN_PLAN_ROUTE_RE.exec(path) : null;
+      const isAdminRoute = adminPlanMatch !== null;
 
       // 1. IP allowlist.
       if (!ipAllowed(ip, this.config.ipAllowlist)) {
@@ -249,7 +309,7 @@ export class HostedGatewayServer {
       let key: { id: string } | undefined;
       let socialIdentity: SocialIdentity | undefined;
       let sessionUserId: string | undefined;
-      if (!isHealth && !isUpdateCheck && !isAuthRoute) {
+      if (!isHealth && !isUpdateCheck && !isAuthRoute && !isAdminRoute) {
         const secret = KeyStore.extractBearer(req.headers.authorization);
 
         if (this.config.socialAuth && secret) {
@@ -345,15 +405,70 @@ export class HostedGatewayServer {
         return;
       }
 
-      // Phase 9.a: requires a valid Sunday session JWT specifically (the
+      // Phase 9.b: requires a valid Sunday session JWT specifically (the
       // middleware also records which auth mode was used in sessionUserId).
+      // Serves the full EntitlementsView computed from the user's plan
+      // template. Top-level `plan` + `entitlements` are kept so Phase 9.a
+      // clients keep working.
       if (method === 'GET' && path === '/me/entitlements') {
         if (!sessionUserId) {
           status = 401;
           throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
         }
+        const user = this.accounts.getUser(sessionUserId);
+        if (!user) {
+          status = 404;
+          throw new ApiError(404, 'unknown_user', 'no Sunday account for this session');
+        }
         status = 200;
-        this.sendJson(res, 200, basicEntitlements());
+        this.sendJson(
+          res,
+          200,
+          computeEntitlements(user.id, planOrBasic(user.plan, this.plans), this.plans),
+        );
+        return;
+      }
+
+      // Phase 9.b: admin plan toggle — for testing gating before billing
+      // exists. NOT for production (single shared key, no audit trail, no
+      // RBAC). Auth: `x-admin-key` header compared in constant time against
+      // SUNDAY_ADMIN_KEY; an unset key fails closed (403 on every call).
+      // The key is NEVER logged. Rate limiting comes from the top-level
+      // per-IP limiter, which already admitted this request.
+      if (adminPlanMatch) {
+        const configuredKey = this.config.adminKey;
+        const presentedKey = req.headers['x-admin-key'];
+        const keyOk =
+          typeof configuredKey === 'string' &&
+          configuredKey.length > 0 &&
+          typeof presentedKey === 'string' &&
+          safeEqual(presentedKey, configuredKey);
+        if (!keyOk) {
+          status = 403;
+          throw new ApiError(
+            403,
+            configuredKey ? 'admin_forbidden' : 'admin_not_configured',
+            configuredKey ? 'invalid admin key' : 'admin API is not configured',
+          );
+        }
+        const body = await this.parseJsonBody(req);
+        const plan = body.plan;
+        if (plan !== 'basic' && plan !== 'smart' && plan !== 'pro') {
+          status = 400;
+          throw new ApiError(400, 'invalid_plan', 'body.plan must be one of basic|smart|pro');
+        }
+        const targetUserId = adminPlanMatch[1] as string;
+        const updated = this.accounts.setUserPlan(targetUserId, plan);
+        if (!updated) {
+          status = 404;
+          throw new ApiError(404, 'unknown_user', 'unknown user id');
+        }
+        status = 200;
+        this.sendJson(
+          res,
+          200,
+          computeEntitlements(updated.id, planOrBasic(updated.plan, this.plans), this.plans),
+        );
         return;
       }
 
@@ -370,6 +485,141 @@ export class HostedGatewayServer {
         // recordUsage below (`sess:<userId>` for session auth).
         this.sendJson(res, 200, this.usage.snapshot(`sess:${sessionUserId}`));
         return;
+      }
+
+      // D3: end-to-end encrypted session sync. Session-auth only. The blob
+      // is stored VERBATIM — the server never decrypts it (see the security
+      // contract in sync.ts). Size cap: 5 MiB.
+      if (method === 'POST' && path === '/sync/sessions') {
+        if (!sessionUserId) {
+          status = 401;
+          throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
+        }
+        const body = await this.parseJsonBody(req, MAX_SYNC_BLOB_BYTES + 1024);
+        const blob = body.blob;
+        const updatedAt = body.updated_at;
+        if (typeof blob !== 'string' || blob.length === 0) {
+          status = 400;
+          throw new ApiError(400, 'invalid_sync_blob', 'body.blob must be a non-empty string');
+        }
+        if (Buffer.byteLength(blob, 'utf8') > MAX_SYNC_BLOB_BYTES) {
+          status = 413;
+          throw new ApiError(
+            413,
+            'sync_blob_too_large',
+            `sync blob exceeds ${MAX_SYNC_BLOB_BYTES} bytes`,
+          );
+        }
+        if (typeof updatedAt !== 'string' || updatedAt.length === 0 || updatedAt.length > 64) {
+          status = 400;
+          throw new ApiError(400, 'invalid_sync_blob', 'body.updated_at must be a short string');
+        }
+        await this.syncStore.save(sessionUserId, blob, updatedAt);
+        status = 200;
+        this.sendJson(res, 200, { ok: true, updated_at: updatedAt });
+        return;
+      }
+
+      if (method === 'GET' && path === '/sync/sessions') {
+        if (!sessionUserId) {
+          status = 401;
+          throw new ApiError(401, 'unauthorized', 'valid Sunday session token required');
+        }
+        const rec = await this.syncStore.load(sessionUserId);
+        if (!rec) {
+          status = 404;
+          throw new ApiError(404, 'sync_not_found', 'no synced sessions for this user');
+        }
+        status = 200;
+        this.sendJson(res, 200, { blob: rec.blob, updated_at: rec.updated_at });
+        return;
+      }
+
+      // A1: async agent tasks. Auth required (identity = key.id, namespaced
+      // like the social/session ids so key ids and user ids never collide).
+      // The sundayd CloudTaskRunner claims queued tasks and posts results;
+      // the IDE submits and polls. Tasks are strictly per-identity.
+      const agentRoute = /^\/agent\/tasks(?:\/([A-Za-z0-9_-]{1,64})(?:\/(claim|result))?)?$/.exec(path);
+      if (agentRoute) {
+        if (!this.agentIpLimiter.tryAdmit(ip)) {
+          status = 429;
+          res.setHeader('Retry-After', '60');
+          throw new ApiError(429, 'agent_rate_limited', 'too many agent-task requests from this IP');
+        }
+        const userId = key!.id;
+        const taskId = agentRoute[1];
+        const action = agentRoute[2];
+
+        if (method === 'POST' && !taskId) {
+          const body = await this.parseJsonBody(req);
+          const problems = validateTaskInput(body.prompt, body.repo_context);
+          if (problems.length) {
+            status = 400;
+            throw new ApiError(400, 'invalid_task', problems.join('; '));
+          }
+          const task = this.agentTasks.create(
+            userId,
+            String(body.prompt).trim(),
+            typeof body.repo_context === 'string' ? body.repo_context : undefined,
+          );
+          status = 201;
+          this.sendJson(res, 201, { task: publicTask(task) });
+          return;
+        }
+
+        if (method === 'GET' && !taskId) {
+          status = 200;
+          this.sendJson(res, 200, {
+            tasks: this.agentTasks.list(userId).map(publicTask),
+          });
+          return;
+        }
+
+        if (taskId && method === 'GET' && !action) {
+          const task = this.agentTasks.get(userId, taskId);
+          if (!task) {
+            status = 404;
+            throw new ApiError(404, 'task_not_found', 'unknown agent task');
+          }
+          status = 200;
+          this.sendJson(res, 200, { task: publicTask(task) });
+          return;
+        }
+
+        if (taskId && method === 'POST' && action === 'claim') {
+          const task = this.agentTasks.claim(userId, taskId);
+          if (!task) {
+            status = 409;
+            throw new ApiError(409, 'task_not_claimable', 'task does not exist, is not yours, or is not queued');
+          }
+          status = 200;
+          this.sendJson(res, 200, { task: publicTask(task) });
+          return;
+        }
+
+        if (taskId && method === 'POST' && action === 'result') {
+          const body = await this.parseJsonBody(req);
+          const hasResult = typeof body.result === 'string';
+          const hasError = typeof body.error === 'string';
+          if (!hasResult && !hasError) {
+            status = 400;
+            throw new ApiError(400, 'invalid_result', 'body must include result or error (string)');
+          }
+          const task = this.agentTasks.complete(userId, taskId, {
+            ...(hasResult ? { result: body.result as string } : {}),
+            ...(hasError ? { error: body.error as string } : {}),
+          });
+          if (!task) {
+            status = 409;
+            throw new ApiError(409, 'task_not_completable', 'task does not exist, is not yours, or is already terminal');
+          }
+          status = 200;
+          this.sendJson(res, 200, { task: publicTask(task) });
+          return;
+        }
+
+        status = 404;
+        throw new ApiError(404, 'not_found', `unknown route: ${method} ${path}`);
       }
 
       if (method === 'GET' && path === '/v1/models') {
