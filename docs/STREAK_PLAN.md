@@ -4,6 +4,29 @@
 
 ---
 
+## 🔇 Two-Mode Design (founder requirement)
+
+Engagement **kabhi** normal VS Code workflow me interfere nahi karega.
+
+### Passive Mode (sirf file read/write, no AI agents)
+- Sirf streak day tracking chalegi (silent, lightweight)
+- Status bar me `🔥 12` dikhega (bas ek number, koi disturbance nahi)
+- **Koi** quest prompt nahi, **koi** XP popup nahi, **koi** achievement toast nahi
+- Allowed notifications (max 1/day): streak milestone (7/14/30 din), 8 PM at-risk nudge
+- User ko pata bhi nahi chalega ki engagement system hai — bas streak badhegi
+
+### Active Mode (AI agents use kar raha hai)
+- Full engagement: quests, achievements, XP, bonus celebrations
+- Achievement toasts, quest progress, milestone celebrations
+- Bonus rate limit unlock notifications
+
+### Auto-Detect
+- Setting: `sunday.engagement.quietMode` (default: auto)
+- Session me pehli AI agent use pe active mode on
+- Streak tracking dono modes me chalti hai (foundation hai)
+
+**Principle:** *Jo user sirf code edit kar raha hai, use kabhi tang mat karo. Engagement uske kaam ke aas-paas ho, uske kaam ke beech me nahi.*
+
 ## 1. Kya hai Streak System?
 
 Roz coding karne pe **streak** badhta hai (Duolingo jaisa 🔥). Lambi streak = **free bonus AI requests**. Simple.
