@@ -85,6 +85,7 @@ file (`SUNDAY_HOSTED_CONFIG`, `{"keys":[{"id":"alice","secret":"…"}]}`).
 | `SUNDAY_HOSTED_AUDIT_LOG` | `stdout` | Audit log file or `stdout` |
 | `SUNDAY_HOSTED_UPSTREAM_TIMEOUT_MS` | `120000` | Provider call timeout |
 | `SUNDAY_SESSION_SECRET` | *(required)* | HS256 secret for Sunday session JWTs (Phase 9.a); generate with `openssl rand -base64 48` |
+| `SUNDAY_ADMIN_KEY` | — | Admin key for `POST /admin/users/:id/plan` (Phase 9.b plan toggle for testing gating before billing exists). Unset = the endpoint 403s on every call (fail closed). Never logged. |
 
 ## Security notes for operators
 

@@ -822,4 +822,47 @@ tampered client cache can only hide UI — never bypass limits.
 required) recomputes entitlements from the plan template. For testing gating
 before billing exists — not for production use.
 
+### A.6 Admin plan toggle (Phase 9.b, Task 8 — implemented)
+
+Before billing exists (Phase 9.c), plan gating is tested with a manual admin
+endpoint on the hosted gateway. It flips a user's plan and recomputes their
+entitlements from `data/plans.json` — the same code path billing webhooks
+will drive later, so gating behavior can be verified end-to-end now.
+
+**Endpoint:** `POST /admin/users/:id/plan`
+
+**Auth:** `x-admin-key` request header, compared in constant time
+(`timingSafeEqual`) against the `SUNDAY_ADMIN_KEY` env var. The key is never
+logged. An unset `SUNDAY_ADMIN_KEY` fails closed: every call returns 403.
+A wrong key also returns 403 (indistinguishable, no key oracle).
+
+**Request:** `{ "plan": "basic" | "smart" | "pro" }`
+
+**Response:** the full `EntitlementsView` for the new plan
+(`user_id`, `plan`, `status`, `renews_at`, `entitlements`, `cached_at`,
+`valid_until`). The user record is persisted atomically to `users.json`.
+
+**Errors:** `400 invalid_plan` (unknown/missing plan id), `404 unknown_user`,
+`403 admin_not_configured` / `admin_forbidden`. The endpoint is covered by the
+gateway's existing per-IP rate limiter.
+
+**Example** (operator shell; the key stays out of shell history with a prompt):
+
+```sh
+read -s SUNDAY_ADMIN_KEY
+curl -s -X POST "$GATEWAY/admin/users/u_9f3a1c2b4d5e6f70/plan" \
+  -H "x-admin-key: $SUNDAY_ADMIN_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"plan":"pro"}' | jq '{plan, entitlements}'
+```
+
+**IDE:** the `sunday.admin.setPlan` command (Sunday category) prompts for a
+plan (Basic/Smart/Pro) and a user id, then calls the endpoint with the
+`x-admin-key` from the `sunday.admin.key` setting (default empty — the
+command warns and aborts when unset; the key is never logged).
+
+**⚠️ Not for production.** A single shared key with no RBAC, no audit trail,
+and no rotation story. Phase 9.c replaces this with billing-webhook-driven
+plan changes (signed webhook payloads, idempotency ledger, Postgres).
+
 *End of `Sunday-monetization-plan.md` v1.0 (Phase 9.b appendix added)*

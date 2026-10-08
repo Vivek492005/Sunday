@@ -196,6 +196,16 @@ function isValidEntitlementValue(key: EntitlementKey, v: unknown): boolean {
 }
 
 /**
+ * Resolve a user's stored plan against the loaded templates. A stored plan
+ * id missing from plans.json (e.g. a template removed after the record was
+ * written) falls back to 'basic', which the schema guarantees exists.
+ * Pure function — no I/O.
+ */
+export function planOrBasic(plan: PlanId, plans: PlansFile): PlanId {
+  return plans.plans.some((p) => p.id === plan) ? plan : 'basic';
+}
+
+/**
  * Compute the served entitlements view for a user from their plan.
  * Pure function — no I/O. `now` is injectable for tests.
  */

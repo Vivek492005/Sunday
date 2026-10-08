@@ -65,6 +65,13 @@ export interface HostedGatewayConfig {
    * missing/empty. Generate with e.g. `openssl rand -base64 48`.
    */
   sessionSecret: string;
+  /**
+   * Admin key for POST /admin/users/:id/plan (Phase 9.b plan toggle for
+   * testing gating before billing exists). Env: SUNDAY_ADMIN_KEY.
+   * Optional — when unset the admin endpoint 403s on every call (fail
+   * closed). Never logged; compared with timingSafeEqual.
+   */
+  adminKey?: string;
 }
 
 interface FileConfig {
@@ -136,6 +143,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     );
   }
 
+  // Phase 9.b: admin key is optional — the /admin/* endpoints fail closed
+  // (403) when it is unset, so a missing key is never a boot error.
+  const adminKey = env.SUNDAY_ADMIN_KEY?.trim() || undefined;
+
   return {
     port: num(env.SUNDAY_HOSTED_PORT, num(env.PORT, 8080)),
     host: env.SUNDAY_HOSTED_HOST?.trim() || '127.0.0.1',
@@ -154,5 +165,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HostedGatewayC
     oauthProviders: oauthProviders.length > 0 ? oauthProviders : ['github', 'google', 'microsoft'],
     dailyQuota: num(env.SUNDAY_HOSTED_DAILY_QUOTA, 200),
     sessionSecret,
+    adminKey,
   };
 }

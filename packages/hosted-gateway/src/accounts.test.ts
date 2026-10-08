@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { mkdtempSync, statSync, readFileSync } from 'node:fs';
+import { mkdtempSync, statSync, readFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AccountsService, SUNDAY_GOOGLE_CLIENT_ID } from './accounts.js';
@@ -108,6 +108,9 @@ interface Started {
 
 async function start(config: HostedGatewayConfig): Promise<Started> {
   const dataDir = freshDataDir();
+  // Phase 9.b: the server loads plans.json once at startup (fail closed),
+  // so test servers seed the committed templates into their tmp data dir.
+  copyFileSync(new URL('../data/plans.json', import.meta.url), join(dataDir, 'plans.json'));
   const server = new HostedGatewayServer(config, {
     dataDir,
     accountsFetch: mockGoogleFetch as typeof fetch,
@@ -342,12 +345,20 @@ describe('accounts endpoints', () => {
     expect((await req(started.base, '/auth/logout', { method: 'POST' })).status).toBe(200);
   });
 
-  it('GET /me/entitlements returns the exact Basic shape with a session JWT', async () => {
+  it('GET /me/entitlements returns the full plan view (plan + entitlements kept for 9.a clients)', async () => {
     started = await start(baseConfig());
-    const { session } = await signIn(started.base);
+    const { session, userId } = await signIn(started.base);
     const r = await req(started.base, '/me/entitlements', { bearer: session });
     expect(r.status).toBe(200);
-    expect(r.json).toEqual(EXACT_ENTITLEMENTS);
+    const j = r.json as Record<string, unknown>;
+    expect(j.user_id).toBe(userId);
+    expect(j.plan).toBe('basic');
+    expect(j.status).toBe('active');
+    expect(j.renews_at).toBeNull();
+    expect(j.entitlements).toEqual(EXACT_ENTITLEMENTS.entitlements);
+    expect(typeof j.cached_at).toBe('string');
+    expect(typeof j.valid_until).toBe('string');
+    expect(Date.parse(j.valid_until as string)).toBeGreaterThan(Date.parse(j.cached_at as string));
   });
 
   it('GET /me/entitlements: 401 without auth, with API key, with bad/expired/tampered JWT', async () => {

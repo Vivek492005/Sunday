@@ -32,6 +32,8 @@ import {
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { computeEntitlements, planOrBasic } from './entitlements.js';
+import type { Entitlements, PlanId, PlansFile } from './entitlements.js';
 import { ApiError } from './openai-api.js';
 
 /**
@@ -54,7 +56,8 @@ export interface UserRecord {
   email: string;
   display_name: string;
   avatar_url: string;
-  plan: 'basic';
+  /** Phase 9.b: widened from 'basic' — see plans.json templates. */
+  plan: PlanId;
   created_at: string;
 }
 
@@ -83,8 +86,8 @@ export const BASIC_ENTITLEMENTS = {
 } as const;
 
 export interface EntitlementsResponse {
-  plan: 'basic';
-  entitlements: typeof BASIC_ENTITLEMENTS;
+  plan: PlanId;
+  entitlements: Entitlements;
 }
 
 export function basicEntitlements(): EntitlementsResponse {
@@ -103,6 +106,13 @@ export interface AccountsDeps {
   dataDir?: string;
   /** fetch implementation (tests inject a mock; never hits Google). */
   fetchFn?: typeof fetch;
+  /**
+   * Loaded plan templates (Phase 9.b). When present, /auth/session returns
+   * the user's plan entitlements instead of the Basic fallback. The
+   * production server always passes the startup-loaded plans; the fallback
+   * path exists only for unit tests that construct the service directly.
+   */
+  plans?: PlansFile;
 }
 
 /** Default storage dir: `data/` under the package root (src/ and dist/ both resolve the same way). */
@@ -203,6 +213,7 @@ export class AccountsService {
   private readonly sessionSecret: string;
   private readonly dataDir: string;
   private readonly fetchFn: typeof fetch;
+  private readonly plans: PlansFile | undefined;
   private users: UserRecord[] = [];
   private sessions: SessionRecord[] = [];
 
@@ -213,9 +224,21 @@ export class AccountsService {
     this.sessionSecret = sessionSecret;
     this.dataDir = deps.dataDir ?? defaultDataDir();
     this.fetchFn = deps.fetchFn ?? fetch;
+    this.plans = deps.plans;
     mkdirSync(this.dataDir, { recursive: true, mode: 0o700 });
     this.users = this.loadJson<UserRecord[]>('users.json', []);
     this.sessions = this.loadJson<SessionRecord[]>('sessions.json', []);
+    // Phase 9.b migration: records written before plans existed may lack
+    // `plan` (or carry an unknown value) — they keep working as Basic, and
+    // the normalized record is persisted so the migration runs once.
+    let migrated = false;
+    for (const u of this.users) {
+      if (u.plan !== 'basic' && u.plan !== 'smart' && u.plan !== 'pro') {
+        u.plan = 'basic';
+        migrated = true;
+      }
+    }
+    if (migrated) this.saveJson('users.json', this.users);
   }
 
   private loadJson<T>(name: string, fallback: T): T {
@@ -327,6 +350,15 @@ export class AccountsService {
     return this.sessions.find((s) => safeEqualHex(s.token_hash, hash));
   }
 
+  /** Plan-aware entitlements payload for /auth/session (Phase 9.a shape kept). */
+  private sessionEntitlements(user: UserRecord): EntitlementsResponse {
+    if (this.plans) {
+      const view = computeEntitlements(user.id, planOrBasic(user.plan, this.plans), this.plans);
+      return { plan: view.plan, entitlements: view.entitlements };
+    }
+    return basicEntitlements();
+  }
+
   /**
    * POST /auth/session: verify the Google access token, find/create the
    * user, issue a session JWT + refresh token. 400 when the token is
@@ -356,7 +388,7 @@ export class AccountsService {
         display_name: user.display_name,
         avatar_url: user.avatar_url,
       },
-      entitlements: basicEntitlements(),
+      entitlements: this.sessionEntitlements(user),
     };
   }
 
@@ -414,6 +446,20 @@ export class AccountsService {
   /** Look up a user for /me responses. */
   getUser(userId: string): UserRecord | undefined {
     return this.users.find((u) => u.id === userId);
+  }
+
+  /**
+   * Phase 9.b admin toggle: set a user's plan and persist the record
+   * (atomic write, same as every other user mutation). Returns the updated
+   * record, or undefined for an unknown user id. Callers validate the plan
+   * id before calling.
+   */
+  setUserPlan(userId: string, plan: PlanId): UserRecord | undefined {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) return undefined;
+    user.plan = plan;
+    this.saveJson('users.json', this.users);
+    return user;
   }
 
   /** Test hook: number of live (unrevoked, unexpired) sessions. */

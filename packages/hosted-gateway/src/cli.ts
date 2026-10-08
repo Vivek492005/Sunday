@@ -51,6 +51,8 @@ Environment (see README.md):
   SUNDAY_HOSTED_ALLOWLIST     IP/CIDR allowlist, comma-separated (default: none)
   SUNDAY_HOSTED_AUDIT_LOG     audit log path or "stdout" (default stdout)
   SUNDAY_SESSION_SECRET       HS256 session-JWT secret (required)
+  SUNDAY_ADMIN_KEY            admin key for POST /admin/users/:id/plan (plan toggle
+                            for testing gating; unset = endpoint 403s, fail closed)
 
 Provider keys (operator's): OPENROUTER_API_KEY, GROQ_API_KEY.`);
       process.exit(0);
