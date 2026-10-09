@@ -384,13 +384,23 @@ jobs:
       # rewritten scripts/sync-builtin.sh; must run BEFORE `gulp core-ci`
       # because the extension compile step picks up vscode/extensions/*/.
       - name: Sync built-in sunday-agent extension into the fork
-        # sync-builtin.sh handles Windows via PowerShell Expand-Archive fallback.
+        # Windows: use mode C (direct copy from built packages — no unzip needed).
+        # The --vsix unzip path is fragile on Windows Git Bash even with the
+        # PowerShell fallback. Mode C copies the same staged layout byte-for-byte.
+        # Linux/macOS keep the --vsix path (unzip is reliable there).
         # Strict on all platforms — the extension MUST bundle with the installer.
         # DIAGNOSTIC: skip_extension=true skips bundling on all platforms
         # to isolate whether the extension bundle causes startup issues.
         if: inputs.skip_extension != 'true'
         run: |
-          bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            bash scripts/sync-builtin.sh --repo "$GITHUB_WORKSPACE" \
+              --sundayd-dist "$GITHUB_WORKSPACE/packages/sundayd/dist" \
+              --browserd-dist "$GITHUB_WORKSPACE/packages/browserd/dist" \
+              --fork "$GITHUB_WORKSPACE/vscode"
+          else
+            bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode"
+          fi
 
       - name: Install copilot extension dependencies
         # The built-in copilot extension has its own lockfile; its
