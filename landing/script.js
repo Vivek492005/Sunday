@@ -424,8 +424,8 @@
 
   const ctx = canvas.getContext('2d');
   const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
-  let W = 0, H = 0, raf = null, mode = 'binary';
-  let cols = [], stars = [], nodes = [];
+  let W = 0, H = 0, raf = null, mode = 'aurora';
+  let cols = [], stars = [], nodes = [], bands = [];
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -460,6 +460,28 @@
         depth: Math.random(), r: 1 + Math.random() * 2.2,
         hot: Math.random() < 0.12
       }));
+    } else if (mode === 'aurora') {
+      // Flowing northern-lights bands in Sunday's amber/gold palette
+      const palette = [
+        [245, 158, 11],   // amber
+        [251, 191, 36],   // gold
+        [234, 88, 12],    // deep orange
+        [168, 85, 247],   // subtle violet accent
+        [245, 158, 11]
+      ];
+      bands = palette.map(function (rgb, i) {
+        return {
+          rgb: rgb,
+          baseY: H * (0.18 + i * 0.16),
+          amp: 40 + Math.random() * 70,
+          len: 0.0016 + Math.random() * 0.0018,
+          speed: 0.00022 + Math.random() * 0.00028,
+          phase: Math.random() * Math.PI * 2,
+          phase2: Math.random() * Math.PI * 2,
+          thickness: 60 + Math.random() * 90,
+          alpha: 0.10 + Math.random() * 0.08
+        };
+      });
     }
   }
 
@@ -539,9 +561,43 @@
     }
   }
 
-  function tick() {
+  /* ---- aurora (northern lights) frame ---- */
+  function auroraFrame(t) {
+    ctx.fillStyle = fadeColor(0.16);
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const step = 14;
+    for (const b of bands) {
+      for (let x = 0; x <= W; x += step) {
+        // Layered sines = organic, ever-changing curtains of light
+        const y = b.baseY
+          + Math.sin(x * b.len + t * b.speed + b.phase) * b.amp
+          + Math.sin(x * b.len * 2.7 + t * b.speed * 1.6 + b.phase2) * b.amp * 0.35;
+        const flicker = 0.75 + 0.25 * Math.sin(t * 0.0006 + b.phase + x * 0.002);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, b.thickness);
+        const col = b.rgb[0] + ',' + b.rgb[1] + ',' + b.rgb[2];
+        g.addColorStop(0, 'rgba(' + col + ',' + (b.alpha * flicker) + ')');
+        g.addColorStop(1, 'rgba(' + col + ',0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - step, y - b.thickness, step * 2, b.thickness * 2);
+      }
+    }
+    // Sparse drifting sparks for depth
+    ctx.fillStyle = 'rgba(251,191,36,0.5)';
+    for (let i = 0; i < 24; i++) {
+      const sx = (i * 197.3 + t * 0.008 * (1 + (i % 3) * 0.4)) % (W + 40) - 20;
+      const sy = (i * 311.7) % H + Math.sin(t * 0.0004 + i) * 30;
+      const r = 0.6 + (i % 3) * 0.5;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function tick(t) {
     if (mode === 'binary') binaryFrame();
     else if (mode === 'warp') warpFrame();
+    else if (mode === 'aurora') auroraFrame(t || 0);
     else neuralFrame();
     raf = requestAnimationFrame(tick);
   }
@@ -563,7 +619,7 @@
   switcher.className = 'bg-fx-switcher';
   switcher.setAttribute('role', 'group');
   switcher.setAttribute('aria-label', 'Background animation');
-  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['neural', '🕸️', 'Neural network']]
+  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['neural', '🕸️', 'Neural network'], ['aurora', '🌌', 'Aurora borealis']]
     .forEach(function ([m, icon, label]) {
       const b = document.createElement('button');
       b.className = 'bg-fx-btn'; b.dataset.fx = m;
@@ -573,8 +629,8 @@
     });
   document.body.appendChild(switcher);
 
-  try { mode = localStorage.getItem('sunday-bg-fx') || 'binary'; } catch (e) {}
-  if (!['binary', 'warp', 'neural'].includes(mode)) mode = 'binary';
+  try { mode = localStorage.getItem('sunday-bg-fx') || 'aurora'; } catch (e) {}
+  if (!['binary', 'warp', 'neural', 'aurora'].includes(mode)) mode = 'aurora';
 
   document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
   window.addEventListener('resize', resize);
