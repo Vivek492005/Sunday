@@ -425,7 +425,7 @@
   const ctx = canvas.getContext('2d');
   const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
   let W = 0, H = 0, raf = null, mode = 'aurora';
-  let cols = [], stars = [], bands = [];
+  let cols = [], stars = [], bands = [], floaters = [];
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -453,25 +453,47 @@
       const n = Math.min(260, Math.floor(W * H / 9000));
       stars = Array.from({ length: n }, () => spawnStar(true));
     } else if (mode === 'aurora') {
-      // Flowing northern-lights bands in Sunday's amber/gold palette
+      // Flowing rainbow northern-lights bands + floating feature words
       const palette = [
+        [239, 68, 68],    // red
+        [249, 115, 22],   // orange
         [245, 158, 11],   // amber
-        [251, 191, 36],   // gold
-        [234, 88, 12],    // deep orange
-        [168, 85, 247],   // subtle violet accent
-        [245, 158, 11]
+        [250, 204, 21],   // yellow
+        [34, 197, 94],    // green
+        [59, 130, 246],   // blue
+        [168, 85, 247],   // violet
+        [236, 72, 153]    // pink
       ];
       bands = palette.map(function (rgb, i) {
         return {
           rgb: rgb,
-          baseY: H * (0.18 + i * 0.16),
+          baseY: H * (0.08 + i * 0.115),
           amp: 40 + Math.random() * 70,
           len: 0.0016 + Math.random() * 0.0018,
           speed: 0.00022 + Math.random() * 0.00028,
           phase: Math.random() * Math.PI * 2,
           phase2: Math.random() * Math.PI * 2,
-          thickness: 60 + Math.random() * 90,
-          alpha: 0.10 + Math.random() * 0.08
+          thickness: 55 + Math.random() * 80,
+          alpha: 0.09 + Math.random() * 0.07
+        };
+      });
+      // Feature words that drift through the aurora like leaves on a stream
+      const FEATURES = [
+        '🤖 AI Agents', '🔥 Streaks', '⚡ Zero-config', '🌐 Browser Control',
+        '👥 Parallel Agents', '🔄 Auto-update', '🎯 Best-of-N', '🧠 Second Brain',
+        '📅 Scheduler', '🛡️ Open Source', '🎮 Gamified', '💰 ₹149/mo'
+      ];
+      floaters = FEATURES.map(function (text, i) {
+        return {
+          text: text,
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: 0.15 + Math.random() * 0.35,
+          vy: (Math.random() - 0.5) * 0.2,
+          life: Math.random(),           // 0..1 fade cycle position
+          lifeSpeed: 0.0008 + Math.random() * 0.0012,
+          size: 13 + Math.random() * 8,
+          hue: (i * 47) % 360
         };
       });
     }
@@ -555,6 +577,25 @@
       const sy = (i * 311.7) % H + Math.sin(t * 0.0004 + i) * 30;
       const r = 0.6 + (i % 3) * 0.5;
       ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
+    }
+    // Floating feature words — drift with the aurora, fade in/out like breathing
+    ctx.textAlign = 'center';
+    for (const f of floaters) {
+      f.x += f.vx; f.y += f.vy + Math.sin(t * 0.0005 + f.x * 0.01) * 0.15;
+      f.life += f.lifeSpeed;
+      if (f.life > 1) {
+        f.life = 0;
+        f.x = -80; f.y = Math.random() * H; // respawn from left
+      }
+      if (f.x > W + 80) { f.x = -80; f.y = Math.random() * H; f.life = 0; }
+      const fade = Math.sin(f.life * Math.PI); // 0 → 1 → 0
+      if (fade <= 0.02) continue;
+      ctx.font = '600 ' + f.size + 'px system-ui, sans-serif';
+      ctx.fillStyle = 'hsla(' + f.hue + ', 85%, 72%, ' + (fade * 0.85) + ')';
+      ctx.shadowColor = 'hsla(' + f.hue + ', 90%, 60%, ' + (fade * 0.8) + ')';
+      ctx.shadowBlur = 12;
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.shadowBlur = 0;
     }
     ctx.restore();
   }
