@@ -416,7 +416,7 @@
 
 })();
 
-/* ============ Hero background FX: binary rain / 3D warp / neural net ============ */
+/* ============ Hero background FX: binary rain / 3D warp / aurora ============ */
 (function() {
   const canvas = document.querySelector('.binary-rain');
   if (!canvas) return;
@@ -425,7 +425,7 @@
   const ctx = canvas.getContext('2d');
   const WORDS = ['SUNDAY', 'AGENT', 'HAPPY_CODING!'];
   let W = 0, H = 0, raf = null, mode = 'aurora';
-  let cols = [], stars = [], nodes = [], bands = [];
+  let cols = [], stars = [], bands = [];
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -452,14 +452,6 @@
     } else if (mode === 'warp') {
       const n = Math.min(260, Math.floor(W * H / 9000));
       stars = Array.from({ length: n }, () => spawnStar(true));
-    } else if (mode === 'neural') {
-      const n = Math.min(80, Math.floor(W * H / 16000));
-      nodes = Array.from({ length: n }, () => ({
-        x: Math.random() * W, y: Math.random() * H,
-        vx: (Math.random() - .5) * .4, vy: (Math.random() - .5) * .4,
-        depth: Math.random(), r: 1 + Math.random() * 2.2,
-        hot: Math.random() < 0.12
-      }));
     } else if (mode === 'aurora') {
       // Flowing northern-lights bands in Sunday's amber/gold palette
       const palette = [
@@ -534,33 +526,6 @@
     }
   }
 
-  /* ---- neural network frame ---- */
-  function neuralFrame() {
-    ctx.fillStyle = fadeColor(0.22);
-    ctx.fillRect(0, 0, W, H);
-    const LINK = 130;
-    for (const n of nodes) {
-      n.x += n.vx * (0.4 + n.depth); n.y += n.vy * (0.4 + n.depth);
-      if (n.x < -20) n.x = W + 20; if (n.x > W + 20) n.x = -20;
-      if (n.y < -20) n.y = H + 20; if (n.y > H + 20) n.y = -20;
-    }
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy);
-        if (d < LINK) {
-          ctx.strokeStyle = 'rgba(245,158,11,' + ((1 - d / LINK) * 0.28) + ')';
-          ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        }
-      }
-    }
-    for (const n of nodes) {
-      ctx.fillStyle = n.hot ? 'rgba(245,158,11,0.9)' : 'rgba(140,140,170,' + (0.3 + n.depth * 0.5) + ')';
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r * (0.6 + n.depth), 0, 7); ctx.fill();
-    }
-  }
-
   /* ---- aurora (northern lights) frame ---- */
   function auroraFrame(t) {
     ctx.fillStyle = fadeColor(0.16);
@@ -597,8 +562,7 @@
   function tick(t) {
     if (mode === 'binary') binaryFrame();
     else if (mode === 'warp') warpFrame();
-    else if (mode === 'aurora') auroraFrame(t || 0);
-    else neuralFrame();
+    else auroraFrame(t || 0);
     raf = requestAnimationFrame(tick);
   }
 
@@ -619,7 +583,7 @@
   switcher.className = 'bg-fx-switcher';
   switcher.setAttribute('role', 'group');
   switcher.setAttribute('aria-label', 'Background animation');
-  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['neural', '🕸️', 'Neural network'], ['aurora', '🌌', 'Aurora borealis']]
+  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['aurora', '🌌', 'Aurora borealis']]
     .forEach(function ([m, icon, label]) {
       const b = document.createElement('button');
       b.className = 'bg-fx-btn'; b.dataset.fx = m;
@@ -630,7 +594,7 @@
   document.body.appendChild(switcher);
 
   try { mode = localStorage.getItem('sunday-bg-fx') || 'aurora'; } catch (e) {}
-  if (!['binary', 'warp', 'neural', 'aurora'].includes(mode)) mode = 'aurora';
+  if (!['binary', 'warp', 'aurora'].includes(mode)) mode = 'aurora';
 
   document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
   window.addEventListener('resize', resize);
