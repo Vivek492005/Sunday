@@ -693,3 +693,20 @@
     apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
 })();
+
+/* ============ Card scroll-reveal entrance ============ */
+(function() {
+  const cards = document.querySelectorAll('.vs-card');
+  if (!cards.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  cards.forEach(function (c, i) {
+    c.classList.add('reveal');
+    c.style.transitionDelay = (i % 3) * 0.08 + 's';
+  });
+  const io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { io.observe(c); });
+})();
