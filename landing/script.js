@@ -443,15 +443,18 @@
   }
 
   function initMode() {
+    if (mode === 'warp') {
+      buildNebula();
+      const n = Math.floor(W * H / 2600);
+      stars = Array.from({ length: n }, spawnDeepStar);
+      meteors = [];
+    }
     if (mode === 'binary') {
       const FONT = 14, n = Math.ceil(W / FONT);
       cols = Array.from({ length: n }, () => ({
         y: Math.random() * -H, speed: 1 + Math.random() * 2.5,
         word: Math.random() < 0.06 ? WORDS[Math.random() * WORDS.length | 0] : null, wi: 0
       }));
-    } else if (mode === 'warp') {
-      const n = Math.min(260, Math.floor(W * H / 9000));
-      stars = Array.from({ length: n }, () => spawnStar(true));
     } else if (mode === 'aurora') {
       // Flowing rainbow northern-lights bands + floating feature words
       const palette = [
@@ -521,31 +524,133 @@
     }
   }
 
-  /* ---- 3D starfield warp frame ---- */
-  function spawnStar(anywhere) {
+  /* ---- NASA deep-space frame (replaces warp) ---- */
+  // Real stellar colors by spectral class (OBAFGKM)
+  const STAR_COLORS = [
+    [157, 180, 255], [170, 191, 255],           // O/B blue-white (rare)
+    [255, 255, 255], [248, 247, 255],           // A white
+    [255, 244, 232],                            // F yellow-white
+    [255, 240, 200],                            // G yellow (sun-like)
+    [255, 217, 160],                            // K orange
+    [255, 184, 154]                             // M red-orange
+  ];
+  const STAR_WEIGHTS = [0.04, 0.05, 0.22, 0.2, 0.16, 0.18, 0.1, 0.05];
+  function pickStarColor() {
+    let r = Math.random(), acc = 0;
+    for (let i = 0; i < STAR_WEIGHTS.length; i++) { acc += STAR_WEIGHTS[i]; if (r < acc) return STAR_COLORS[i]; }
+    return STAR_COLORS[2];
+  }
+  let nebulaCanvas = null, meteors = [];
+  function buildNebula() {
+    // Fractal-ish nebula: clustered soft bubbles (deep purples/blues/teal + faint amber)
+    nebulaCanvas = document.createElement('canvas');
+    nebulaCanvas.width = Math.max(2, W >> 2); nebulaCanvas.height = Math.max(2, H >> 2);
+    const nctx = nebulaCanvas.getContext('2d');
+    const palettes = [
+      [88, 60, 180], [60, 80, 200], [40, 140, 170],
+      [120, 70, 200], [200, 120, 60], [50, 60, 160]
+    ];
+    const clusters = 5 + Math.random() * 3 | 0;
+    for (let c = 0; c < clusters; c++) {
+      const cx = Math.random() * nebulaCanvas.width, cy = Math.random() * nebulaCanvas.height;
+      const pal = palettes[Math.random() * palettes.length | 0];
+      const bubbles = 26 + Math.random() * 30 | 0;
+      for (let b = 0; b < bubbles; b++) {
+        const ang = Math.random() * Math.PI * 2, dist = Math.pow(Math.random(), 1.6) * 90;
+        const bx = cx + Math.cos(ang) * dist, by = cy + Math.sin(ang) * dist * 0.7;
+        const br = 12 + Math.random() * 42;
+        const alpha = 0.028 + Math.random() * 0.05;
+        const g = nctx.createRadialGradient(bx, by, 0, bx, by, br);
+        g.addColorStop(0, 'rgba(' + pal[0] + ',' + pal[1] + ',' + pal[2] + ',' + alpha + ')');
+        g.addColorStop(1, 'rgba(' + pal[0] + ',' + pal[1] + ',' + pal[2] + ',0)');
+        nctx.fillStyle = g;
+        nctx.beginPath(); nctx.arc(bx, by, br, 0, 7); nctx.fill();
+      }
+    }
+  }
+  function spawnDeepStar() {
+    // Milky-way band: diagonal density boost
+    const bandY = (s) => H * 0.5 + (s.x / W - 0.5) * H * 0.9;
+    let x = Math.random() * W, y = Math.random() * H;
+    if (Math.random() < 0.45) { // 45% of stars cluster near the band
+      x = Math.random() * W;
+      y = bandY({ x }) + (Math.random() + Math.random() + Math.random() - 1.5) * H * 0.22;
+    }
+    const mag = Math.pow(Math.random(), 2.6); // few bright, many dim (realistic)
+    const col = pickStarColor();
     return {
-      x: (Math.random() - .5) * W * 2, y: (Math.random() - .5) * H * 2,
-      z: anywhere ? Math.random() * W : W,
-      px: 0, py: 0, hot: Math.random() < 0.18
+      x, y,
+      r: 0.35 + mag * 2.1,
+      col, mag,
+      tw: 0.6 + Math.random() * 2.4,      // twinkle speed
+      ph: Math.random() * Math.PI * 2,     // twinkle phase
+      drift: 0.008 + Math.random() * 0.03, // slow drift px/frame
+      spikes: mag > 0.86                   // brightest get Hubble diffraction spikes
     };
   }
-  function warpFrame() {
-    ctx.fillStyle = fadeColor(0.35);
+  function drawSpikes(s, alpha) {
+    const len = s.r * 7, w = Math.max(1, s.r * 0.5);
+    const c = 'rgba(' + s.col[0] + ',' + s.col[1] + ',' + s.col[2] + ',';
+    ctx.strokeStyle = c + (alpha * 0.55) + ')';
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(s.x - len, s.y); ctx.lineTo(s.x + len, s.y);
+    ctx.moveTo(s.x, s.y - len); ctx.lineTo(s.x, s.y + len);
+    ctx.stroke();
+    // fainter diagonal secondary spikes
+    ctx.strokeStyle = c + (alpha * 0.22) + ')';
+    ctx.lineWidth = w * 0.6;
+    const d = len * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(s.x - d, s.y - d); ctx.lineTo(s.x + d, s.y + d);
+    ctx.moveTo(s.x - d, s.y + d); ctx.lineTo(s.x + d, s.y - d);
+    ctx.stroke();
+  }
+  function warpFrame(t) {
+    ctx.fillStyle = isLight() ? '#f5f2ea' : '#040409';
     ctx.fillRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2, speed = 14;
-    for (const s of stars) {
-      const pz = s.z;
-      s.z -= speed;
-      if (s.z <= 1) Object.assign(s, spawnStar(false));
-      const sx = cx + (s.x / s.z) * cx, sy = cy + (s.y / s.z) * cy;
-      const px = cx + (s.x / pz) * cx, py = cy + (s.y / pz) * cy;
-      const bright = 1 - s.z / W;
-      ctx.strokeStyle = s.hot
-        ? 'rgba(245,158,11,' + (0.25 + bright * 0.75) + ')'
-        : 'rgba(160,160,190,' + (0.15 + bright * 0.7) + ')';
-      ctx.lineWidth = 1 + bright * 2;
-      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(sx, sy); ctx.stroke();
+    // Nebula backdrop (pre-rendered, drawn scaled up)
+    if (nebulaCanvas) {
+      ctx.save();
+      ctx.globalAlpha = isLight() ? 0.35 : 0.9;
+      ctx.drawImage(nebulaCanvas, 0, 0, W, H);
+      ctx.restore();
     }
+    // Stars with twinkle + drift
+    for (const s of stars) {
+      s.x += s.drift;
+      if (s.x > W + 4) { s.x = -4; }
+      const tw = 0.72 + 0.28 * Math.sin(t * 0.001 * s.tw + s.ph);
+      const a = (0.25 + s.mag * 0.75) * tw;
+      const c = s.col;
+      // soft glow for brighter stars
+      if (s.mag > 0.55) {
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+        g.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a * 0.5) + ')');
+        g.addColorStop(1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 4, 0, 7); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+      if (s.spikes && !isLight()) drawSpikes(s, a);
+    }
+    // Occasional shooting star
+    if (!isLight() && Math.random() < 0.006 && meteors.length < 2) {
+      const mx = Math.random() * W * 0.8 + W * 0.1, my = Math.random() * H * 0.4;
+      const ang = Math.PI * (0.72 + Math.random() * 0.1);
+      meteors.push({ x: mx, y: my, vx: Math.cos(ang) * 11, vy: -Math.sin(ang) * 11, life: 1 });
+    }
+    meteors = meteors.filter(function (m) {
+      m.x += m.vx; m.y += m.vy; m.life -= 0.016;
+      if (m.life <= 0) return false;
+      const grad = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 9, m.y - m.vy * 9);
+      grad.addColorStop(0, 'rgba(255,255,255,' + (m.life * 0.9) + ')');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = grad; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(m.x - m.vx * 9, m.y - m.vy * 9); ctx.stroke();
+      return true;
+    });
   }
 
   /* ---- aurora (northern lights) frame ---- */
@@ -602,7 +707,7 @@
 
   function tick(t) {
     if (mode === 'binary') binaryFrame();
-    else if (mode === 'warp') warpFrame();
+    else if (mode === 'warp') warpFrame(t || 0);
     else auroraFrame(t || 0);
     raf = requestAnimationFrame(tick);
   }
@@ -624,7 +729,7 @@
   switcher.className = 'bg-fx-switcher';
   switcher.setAttribute('role', 'group');
   switcher.setAttribute('aria-label', 'Background animation');
-  [['binary', '🌧️', 'Binary rain'], ['warp', '✨', '3D starfield warp'], ['aurora', '🌌', 'Aurora borealis']]
+  [['binary', '🌧️', 'Binary rain'], ['warp', '🔭', 'Deep space'], ['aurora', '🌌', 'Aurora borealis']]
     .forEach(function ([m, icon, label]) {
       const b = document.createElement('button');
       b.className = 'bg-fx-btn'; b.dataset.fx = m;
