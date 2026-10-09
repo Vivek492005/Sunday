@@ -31,7 +31,7 @@
       "status": "done"
     },
     {
-      "detail": "3/3 CI green (Linux/macOS/Windows), 1.0.0-beta.1 released",
+      "detail": "3/3 CI green; black-screen root cause fixed (dd29d944 had deleted defaultChatAgent; 4730690f restored it) \u2014 fixed Beta.1 release live with 5 assets; CI guard added so it can never silently regress",
       "name": "Fork Build (Full IDE)",
       "percent": 100,
       "status": "done"
@@ -85,5 +85,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-08T19:09:20+00:00"
+  "updated": "2026-10-09T21:06:14+00:00"
 }
