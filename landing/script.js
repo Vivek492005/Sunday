@@ -761,14 +761,22 @@
       o.style.transform = 'translate3d(' + (-current * maxShift() * depth) + 'px,' + (Math.sin(current * 6 + i * 2) * 24) + 'px,0)';
     });
 
-    // Active scene = closest card center to viewport center
+    // 3D carousel tilt — cards rotate like passing panels (Wispr-style)
     const trackX = -current * maxShift();
     const vc = window.innerWidth / 2;
     let best = 0, bestDist = Infinity;
     scenes.forEach(function (s, i) {
       const c = trackX + s.offsetLeft + s.offsetWidth / 2;
-      const d = Math.abs(c - vc);
-      if (d < bestDist) { bestDist = d; best = i; }
+      const d = c - vc; // signed: negative = left of center
+      const ad = Math.abs(d);
+      if (ad < bestDist) { bestDist = ad; best = i; }
+      // Tilt: left cards rotateY(+), right cards rotateY(-), max ~28deg
+      const norm = Math.max(-1, Math.min(1, d / (window.innerWidth * 0.55)));
+      const rotY = norm * -26;
+      const scale = 1 - Math.min(0.22, ad / window.innerWidth * 0.5);
+      const z = -Math.min(220, ad * 0.45); // depth pushback
+      const yArc = Math.min(46, ad * ad / window.innerWidth * 0.14); // subtle arc dip
+      s.style.transform = 'translate3d(0,' + yArc + 'px,' + z + 'px) rotateY(' + rotY + 'deg) scale(' + scale.toFixed(3) + ')';
     });
     scenes.forEach(function (s, i) { s.classList.toggle('active', i === best); });
     dots.forEach(function (d, i) { d.classList.toggle('on', i === best); });

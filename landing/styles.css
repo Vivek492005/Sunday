@@ -297,22 +297,23 @@ a.vs-dl-option:hover { border-color: var(--sun); }
 .journey-intro .vs-section-sub { margin-bottom: 0; }
 .journey-intro .vs-section-sub strong { color: #fbbf24; }
 .journey-wrap { height: 650vh; position: relative; }
-.journey-pin { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; align-items: center; }
+.journey-pin { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; align-items: center; perspective: 1400px; }
 .journey-orbs { position: absolute; inset: 0; pointer-events: none; }
 .j-orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .35; will-change: transform; }
 .j-orb.o1 { width: 420px; height: 420px; background: #f59e0b; top: 8%; left: 12%; }
 .j-orb.o2 { width: 340px; height: 340px; background: #7c3aed; top: 55%; left: 55%; opacity: .28; }
 .j-orb.o3 { width: 280px; height: 280px; background: #ea580c; top: 30%; left: 78%; opacity: .3; }
 .journey-thread { position: absolute; top: 50%; left: 0; width: 100%; height: 420px; transform: translateY(-58%); pointer-events: none; }
-.journey-track { display: flex; gap: 5vw; padding: 0 12vw; align-items: center; will-change: transform; position: relative; z-index: 1; }
+.journey-track { display: flex; gap: 4vw; padding: 0 10vw; align-items: center; will-change: transform; position: relative; z-index: 1; transform-style: preserve-3d; }
 .j-scene {
-  flex: 0 0 360px; position: relative;
-  background: rgba(20, 20, 28, .82); backdrop-filter: blur(12px);
-  border: 1px solid var(--line); border-radius: 20px; padding: 34px 30px;
-  transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .5s, border-color .4s, box-shadow .5s;
-  transform: scale(.9); opacity: .45;
+  flex: 0 0 480px; position: relative;
+  background: rgba(22, 22, 30, .88); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 24px; padding: 44px 40px;
+  transition: opacity .45s, border-color .4s, box-shadow .5s;
+  transform-style: preserve-3d; will-change: transform, opacity;
+  opacity: .5;
 }
-.j-scene.active { transform: scale(1.04); opacity: 1; border-color: rgba(245,158,11,.6); box-shadow: 0 24px 70px -20px rgba(245,158,11,.45), 0 0 0 1px rgba(245,158,11,.15); }
+.j-scene.active { opacity: 1; border-color: rgba(245,158,11,.65); box-shadow: 0 30px 80px -20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.15); }
 .j-node {
   position: absolute; top: -71px; left: 50%; transform: translateX(-50%);
   width: 18px; height: 18px; border-radius: 50%;
@@ -320,16 +321,16 @@ a.vs-dl-option:hover { border-color: var(--sun); }
   transition: border-color .4s, box-shadow .4s, background .4s;
 }
 .j-scene.active .j-node { border-color: #f59e0b; background: #f59e0b; box-shadow: 0 0 24px rgba(245,158,11,.9); }
-.j-scene-num { font-family: var(--mono, monospace); font-size: 13px; letter-spacing: 3px; color: #f59e0b; margin-bottom: 14px; }
+.j-scene-num { font-family: var(--mono, monospace); font-size: 14px; letter-spacing: 4px; color: #f59e0b; margin-bottom: 16px; }
 .j-scene-icon {
-  width: 54px; height: 54px; margin-bottom: 18px; display: flex; align-items: center; justify-content: center;
-  border-radius: 15px; color: #fbbf24;
+  width: 64px; height: 64px; margin-bottom: 22px; display: flex; align-items: center; justify-content: center;
+  border-radius: 18px; color: #fbbf24;
   background: linear-gradient(135deg, rgba(245,158,11,.18), rgba(234,88,12,.08));
   border: 1px solid rgba(245,158,11,.3);
 }
-.j-scene-icon svg { width: 27px; height: 27px; }
-.j-scene h3 { font-size: 22px; margin-bottom: 10px; color: #fff; }
-.j-scene p { color: var(--muted); font-size: 15px; line-height: 1.65; }
+.j-scene-icon svg { width: 32px; height: 32px; }
+.j-scene h3 { font-size: 28px; margin-bottom: 12px; color: #fff; letter-spacing: -.5px; }
+.j-scene p { color: var(--muted); font-size: 16.5px; line-height: 1.7; }
 .journey-dots { position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 2; }
 .j-dot {
   width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
