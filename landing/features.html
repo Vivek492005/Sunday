@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Features — Sunday</title>
+<meta name="description" content="Every Sunday feature documented in depth: parallel agents, Second Brain, browser agent, coding streaks, and more.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.content h2 { font-size: 27px; margin: 52px 0 16px; letter-spacing: -.5px; display: flex; align-items: center; gap: 14px; }
+.content h2:first-child { margin-top: 0; }
+.content h3 { font-size: 19px; margin: 28px 0 10px; color: var(--sun-h); }
+.content p { color: #c9c9d4; margin-bottom: 14px; }
+.content ul, .content ol { margin: 0 0 16px 24px; color: #c9c9d4; }
+.content li { margin-bottom: 8px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+pre { background: #0d0d14; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; overflow-x: auto; margin: 0 0 20px; }
+pre code { background: none; border: none; padding: 0; color: #d4d4dc; font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 26px; margin: 0 0 20px; }
+.note { border-left: 3px solid var(--sun); background: rgba(245,158,11,.06); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 0 0 20px; }
+.note p { margin: 0; }
+.toc { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; margin-bottom: 44px; }
+.toc strong { display: block; margin-bottom: 12px; color: #fff; }
+.toc ul { list-style: none; margin: 0; columns: 2; }
+.toc li { margin-bottom: 8px; }
+.toc a { color: var(--muted); font-size: 14.5px; }
+.toc a:hover { color: var(--sun-h); }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--sun-h); background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); border-radius: 20px; padding: 3px 12px; margin-bottom: 10px; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+@media (max-width: 720px) { .toc ul { columns: 1; } }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html" class="active">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Features</h1>
+  <p>Everything Sunday can do — from parallel agent swarms to coding streaks. Each feature explained: what it is, how it works, and why it matters for your workflow.</p>
+</div>
+
+<div class="content">
+
+<div class="toc">
+  <strong>On this page</strong>
+  <ul>
+    <li><a href="#parallel-agents">Parallel agents</a></li>
+    <li><a href="#hierarchical">Hierarchical orchestration</a></li>
+    <li><a href="#second-brain">Second Brain</a></li>
+    <li><a href="#browser-agent">Browser agent</a></li>
+    <li><a href="#swarm">One-prompt swarm</a></li>
+    <li><a href="#artifacts">Artifacts</a></li>
+    <li><a href="#mission-control">Mission Control</a></li>
+    <li><a href="#best-of-n">Best-of-N</a></li>
+    <li><a href="#scheduled">Scheduled tasks</a></li>
+    <li><a href="#streaks">Coding streaks</a></li>
+    <li><a href="#zero-config">Zero-config free tier</a></li>
+    <li><a href="#auto-updates">Auto-updates</a></li>
+  </ul>
+</div>
+
+<h2 id="parallel-agents"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>Parallel agents</h2>
+<span class="tag">Core</span>
+<p><strong>What it is.</strong> Instead of one AI assistant working through your task step by step, Sunday spins up multiple agents that work on different parts of the same task simultaneously — then merges their results.</p>
+<p><strong>How it works.</strong> When you describe a task, the orchestrator decomposes it into independent subtasks and assigns each to an agent from a bounded pool. Agents run in isolated contexts with their own file-edit scopes. A conflict-detection layer watches for overlapping edits; when two agents touch the same region, one is paused and the other finishes first. A single final verifier agent reviews the merged result for consistency before anything is committed to your workspace.</p>
+<p><strong>Why it matters.</strong> Large refactors, multi-file features, and test+implementation pairs are embarrassingly parallel. Parallel agents routinely cut wall-clock time by 2–4x on decomposed tasks, and the bounded pool means your machine never thrashes — you set the cap (default 4 on Pro, 2 on Basic).</p>
+<div class="note"><p><strong>Tip:</strong> Tier limits control how many agents run at once — Free: 1 agent, Basic: 2 sequential, Smart: 3 sequential, Pro: 4 parallel. See <a href="docs.html#pricing">pricing in the docs</a>.</p></div>
+
+<h2 id="hierarchical"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></span>Hierarchical orchestration</h2>
+<span class="tag">Core</span>
+<p><strong>What it is.</strong> The intelligence behind parallel agents: a planning layer that breaks your goal into a tree of subtasks, where each node gets exactly the context it needs — no more, no less.</p>
+<p><strong>How it works.</strong> The root planner reads your prompt plus the relevant project context (open files, repo structure, Second Brain memories) and produces a task tree. Each child agent receives a scoped brief: its goal, its files, and its constraints. Children can spawn their own sub-agents for nested work. Results bubble up the tree, with each parent verifying its children's output against acceptance criteria before marking the node complete.</p>
+<p><strong>Why it matters.</strong> Context is the scarcest resource in agent coding. Dumping your whole repo into every agent wastes tokens and degrades quality. Context-centric decomposition keeps each agent focused, which means fewer hallucinations, lower cost per task, and results you can actually review node by node.</p>
+
+<h2 id="second-brain"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg></span>Second Brain</h2>
+<span class="tag">Memory</span>
+<p><strong>What it is.</strong> Persistent memory for your agents. Sunday remembers your preferences, project conventions, and past decisions across sessions — so you stop repeating yourself.</p>
+<p><strong>How it works.</strong> As you work, Sunday extracts durable facts ("prefers pnpm over npm", "API base URL lives in env", "always writes tests for utils") into a local memory store. Every new agent task starts with a memory lookup: relevant facts are injected into the agent's context automatically. You can view, edit, and delete memories from the Second Brain panel, and nothing leaves your machine unless you enable cloud sync.</p>
+<p><strong>Why it matters.</strong> The difference between a tool and a teammate is memory. With Second Brain, your tenth session with Sunday is noticeably better than your first — conventions stick, style matches, and "like last time" actually works.</p>
+
+<h2 id="browser-agent"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>Browser agent</h2>
+<span class="tag">Automation</span>
+<p><strong>What it is.</strong> An agent that can see and act on the web: it drives a real browser, watches the page through a live screencast, and clicks, types, and scrapes like you would.</p>
+<p><strong>How it works.</strong> The browser agent runs a controlled Chromium session in a sandbox. You see exactly what it sees via the live screencast panel. <strong>Takeover mode</strong> lets you grab control mid-task — move the mouse or type, and the agent pauses and watches, then resumes when you hand back control. Every session is recorded with media, so you can replay what the agent did and audit every action.</p>
+<p><strong>Why it matters.</strong> Half of real development work lives in the browser: checking docs, testing deployments, filing issues, verifying UI. The browser agent closes that loop without you context-switching, and the recording gives you a verifiable trail instead of a black box.</p>
+<div class="note"><p><strong>Availability:</strong> Browser sessions are tier-limited — Free has no browser access, Basic gets 5 sessions/day, Smart 15/day, Pro unlimited.</p></div>
+
+<h2 id="swarm"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>One-prompt swarm</h2>
+<span class="tag">Core</span>
+<p><strong>What it is.</strong> Type one prompt — "add user authentication with tests" — and watch it become a live Kanban board of parallel subtasks, each worked by its own agent.</p>
+<p><strong>How it works.</strong> The swarm planner converts your prompt into cards on a Kanban board: columns for queued, in-progress, in-review, and done. Each card is a scoped agent task with its own context. You can drag cards to reprioritize, click any card to see its agent's live log, pause individual cards, or add new cards mid-run. Dependencies between cards are tracked automatically — a card blocked on another waits instead of guessing.</p>
+<p><strong>Why it matters.</strong> Big tasks are easier to trust when you can see the plan. The Kanban view turns agent work from a mysterious loading spinner into a project you can manage, with the same mental model teams already use.</p>
+
+<h2 id="artifacts"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>Artifacts</h2>
+<span class="tag">Output</span>
+<p><strong>What it is.</strong> When agents produce something worth looking at — an HTML mockup, a diagram, a document — it opens in a dedicated Artifacts panel as a live, interactive preview instead of a raw file.</p>
+<p><strong>How it works.</strong> Agents can emit artifacts in supported formats (HTML, SVG, Markdown). The Artifacts panel renders them live: HTML previews run in a sandboxed frame, diagrams render from generated SVG, documents render as formatted Markdown. Each artifact is versioned — when the agent iterates, you can flip between versions and diff them. One click exports any version to your workspace as a real file.</p>
+<p><strong>Why it matters.</strong> Reviewing agent output as files is slow. Artifacts let you see what the agent made the way it was meant to be seen, iterate visually ("make the header darker"), and only commit to disk when you're happy.</p>
+
+<h2 id="mission-control"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span>Mission Control</h2>
+<span class="tag">Observability</span>
+<p><strong>What it is.</strong> One dashboard showing every running agent: what it's doing, its live log, its token usage, and controls to pause, resume, or stop it.</p>
+<p><strong>How it works.</strong> Every agent registers with the local daemon (<code>sundayd</code>) on spawn. Mission Control lists them with real-time status, current subtask, elapsed time, and request counts. Expanding an agent streams its log. You can pause an agent mid-run to inspect its working tree, resume it, or kill it — killed agents leave their partial work in a recoverable state.</p>
+<p><strong>Why it matters.</strong> Parallel agents without observability are chaos. Mission Control is the difference between "something is running" and "I know exactly what's running, what it costs, and I can stop any of it."</p>
+
+<h2 id="best-of-n"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>Best-of-N</h2>
+<span class="tag">Quality</span>
+<p><strong>What it is.</strong> For tricky problems, Sunday tries N different approaches in parallel — then shows you the candidates side by side so you pick the winner.</p>
+<p><strong>How it works.</strong> Enable Best-of-N on any task (or set it as default for refactors). The orchestrator spawns N agents with deliberately varied strategies — different decompositions, different libraries, different trade-offs. Each produces a complete solution. The comparison view shows diffs, test results, and each agent's rationale. You pick a winner, or merge pieces from several.</p>
+<p><strong>Why it matters.</strong> The first solution an AI produces is rarely the best one. Best-of-N trades compute for quality on the tasks where quality actually matters — architecture decisions, tricky refactors, API design — and the side-by-side view makes the trade-offs legible.</p>
+
+<h2 id="scheduled"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Scheduled tasks</h2>
+<span class="tag">Automation</span>
+<p><strong>What it is.</strong> Cron for agents. Describe a recurring job in plain language — "every morning, check test health and report" — and Sunday runs it on schedule, even when the IDE is closed.</p>
+<p><strong>How it works.</strong> Scheduled tasks are defined with a natural-language prompt plus a cron expression (or a preset like "daily at 9am"). The daemon wakes the task, spins up an agent with the saved context, runs it, and delivers the result — to a notification, a file, or your inbox depending on configuration. Full run history is kept, so you can see what ran, what it found, and what it changed.</p>
+<p><strong>Why it matters.</strong> Agents are most valuable when they work while you don't. Nightly dependency checks, morning standup summaries, weekly changelog drafts — the boring-but-important work happens on autopilot.</p>
+
+<h2 id="streaks"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>Coding streaks</h2>
+<span class="tag">Gamification</span>
+<p><strong>What it is.</strong> Daily coding streaks that reward consistency: code every day to build your streak, and longer streaks earn bonus AI requests on top of your plan quota.</p>
+<p><strong>How it works.</strong> Any day with meaningful editor activity counts toward your streak, shown as a fire indicator in the status bar. Life happens, so two safety nets exist: <strong>Streak Freeze</strong> (bank freezes that preserve your streak through missed days) and <strong>Vacation Mode</strong> (pause streak counting for a planned break). Streak milestones pay out: a <strong>7-day streak adds +100 requests/day</strong> to your quota, and a <strong>30-day streak adds +500/day</strong>.</p>
+<p><strong>Why it matters.</strong> Consistency beats intensity in skill-building. Streaks turn "I should code today" into a visible, rewarding habit — and the quota bonuses mean your most consistent weeks are also your most powerful.</p>
+
+<h2 id="zero-config"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>Zero-config free tier</h2>
+<span class="tag">Onboarding</span>
+<p><strong>What it is.</strong> Install Sunday, sign in with GitHub, Google, or Microsoft, and you're building with real AI models in under a minute. No API keys, no provider accounts, no configuration.</p>
+<p><strong>How it works.</strong> The Sunday hosted gateway holds provider keys server-side and issues you a session on sign-in. The free tier includes <strong>200 AI requests per day</strong> — real models, not a trial, with no credit card and no expiry. If you outgrow it, paid tiers raise the limits; if you prefer your own keys, BYOK (bring your own key) for OpenRouter or Groq is supported and bypasses Sunday quotas entirely.</p>
+<p><strong>Why it matters.</strong> API-key setup is the number-one reason developers abandon AI tools before trying them. Zero-config removes the entire funnel between "download" and "first agent task" — which is exactly where adoption is won or lost.</p>
+
+<h2 id="auto-updates"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>Auto-updates</h2>
+<span class="tag">Platform</span>
+<p><strong>What it is.</strong> Sunday checks for updates on startup and installs them in one click. Beta users automatically receive prerelease builds through the beta channel.</p>
+<p><strong>How it works.</strong> On launch, the updater queries the release feed. Stable installs only ever see stable releases; beta installs see the latest beta build. When an update is available, a single click downloads and applies it — no manual re-downloads, no installer hunting. The beta channel means testers get fixes within hours of a release, not weeks.</p>
+<p><strong>Why it matters.</strong> An AI coding tool that falls behind is a liability — models, providers, and agent strategies evolve weekly. Auto-updates keep every install current with zero maintenance burden on you.</p>
+
+<div class="card" style="margin-top: 48px; text-align: center;">
+  <h3 style="color: #fff; margin-bottom: 8px;">Ready to try them?</h3>
+  <p>Download Sunday for Windows, macOS, or Linux and get 200 free AI requests per day — no API key required.</p>
+  <p style="margin: 0;"><a href="index.html#download" style="font-weight: 600;">Download Sunday v1.0.0-beta.1</a> &nbsp;·&nbsp; <a href="learn.html">Start the 5-minute tutorial</a></p>
+</div>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

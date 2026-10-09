@@ -1,66 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blog — Sunday</title>
-<link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
-<link rel="stylesheet" href="styles.css" />
+<meta name="description" content="The Sunday blog: launch announcements, deep dives on parallel agents, and the story behind coding streaks.">
+<link rel="icon" href="sunday-logo.jpg">
 <style>
-.blog-list { max-width: 760px; margin: 0 auto; padding: 60px 24px; }
-.blog-list h1 { font-size: 40px; color: #fff; margin-bottom: 8px; }
-.blog-list .sub { color: var(--muted); margin-bottom: 40px; }
-.post { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
-.post h2 { font-size: 22px; margin-bottom: 8px; }
-.post h2 a { color: #fff !important; text-decoration: none !important; }
-.post h2 a:hover { color: var(--sun-h) !important; }
-.post .meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-.post p { color: var(--muted); }
-.back { display: inline-block; margin-bottom: 24px; }
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.75; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 820px; margin: 0 auto; padding: 48px 24px 80px; }
+.post-index { display: grid; gap: 18px; margin-bottom: 64px; }
+.post-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 26px 28px; transition: border-color .3s, transform .3s; }
+.post-card:hover { border-color: rgba(245,158,11,.5); transform: translateY(-3px); }
+.post-card .meta { color: var(--muted); font-size: 13.5px; margin-bottom: 8px; }
+.post-card h2 { font-size: 22px; margin: 0 0 8px; }
+.post-card h2 a { color: #fff; }
+.post-card h2 a:hover { color: var(--sun-h); }
+.post-card p { color: var(--muted); font-size: 15px; margin: 0; }
+article { margin-bottom: 80px; padding-top: 24px; border-top: 1px solid var(--line); }
+article:first-of-type { border-top: none; padding-top: 0; }
+article h2 { font-size: 32px; letter-spacing: -.5px; margin-bottom: 8px; }
+article .meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+article h3 { font-size: 21px; margin: 32px 0 12px; color: var(--sun-h); }
+article p { color: #c9c9d4; margin-bottom: 16px; }
+article ul, article ol { margin: 0 0 16px 24px; color: #c9c9d4; }
+article li { margin-bottom: 8px; }
+article blockquote { border-left: 3px solid var(--sun); background: rgba(245,158,11,.06); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 0 0 20px; color: #c9c9d4; font-style: italic; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+.back-top { display: inline-block; margin-top: 24px; font-size: 14px; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
 </style>
 </head>
 <body>
+
 <header class="vs-nav">
   <div class="vs-nav-inner">
-    <a href="index.html" class="vs-brand">
-      <img src="sunday-logo.jpg" alt="Sunday" width="28" height="28" />
-      <span>Sunday</span>
-    </a>
-    <div class="vs-nav-right">
-      <a href="index.html#download" class="vs-download-btn">Download</a>
-    </div>
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html" class="active">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
   </div>
 </header>
 
-<main class="blog-list">
-  <a href="index.html" class="back">← Back to home</a>
+<div class="page-hero">
   <h1>Blog</h1>
-  <p class="sub">Notes on building the agent-first IDE.</p>
+  <p>Launch stories, engineering deep dives, and the thinking behind agent-driven development.</p>
+</div>
 
-  <article class="post">
-    <h2><a href="#">Sunday v1.0.0-beta.2 is here</a></h2>
-    <div class="meta">October 6, 2026 · 3 min read</div>
-    <p>Our first public beta: Windows, Linux, and macOS installers, parallel agents, MCP support, and a published threat model. Download it free and tell us what breaks.</p>
-  </article>
+<div class="content">
 
-  <article class="post">
-    <h2><a href="#">Why hierarchical orchestration?</a></h2>
-    <div class="meta">October 4, 2026 · 6 min read</div>
-    <p>Single-agent loops lose coherence on multi-file tasks. We decompose by context, not job titles — each Feature Agent gets exactly what it needs, and a single verifier merges with confidence.</p>
-  </article>
+<div class="post-index" id="index">
+  <div class="post-card">
+    <div class="meta">October 9, 2026 · Launch</div>
+    <h2><a href="#introducing-sunday">Introducing Sunday: the open-source AI code editor</a></h2>
+    <p>Why we forked VS Code, what "agent-driven development" actually means, and what ships in the first public beta.</p>
+  </div>
+  <div class="post-card">
+    <div class="meta">October 9, 2026 · Engineering</div>
+    <h2><a href="#parallel-agents-deep-dive">How parallel agents work under the hood</a></h2>
+    <p>Task decomposition, bounded pools, conflict detection, and the verifier — the architecture that lets many agents share one codebase safely.</p>
+  </div>
+  <div class="post-card">
+    <div class="meta">October 9, 2026 · Product</div>
+    <h2><a href="#coding-streaks">Coding streaks: gamifying consistency</a></h2>
+    <p>Why we added streaks to a code editor, how Streak Freeze and Vacation Mode keep them humane, and why streaks pay out in real quota.</p>
+  </div>
+</div>
 
-  <article class="post">
-    <h2><a href="#">Taint tracking: stopping prompt injection</a></h2>
-    <div class="meta">October 2, 2026 · 5 min read</div>
-    <p>Any tool result from an untrusted source is marked tainted. State-changing calls proposed in the same turn escalate to manual approval — even if autonomy settings would auto-run them.</p>
-  </article>
-</main>
+<article id="introducing-sunday">
+  <h2>Introducing Sunday: the open-source AI code editor</h2>
+  <div class="meta">October 9, 2026 · by Vivek Bartwal · 6 min read</div>
+
+  <p>Today we're releasing the first public beta of <strong>Sunday</strong> — an open-source, AI-native code editor built as a VS Code fork, free to use with 200 AI requests per day and zero configuration.</p>
+
+  <h3>Why another AI editor?</h3>
+  <p>AI coding assistants have converged on the same interaction model: one chat panel, one agent, one task at a time. That model breaks down the moment your task is bigger than a single file. Real software work is parallel — the frontend, the API, the tests, the migration script — and forcing it through a single sequential agent is like hiring a team and only letting one person work at a time.</p>
+  <p>Sunday starts from a different premise: <strong>development is a team sport, and your team can be agents.</strong> Describe the goal once, and Sunday's orchestrator decomposes it into parallel subtasks, runs agents against them simultaneously, detects conflicts between their edits, and verifies the merged result. You manage the plan; agents do the work.</p>
+
+  <h3>Why a fork, not an extension?</h3>
+  <p>We started with an extension (<code>sunday-agent</code>, still available as a standalone VSIX). But the features that matter most — a persistent daemon for scheduled tasks, workbench-level agent panels, cross-agent conflict detection, deep memory integration — need to live below the extension API. Forking VS Code gives us the surface area to build agent-driven development as a first-class citizen rather than a bolt-on.</p>
+
+  <h3>What's in the beta</h3>
+  <ul>
+    <li><strong>Parallel agents</strong> with bounded pools and conflict detection</li>
+    <li><strong>Second Brain</strong> persistent memory across sessions</li>
+    <li><strong>Browser agent</strong> with live screencast and takeover mode</li>
+    <li><strong>One-prompt swarm</strong> — one prompt becomes a Kanban board of agents</li>
+    <li><strong>Coding streaks</strong> with Streak Freeze, Vacation Mode, and quota bonuses</li>
+    <li><strong>Zero-config free tier</strong> — sign in with GitHub/Google/Microsoft, get 200 req/day</li>
+    <li><strong>Beta auto-updates</strong> through the prerelease channel</li>
+  </ul>
+
+  <h3>Open source, for real</h3>
+  <p>Sunday is Apache-2.0. The IDE, the extension, and the daemon are all public at <a href="https://github.com/Vivek492005/Sunday">github.com/Vivek492005/Sunday</a>. We believe the tool that writes your code should be auditable by you — especially when agents are editing files and running commands on your machine.</p>
+
+  <h3>What's next</h3>
+  <p>The beta is the foundation. Next come quests and achievements, ranks and leagues, the JetBrains plugin, and the stable 1.0. But the most important thing right now is feedback: <a href="https://github.com/Vivek492005/Sunday/issues">open an issue</a>, tell us what breaks, and help shape what Sunday becomes.</p>
+
+  <blockquote>Download Sunday v1.0.0-beta.1 for Windows, macOS, or Linux — free, no API key required.</blockquote>
+  <a class="back-top" href="#index">↑ Back to all posts</a>
+</article>
+
+<article id="parallel-agents-deep-dive">
+  <h2>How parallel agents work under the hood</h2>
+  <div class="meta">October 9, 2026 · by Vivek Bartwal · 8 min read</div>
+
+  <p>Parallel agents are Sunday's signature feature — and the one most likely to be misunderstood. This post explains the actual architecture: how tasks get decomposed, how agents stay out of each other's way, and what the verifier does.</p>
+
+  <h3>The problem with naive parallelism</h3>
+  <p>Give five agents the same repo and one shared instruction, and you get five agents stepping on each other: duplicate work, conflicting edits, and a merge nightmare. Parallelism without coordination is worse than sequential work. Sunday's answer is a four-stage pipeline: <strong>decompose → scope → execute → verify</strong>.</p>
+
+  <h3>Stage 1: Decompose</h3>
+  <p>The orchestrator (a planning pass, not a worker) reads your prompt plus project context — open files, repo structure, Second Brain memories — and produces a task tree. Each node has a goal, acceptance criteria, and a file scope. The tree is the contract: agents don't negotiate with each other, they fulfill their node.</p>
+  <p>Decomposition is context-centric. A node working on the auth module gets the auth files and the API contract — not the entire repo. This keeps each agent's context small, focused, and cheap.</p>
+
+  <h3>Stage 2: Scope and schedule</h3>
+  <p>Nodes are scheduled onto a <strong>bounded pool</strong> of agent workers. The bound matters: unbounded parallelism thrashes your machine and burns quota. Defaults are 2 (Basic), 3 (Smart), and 4 parallel (Pro). Independent nodes run concurrently; dependent nodes wait — the scheduler tracks the dependency graph so a node blocked on another node's output doesn't start early and guess.</p>
+
+  <h3>Stage 3: Execute with conflict detection</h3>
+  <p>Each agent works in its own context with its declared file scope. A conflict-detection layer watches edit regions: if two agents target overlapping regions of the same file, one is paused until the other commits its change, then the paused agent re-reads and continues. This is the piece most "multi-agent" demos skip — and the piece that makes parallel agents actually usable on real codebases.</p>
+
+  <h3>Stage 4: Verify</h3>
+  <p>A single verifier agent reviews the merged result against every node's acceptance criteria. It runs the tests, checks the diffs, and either approves or sends specific nodes back for rework. Nothing reaches your working tree until verification passes — you review one coherent diff, not five partial ones.</p>
+
+  <h3>When not to parallelize</h3>
+  <p>Honest note: not every task benefits. A single focused bug fix in one function is often faster with one agent — decomposition overhead isn't free. Sunday's orchestrator estimates parallelizability and will tell you when a task is better run solo. The <a href="learn.html#chaining">chaining tutorial</a> covers how to think about this in practice.</p>
+
+  <a class="back-top" href="#index">↑ Back to all posts</a>
+</article>
+
+<article id="coding-streaks">
+  <h2>Coding streaks: gamifying consistency</h2>
+  <div class="meta">October 9, 2026 · by Vivek Bartwal · 5 min read</div>
+
+  <p>The most controversial feature in Sunday's beta isn't an agent feature at all — it's a fire icon in the status bar. Here's why we built coding streaks into a code editor, and how we tried to make them humane.</p>
+
+  <h3>Consistency beats intensity</h3>
+  <p>Every experienced developer knows the pattern: the developers who improve fastest aren't the ones who pull heroic 12-hour sessions — they're the ones who show up every day. Ninety minutes daily beats a monthly hackathon for skill-building, every time. But "show up every day" is a hard habit to maintain without feedback. Streaks are that feedback: a visible, honest record of showing up.</p>
+
+  <h3>Designed to be humane</h3>
+  <p>Streak systems have a dark side — they punish rest, travel, and life. We built two safety nets from day one:</p>
+  <ul>
+    <li><strong>Streak Freeze:</strong> bank freezes that preserve your streak through missed days. Earn them through consistent weeks, spend them when life happens.</li>
+    <li><strong>Vacation Mode:</strong> going away? Pause streak counting entirely for a planned break. No penalty, no guilt, no gaming the system.</li>
+  </ul>
+  <p>A streak system without rest mechanics is a burnout machine. We'd rather you take the vacation.</p>
+
+  <h3>Streaks pay real rewards</h3>
+  <p>Vanity metrics are cheap; we wanted streaks to have teeth. So streak milestones pay out in the currency developers actually value — <strong>AI quota</strong>:</p>
+  <ul>
+    <li><strong>7-day streak:</strong> +100 requests/day on top of your plan</li>
+    <li><strong>30-day streak:</strong> +500 requests/day on top of your plan</li>
+  </ul>
+  <p>Your most consistent weeks become your most powerful weeks. The better your habit, the more agent firepower you have to build with.</p>
+
+  <h3>What's next for engagement</h3>
+  <p>Streaks are phase one. The roadmap adds quests (guided challenges for learning agent workflows), achievements (milestones like your first swarm), and eventually ranks, squads, and seasonal leagues. The philosophy stays the same: reward consistency, respect rest, and make every reward real.</p>
+
+  <a class="back-top" href="#index">↑ Back to all posts</a>
+</article>
+
+</div>
 
 <footer class="vs-footer">
   <div class="vs-footer-inner">
     <span>© 2026 Sunday · Apache-2.0</span>
-    <nav><a href="https://github.com/Vivek492005/Sunday">GitHub</a><a href="index.html">Home</a></nav>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
   </div>
 </footer>
+
 </body>
 </html>

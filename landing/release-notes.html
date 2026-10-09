@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Release Notes — Sunday</title>
+<meta name="description" content="Sunday release notes: v1.0.0-beta.1 changelog and the upcoming roadmap.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.content h2 { font-size: 27px; margin: 52px 0 16px; letter-spacing: -.5px; display: flex; align-items: center; gap: 14px; }
+.content h2:first-child { margin-top: 0; }
+.content h3 { font-size: 19px; margin: 28px 0 10px; color: #fff; }
+.content p { color: #c9c9d4; margin-bottom: 14px; }
+.content ul, .content ol { margin: 0 0 16px 24px; color: #c9c9d4; }
+.content li { margin-bottom: 8px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+.release-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px 30px; margin-bottom: 22px; }
+.release-card h3 { margin: 0 0 6px; font-size: 20px; display: flex; align-items: center; gap: 12px; }
+.release-card .meta { color: var(--muted); font-size: 13.5px; margin-bottom: 12px; }
+.release-card p { margin-bottom: 10px; font-size: 15px; }
+.release-card p:last-child { margin-bottom: 0; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #1a1005; background: var(--sun); border-radius: 20px; padding: 3px 12px; }
+.badge.soon { color: var(--sun-h); background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.35); }
+.roadmap { list-style: none; margin: 0; padding: 0; }
+.roadmap li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; margin-bottom: 12px; }
+.roadmap strong { color: #fff; }
+.roadmap p { margin: 6px 0 0; font-size: 14.5px; }
+.timeline { border-left: 2px solid var(--line); margin: 24px 0 0 8px; padding-left: 28px; }
+.timeline-item { position: relative; margin-bottom: 28px; }
+.timeline-item::before { content: ""; position: absolute; left: -36px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--sun); border: 3px solid var(--bg); box-shadow: 0 0 0 2px var(--sun); }
+.timeline-item .ver { font-family: var(--mono); font-size: 13px; color: var(--sun-h); }
+.timeline-item h4 { color: #fff; margin: 4px 0; }
+.timeline-item p { font-size: 14.5px; margin: 0; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html" class="active">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Release Notes</h1>
+  <p>What shipped, what changed, and what's coming next. Beta users receive every release automatically through the beta auto-update channel.</p>
+</div>
+
+<div class="content">
+
+<h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8c-2 0-3 1-3 3v13c0 2 1 3 3 3"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg></span>Latest release</h2>
+
+<div class="release-card" style="border-color: rgba(245,158,11,.4);">
+  <h3><span class="badge">Latest</span> v1.0.0-beta.1</h3>
+  <div class="meta">Released October 9, 2026 · Windows / macOS / Linux · <a href="https://github.com/Vivek492005/Sunday/releases/tag/ide-v1.0.0-beta.1">GitHub release</a></div>
+  <p>The first public beta of the Sunday IDE. Full VS Code-compatible editor with the Sunday agent stack, zero-config free tier, and beta auto-updates.</p>
+</div>
+
+<h3>Highlights</h3>
+
+<div class="release-card">
+  <h3>Coding Streaks</h3>
+  <div class="meta">Gamification</div>
+  <p>Daily coding streaks with a status-bar fire indicator. <strong>Streak Freeze</strong> banks protection against missed days, and <strong>Vacation Mode</strong> pauses counting during planned breaks. Streaks pay out in quota: <strong>7 days → +100 requests/day</strong>, <strong>30 days → +500/day</strong>.</p>
+</div>
+
+<div class="release-card">
+  <h3>Admin Gateway</h3>
+  <div class="meta">Platform</div>
+  <p>A separate administrator login with full bypass of rate limits and quotas for operations and support. Admin sessions are issued and refreshed through dedicated endpoints with strict allowlisting.</p>
+</div>
+
+<div class="release-card">
+  <h3>Anti-Abuse Protection</h3>
+  <div class="meta">Security</div>
+  <p>Free-tier fairness guardrails: max <strong>2 distinct accounts per machine per 24 hours</strong>. Paid plans bypass the restriction. Keeps the 200 req/day free tier sustainable for genuine users.</p>
+</div>
+
+<div class="release-card">
+  <h3>Beta Auto-Updates</h3>
+  <div class="meta">Platform</div>
+  <p>Beta installs now resolve the latest prerelease from the releases feed instead of only stable builds. <strong>Help → Check for Updates</strong> delivers beta builds in one click, and future updates download automatically. Stable installs are never offered beta builds.</p>
+</div>
+
+<div class="release-card">
+  <h3>GitHub Integration</h3>
+  <div class="meta">Onboarding</div>
+  <p>Sign in with GitHub alongside Google and Microsoft, plus <strong>one-click repository import</strong> — paste a repo URL and start working with agents immediately.</p>
+</div>
+
+<div class="release-card">
+  <h3>Windows CI Fixes</h3>
+  <div class="meta">Engineering</div>
+  <p>Five Windows-specific CI failures fixed; the full test matrix is green on Linux, macOS, and Windows. A new fast CI pipeline catches regressions in about 5 minutes.</p>
+</div>
+
+<h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Version history</h2>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <span class="ver">v1.0.0-beta.1</span>
+    <h4>First public beta — October 9, 2026</h4>
+    <p>Coding streaks, admin gateway, anti-abuse protection, beta auto-updates, GitHub integration, Windows CI fixes. Shipped for Windows, macOS, and Linux.</p>
+  </div>
+  <div class="timeline-item">
+    <span class="ver">v0.1.0</span>
+    <h4>Dev preview — October 1, 2026</h4>
+    <p>First packaged release: sunday-agent VSIX plus Windows installer. Parallel agents, browser agent UI, editor intelligence, and the initial hardening pass.</p>
+  </div>
+</div>
+
+<h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>Coming soon <span class="badge soon">Roadmap</span></h2>
+<p>What we're building next. Dates are intentionally not promised — beta feedback sets the order.</p>
+
+<ul class="roadmap">
+  <li><strong>Quests and achievements</strong><p>The next engagement layer after streaks: guided quests for learning agent workflows, and achievements for milestones like your first swarm or 10 merged PRs.</p></li>
+  <li><strong>Ranks, squads, and leagues</strong><p>Social coding: seasonal leagues, team squads, and visible ranks for consistent builders. Designed, not yet shipped.</p></li>
+  <li><strong>Durable billing backend</strong><p>Paddle checkout is decided; the production billing service (subscriptions, webhooks, durable session storage) lands with the first paid-tier launch.</p></li>
+  <li><strong>JetBrains plugin</strong><p>The sunday-agent experience for IntelliJ-based IDEs — chat tool window, editor actions, and daemon protocol client are built; packaging and release are next.</p></li>
+  <li><strong>npm: @sunday/cli</strong><p>The Sunday CLI for terminal-first agent workflows, published to npm.</p></li>
+  <li><strong>Stable 1.0</strong><p>The beta channel graduates: hardened auto-update rehearsals, accessibility pass, and the full engagement suite.</p></li>
+</ul>
+
+<p style="margin-top: 32px;">Found a bug or want a feature? <a href="https://github.com/Vivek492005/Sunday/issues">Open an issue on GitHub</a> — beta feedback directly shapes the roadmap above.</p>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resources — Sunday</title>
+<meta name="description" content="Sunday community resources: GitHub, documentation, contribution guide, brand assets, support channels, and system requirements.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.content h2 { font-size: 27px; margin: 52px 0 16px; letter-spacing: -.5px; display: flex; align-items: center; gap: 14px; }
+.content h2:first-child { margin-top: 0; }
+.content h3 { font-size: 19px; margin: 28px 0 10px; color: #fff; }
+.content p { color: #c9c9d4; margin-bottom: 14px; }
+.content ul, .content ol { margin: 0 0 16px 24px; color: #c9c9d4; }
+.content li { margin-bottom: 8px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+pre { background: #0d0d14; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; overflow-x: auto; margin: 0 0 20px; }
+pre code { background: none; border: none; padding: 0; color: #d4d4dc; font-size: 14px; }
+.res-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 8px; }
+.res-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; transition: border-color .3s, transform .3s; }
+.res-card:hover { border-color: rgba(245,158,11,.5); transform: translateY(-3px); }
+.res-card h3 { margin: 0 0 6px; font-size: 17px; }
+.res-card h3 a { color: #fff; }
+.res-card h3 a:hover { color: var(--sun-h); }
+.res-card p { font-size: 14.5px; margin: 0; color: var(--muted); }
+.support-row { display: flex; align-items: center; gap: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; margin-bottom: 12px; }
+.support-row .section-icon { width: 44px; height: 44px; }
+.support-row .section-icon svg { width: 22px; height: 22px; }
+.support-row strong { color: #fff; display: block; }
+.support-row span { color: var(--muted); font-size: 14.5px; }
+.support-row a { margin-left: auto; white-space: nowrap; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; margin: 0 0 24px; font-size: 15px; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--sun-h); font-weight: 600; }
+td { color: #c9c9d4; }
+.note { border-left: 3px solid var(--sun); background: rgba(245,158,11,.06); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 0 0 20px; }
+.note p { margin: 0; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+@media (max-width: 640px) { .res-grid { grid-template-columns: 1fr; } .support-row { flex-wrap: wrap; } .support-row a { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html" class="active">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Resources</h1>
+  <p>Everything around Sunday in one place — code, docs, community, brand, and how to reach us.</p>
+</div>
+
+<div class="content">
+
+<h2 id="community"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-4.8-4.8H4a4.8 4.8 0 0 0-4.8 4.8V22"/><circle cx="9" cy="7" r="4"/><path d="M22 22v-4a4.8 4.8 0 0 0-4.8-4.8h-1.6"/><path d="M15.5 3.13a4 4 0 0 1 0 7.75"/></svg></span>Community &amp; code</h2>
+<div class="res-grid">
+  <div class="res-card">
+    <h3><a href="https://github.com/Vivek492005/Sunday">GitHub repository</a></h3>
+    <p>The source of truth: IDE, extension, daemon, gateway, issues, and pull requests. Star it to follow development.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="https://github.com/Vivek492005/Sunday/releases">Releases</a></h3>
+    <p>Every build: Windows installers, Linux tarball, macOS DMG, and the sunday-agent VSIX — plus full changelogs.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="https://github.com/Vivek492005/Sunday/issues">Issue tracker</a></h3>
+    <p>Found a bug or want a feature? Open an issue. Beta feedback directly shapes the roadmap.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="blog.html">Blog</a></h3>
+    <p>Launch stories and engineering deep dives — including how parallel agents work under the hood.</p>
+  </div>
+</div>
+
+<h2 id="docs-links"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>Documentation</h2>
+<div class="res-grid">
+  <div class="res-card">
+    <h3><a href="docs.html#getting-started">Getting started</a></h3>
+    <p>Install, sign in, and run your first agent task — the five-minute path from zero to working.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="features.html">Feature reference</a></h3>
+    <p>Every Sunday feature documented in depth: what it is, how it works, why it matters.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="learn.html">Tutorials</a></h3>
+    <p>Step-by-step guides: parallel agent chaining, scheduled tasks, Second Brain, Best-of-N refactors.</p>
+  </div>
+  <div class="res-card">
+    <h3><a href="docs.html#faq">FAQ</a></h3>
+    <p>Quick answers on pricing, quotas, privacy, platforms, and contributing.</p>
+  </div>
+</div>
+
+<h2 id="contributing"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg></span>Contributing</h2>
+<p>Sunday is Apache-2.0 and community-driven. Here's how to get involved:</p>
+<ol>
+  <li><strong>Find an issue</strong> — browse <a href="https://github.com/Vivek492005/Sunday/issues">open issues</a>; newcomer-friendly ones are labeled for first-time contributors.</li>
+  <li><strong>Fork and branch</strong> — fork the repo, create a feature branch, and make your change with tests.</li>
+  <li><strong>Open a pull request</strong> — describe what changed and why. CI runs the full matrix (Windows, macOS, Linux) on every PR.</li>
+  <li><strong>Docs count too</strong> — fixing a tutorial, clarifying the FAQ, or adding a glossary term are all valuable contributions.</li>
+</ol>
+<div class="note"><p><strong>Ground rules:</strong> be kind, keep PRs focused, and don't commit secrets. The full contribution guide lives in <code>CONTRIBUTING.md</code> at the repo root.</p></div>
+
+<h2 id="brand"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>Brand assets</h2>
+<p>Building something with or about Sunday? You're welcome to use the brand assets:</p>
+<ul>
+  <li><strong>Logo:</strong> <a href="sunday-logo.jpg">sunday-logo.jpg</a> (used across this site) and <a href="sunday-logo.webp">sunday-logo.webp</a> (high-resolution).</li>
+  <li><strong>Colors:</strong> Sunday Amber <code>#f59e0b</code>, Sunrise Gold <code>#fbbf24</code>, Deep Space <code>#0a0a0f</code>.</li>
+  <li><strong>Typography:</strong> system sans for UI, Cascadia Code / Consolas for code.</li>
+  <li><strong>License note:</strong> the logo and brand assets are provided for editorial and community use. The software itself is Apache-2.0 — see <code>LICENSE</code> in the repo.</li>
+</ul>
+
+<h2 id="support"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>Support channels</h2>
+<p>Questions, feedback, press, or partnership inquiries — reach the founder directly:</p>
+<div class="support-row">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+  <div><strong>WhatsApp</strong><span>Fastest for quick questions — 70883 43390</span></div>
+  <a href="https://wa.me/917088343390">Chat now</a>
+</div>
+<div class="support-row">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+  <div><strong>Email</strong><span>vivekbartwal.tech@gmail.com — for detailed feedback and press</span></div>
+  <a href="mailto:vivekbartwal.tech@gmail.com">Send email</a>
+</div>
+<div class="support-row">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></svg></span>
+  <div><strong>LinkedIn</strong><span>Vivek Bartwal — connect and follow Sunday updates</span></div>
+  <a href="https://www.linkedin.com/in/vivek-bartwal">Connect</a>
+</div>
+
+<h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span>System requirements</h2>
+<table>
+  <tr><th>Platform</th><th>Minimum</th><th>Notes</th></tr>
+  <tr><td><strong>Windows</strong></td><td>Windows 10 64-bit</td><td>Per-user installer recommended; all-users installer available</td></tr>
+  <tr><td><strong>macOS</strong></td><td>macOS 12+, Apple Silicon</td><td>Distributed as a signed DMG</td></tr>
+  <tr><td><strong>Linux</strong></td><td>64-bit, glibc 2.28+</td><td>Portable tarball; no root required</td></tr>
+  <tr><td><strong>Stock VS Code</strong></td><td>VS Code 1.85+</td><td>Via the <code>sunday-agent</code> VSIX — agent features without the fork</td></tr>
+</table>
+<p>AI features require internet access for inference (hosted gateway or BYOK), except when using a locally configured Ollama fallback.</p>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

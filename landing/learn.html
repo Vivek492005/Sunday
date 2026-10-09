@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learn — Sunday</title>
+<meta name="description" content="Sunday tutorials: your first agent task, chaining parallel agents, scheduled tasks, Second Brain, and Best-of-N refactors.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.toc { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; margin-bottom: 48px; }
+.toc strong { display: block; margin-bottom: 12px; color: #fff; }
+.toc ul { list-style: none; margin: 0; }
+.toc li { margin-bottom: 8px; }
+.toc a { color: var(--muted); font-size: 14.5px; }
+.toc a:hover { color: var(--sun-h); }
+.tutorial { margin-bottom: 72px; padding-top: 8px; }
+.tutorial-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.tutorial h2 { font-size: 27px; letter-spacing: -.5px; }
+.tutorial .meta { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.tutorial p { color: #c9c9d4; margin-bottom: 14px; }
+.tutorial ol.steps { list-style: none; margin: 0 0 20px; padding: 0; counter-reset: step; }
+.tutorial ol.steps > li { counter-increment: step; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px 20px 68px; margin-bottom: 14px; position: relative; color: #c9c9d4; }
+.tutorial ol.steps > li::before { content: counter(step); position: absolute; left: 20px; top: 20px; width: 32px; height: 32px; border-radius: 50%; background: rgba(245,158,11,.14); border: 1px solid rgba(245,158,11,.4); color: var(--sun-h); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.tutorial ol.steps > li strong { color: #fff; display: block; margin-bottom: 4px; }
+.tutorial ol.steps > li p { margin: 0; font-size: 15px; }
+.tutorial ul { margin: 0 0 16px 24px; color: #c9c9d4; }
+.tutorial li { margin-bottom: 8px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+pre { background: #0d0d14; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; overflow-x: auto; margin: 0 0 20px; }
+pre code { background: none; border: none; padding: 0; color: #d4d4dc; font-size: 14px; }
+.note { border-left: 3px solid var(--sun); background: rgba(245,158,11,.06); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 0 0 20px; }
+.note p { margin: 0; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html" class="active">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Learn</h1>
+  <p>Step-by-step tutorials for agent-driven development — from your first task to advanced multi-agent workflows.</p>
+</div>
+
+<div class="content">
+
+<div class="toc">
+  <strong>Tutorials</strong>
+  <ul>
+    <li><a href="#first-task">Your first agent task in 5 minutes</a></li>
+    <li><a href="#chaining">Chaining parallel agents</a></li>
+    <li><a href="#scheduled">Setting up scheduled tasks</a></li>
+    <li><a href="#second-brain">Using Second Brain effectively</a></li>
+    <li><a href="#best-of-n">Best-of-N for tricky refactors</a></li>
+  </ul>
+</div>
+
+<div class="tutorial" id="first-task">
+  <div class="tutorial-head"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><h2>Your first agent task in 5 minutes</h2></div>
+  <div class="meta">Beginner · 5 min · No prior agent experience needed</div>
+  <p>The fastest way to understand Sunday is to give it a small, real task and watch what happens. You'll go from install to a reviewed, merged diff in about five minutes.</p>
+  <ol class="steps">
+    <li><strong>Open a scratch folder</strong><p>Create an empty folder anywhere and open it in Sunday (<strong>File → Open Folder</strong>). A scratch folder is ideal — there's nothing to break.</p></li>
+    <li><strong>Open the agent panel</strong><p>Click the Sunday Agent icon in the activity bar (left sidebar). If this is your first run, sign in with GitHub, Google, or Microsoft when prompted — this activates your 200 req/day free tier.</p></li>
+    <li><strong>Describe a concrete task</strong><p>Type something specific and verifiable, for example:</p><pre><code>Create a Python script called organizer.py that moves every .txt file
+in this folder into a subfolder named by today's date (YYYY-MM-DD),
+skips files already organized, and prints a summary. Add a short
+README.md explaining how to run it.</code></pre><p>Specific beats vague: name the files, the behavior, and the edge cases you care about.</p></li>
+    <li><strong>Watch the plan</strong><p>Before writing code, the agent shows its plan: the steps it intends to take and the files it will touch. Read it. If something looks wrong, edit your prompt and re-run — steering early is ten times cheaper than fixing later.</p></li>
+    <li><strong>Review the diff, then accept</strong><p>When the agent finishes, you get a diff — not a blob of pasted code. Review each change, run the script yourself (<code>python organizer.py</code>), then accept. Congratulations: you've done agent-driven development.</p></li>
+  </ol>
+  <div class="note"><p><strong>What you just learned:</strong> the core loop — prompt → plan → execute → review. Every advanced workflow in Sunday is this loop, scaled up.</p></div>
+</div>
+
+<div class="tutorial" id="chaining">
+  <div class="tutorial-head"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span><h2>Chaining parallel agents</h2></div>
+  <div class="meta">Intermediate · 15 min · Requires: first-task tutorial</div>
+  <p>One agent is a helper. Multiple agents on one task is a team. This tutorial shows how to decompose a realistic feature so parallel agents actually help instead of colliding.</p>
+  <ol class="steps">
+    <li><strong>Pick a decomposable task</strong><p>Good candidates have independent parts. Example: <em>"Add a settings page with three sections (Profile, Notifications, Billing), each with its own form, validation, and tests."</em> Bad candidates: <em>"Fix this one-line bug"</em> — decomposition overhead isn't worth it.</p></li>
+    <li><strong>Prompt with explicit boundaries</strong><p>Tell the orchestrator how to split the work:</p><pre><code>Build the settings page as three parallel tracks:
+1. Profile section (form + validation + tests)
+2. Notifications section (form + validation + tests)
+3. Billing section (form + validation + tests)
+Shared: use the existing Card and Input components, follow the
+patterns in src/pages/account.jsx. Run all tests at the end.</code></pre></li>
+    <li><strong>Inspect the task tree</strong><p>Sunday shows the decomposition before executing: three worker nodes plus a verifier. Check that the file scopes don't overlap unexpectedly — if two nodes claim the same file, say so and let the planner re-scope.</p></li>
+    <li><strong>Let them run, watch Mission Control</strong><p>Open Mission Control to see all three agents live. You'll notice the pool limit in action: on a 2-agent plan, the third node queues until a worker frees up. This is intentional — bounded parallelism protects your machine.</p></li>
+    <li><strong>Review the verifier's report</strong><p>The verifier runs the full test suite and checks each node's acceptance criteria. If a node fails, it goes back for rework automatically — you only see the final, verified diff.</p></li>
+  </ol>
+  <div class="note"><p><strong>Rule of thumb:</strong> parallelize across files and modules, not within a single function. If two agents would edit the same 50 lines, keep it sequential.</p></div>
+</div>
+
+<div class="tutorial" id="scheduled">
+  <div class="tutorial-head"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><h2>Setting up scheduled tasks</h2></div>
+  <div class="meta">Intermediate · 10 min · Requires: a project with tests</div>
+  <p>Scheduled tasks are cron for agents: plain-language recurring jobs that run via the <code>sundayd</code> daemon, even when the IDE is closed.</p>
+  <ol class="steps">
+    <li><strong>Open the scheduler</strong><p>In the Sunday Agent panel, go to the <strong>Scheduled</strong> tab and click <strong>New task</strong>.</p></li>
+    <li><strong>Describe the job in plain language</strong><p>Example: <em>"Every weekday at 8am, run the test suite in this project. If anything fails, summarize which tests failed and what changed recently that might have caused it. Save the report to reports/daily-health.md."</em> Be as specific as you were in the first-task tutorial — the agent that runs at 8am only has your description to work with.</p></li>
+    <li><strong>Pick a schedule</strong><p>Use a preset (daily, weekdays, weekly) or a cron expression. Start with something frequent while testing — you can relax it later. For the first run, use <strong>Run once now</strong> to validate the task works before it goes on autopilot.</p></li>
+    <li><strong>Choose the delivery</strong><p>Decide where results go: a desktop notification, a file in the workspace, or both. For reports you'll actually read, file + notification is the sweet spot.</p></li>
+    <li><strong>Check the run history</strong><p>After a few runs, open the task's history. You'll see each execution, its output, and any errors. If a run fails, the error is shown with the agent's log — fix the description and re-run.</p></li>
+  </ol>
+  <div class="note"><p><strong>Ideas for scheduled tasks:</strong> nightly dependency-outdated checks, Monday-morning changelog drafts from the week's commits, daily "what's broken on main" summaries for team leads.</p></div>
+</div>
+
+<div class="tutorial" id="second-brain">
+  <div class="tutorial-head"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg></span><h2>Using Second Brain effectively</h2></div>
+  <div class="meta">Intermediate · 10 min · Requires: a few days of Sunday usage</div>
+  <p>Second Brain is Sunday's persistent memory. Used well, it's the difference between briefing a new contractor every morning and working with someone who knows your project. Used poorly, it's a junk drawer. Here's how to keep it sharp.</p>
+  <ol class="steps">
+    <li><strong>Seed it deliberately</strong><p>Open the Second Brain panel and add your project's durable facts up front: <em>"We use pnpm, not npm"</em>, <em>"API base URL comes from VITE_API_URL"</em>, <em>"All utils need unit tests"</em>, <em>"Prefer composition over inheritance in React components."</em> Five minutes of seeding saves hours of repeated corrections.</p></li>
+    <li><strong>Let it learn, then curate</strong><p>As you work, Sunday extracts new facts automatically. Once a week, skim the recent additions: keep what's durable, delete what's stale (that "temporary workaround" from March is not a convention). Memory quality compounds — in both directions.</p></li>
+    <li><strong>Scope memories to projects</strong><p>Facts can be global or project-scoped. Keep project conventions (framework choices, API patterns) scoped to the project; keep personal preferences (editor style, communication tone) global. This prevents your React conventions from leaking into your Python project.</p></li>
+    <li><strong>Reference it in prompts</strong><p>You can invoke memory explicitly: <em>"Refactor this following our testing conventions"</em> pulls the relevant Second Brain facts into the agent's context with higher priority. Useful when the automatic recall misses something.</p></li>
+    <li><strong>Audit before sharing</strong><p>If you enable cloud sync or export a project, review what's in memory first. Second Brain can accumulate API endpoints, internal hostnames, and other things you may not want leaving the machine. The panel shows everything; delete freely.</p></li>
+  </ol>
+  <div class="note"><p><strong>The test:</strong> after two weeks, prompt <em>"set up a new module like the others"</em> and see if the agent matches your conventions without being told. If it does, your Second Brain is working.</p></div>
+</div>
+
+<div class="tutorial" id="best-of-n">
+  <div class="tutorial-head"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span><h2>Best-of-N for tricky refactors</h2></div>
+  <div class="meta">Advanced · 20 min · Requires: comfort with parallel agents</div>
+  <p>For high-stakes changes — architecture decisions, tricky refactors, API design — the first solution is rarely the best. Best-of-N runs N agents with deliberately different strategies, then lets you compare.</p>
+  <ol class="steps">
+    <li><strong>Choose a decision worth the compute</strong><p>Best-of-N costs N times the requests. Reserve it for choices you'll live with: <em>"Refactor the data-fetching layer — it's tangled across 12 files and every new feature touches it."</em> Not for renaming a variable.</p></li>
+    <li><strong>Enable Best-of-N and set N=3</strong><p>In the agent panel, toggle <strong>Best-of-N</strong> and set the candidate count. Three is the sweet spot: enough diversity to matter, cheap enough to run casually. Five for truly consequential decisions.</p></li>
+    <li><strong>Give strategy hints, not solutions</strong><p>Prompt the goal and let the strategies vary naturally — or nudge them: <em>"Explore different approaches: one minimal-change, one clean-slate redesign, one incremental migration path."</em> The value is in the diversity of approaches.</p></li>
+    <li><strong>Compare in the diff view</strong><p>When candidates are ready, the comparison view shows them side by side: diffs, test results, and each agent's written rationale. Read the rationales — they often surface trade-offs you hadn't considered, which is half the value.</p></li>
+    <li><strong>Pick, merge, or steal</strong><p>You don't have to take one winner wholesale. Common outcome: pick candidate B's structure with candidate A's migration strategy. Tell the agent what to combine and it produces the final merged change for review.</p></li>
+  </ol>
+  <div class="note"><p><strong>Pro move:</strong> save the losing candidates' rationales in your project docs. Six months later, "why did we choose this approach" will be answered — with the alternatives you already evaluated.</p></div>
+</div>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

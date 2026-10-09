@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events — Sunday</title>
+<meta name="description" content="Sunday events: launch livestreams, community office hours, and hackathons. Stay updated on what's coming.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.content h2 { font-size: 27px; margin: 52px 0 16px; letter-spacing: -.5px; display: flex; align-items: center; gap: 14px; }
+.content h2:first-child { margin-top: 0; }
+.content p { color: #c9c9d4; margin-bottom: 14px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+.event-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px 30px; margin-bottom: 20px; display: flex; gap: 22px; align-items: flex-start; }
+.event-card .section-icon { width: 54px; height: 54px; }
+.event-card h3 { color: #fff; font-size: 20px; margin-bottom: 4px; }
+.event-card .meta { color: var(--muted); font-size: 13.5px; margin-bottom: 10px; }
+.event-card p { font-size: 15px; margin-bottom: 8px; }
+.event-card p:last-child { margin-bottom: 0; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--sun-h); background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.35); border-radius: 20px; padding: 3px 12px; margin-left: 10px; vertical-align: middle; }
+.stay-updated { background: linear-gradient(135deg, rgba(245,158,11,.1), rgba(234,88,12,.04)); border: 1px solid rgba(245,158,11,.3); border-radius: 18px; padding: 40px 36px; text-align: center; margin-top: 56px; }
+.stay-updated h2 { justify-content: center; margin-top: 0; }
+.stay-updated p { max-width: 560px; margin: 0 auto 24px; }
+.btn { display: inline-block; background: var(--sun); color: #1a1005; font-weight: 600; padding: 12px 32px; border-radius: 8px; font-size: 16px; }
+.btn:hover { background: var(--sun-h); color: #1a1005; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+@media (max-width: 640px) { .event-card { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html" class="active">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Events</h1>
+  <p>Livestreams, office hours, and hackathons from the Sunday team. We're just getting started — dates for the first events are being finalized now.</p>
+</div>
+
+<div class="content">
+
+<h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span>Upcoming events</h2>
+
+<div class="event-card">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+  <div>
+    <h3>Sunday Beta Launch Livestream <span class="badge">Date TBA</span></h3>
+    <div class="meta">Livestream · ~60 minutes · Free</div>
+    <p>The official launch walkthrough: install to first agent task in real time, a tour of parallel agents and Mission Control, the story behind coding streaks, and a live Q&amp;A with the founder. We'll build something real on stream — and take audience prompts for the agent to attempt live.</p>
+    <p>Bring your questions. The roadmap for what comes after the beta will be shared first with livestream attendees.</p>
+  </div>
+</div>
+
+<div class="event-card">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+  <div>
+    <h3>Community Office Hours <span class="badge">Date TBA</span></h3>
+    <div class="meta">Recurring · 45 minutes · Free</div>
+    <p>A regular open session for Sunday users: bring your stuck agent tasks, your weird edge cases, and your feature requests. We'll debug live, share workflow tips, and talk through what's coming in the next release. No agenda, no slides — just builders helping builders.</p>
+    <p>Planned as a recurring event once the community reaches critical mass. Sign up below to be notified of the first session.</p>
+  </div>
+</div>
+
+<div class="event-card">
+  <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></span>
+  <div>
+    <h3>Sunday Agent Hackathon <span class="badge">Date TBA</span></h3>
+    <div class="meta">Competition · Weekend · Prizes TBA</div>
+    <p>Build the most impressive thing you can with Sunday's agent stack in one weekend. Categories will include best parallel-agent workflow, best browser automation, and most creative use of scheduled tasks. Judged on ambition, execution, and how well you wield the swarm.</p>
+    <p>Whether you're competing or just watching the submissions, it's the fastest way to see what's possible. Details and prize structure announced with the date.</p>
+  </div>
+</div>
+
+<div class="stay-updated" id="stay-updated">
+  <h2><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>Stay updated</h2>
+  <p>Event dates will be announced here, on the blog, and via the release notes feed. Want a personal heads-up? Email us and we'll add you to the events list — no spam, just event announcements.</p>
+  <a class="btn" href="mailto:vivekbartwal.tech@gmail.com?subject=Sunday%20events%20signup&body=Hi%2C%20please%20notify%20me%20about%20upcoming%20Sunday%20events.">Notify me about events</a>
+</div>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

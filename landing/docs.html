@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentation — Sunday</title>
+<meta name="description" content="Sunday documentation: getting started, architecture, providers, security, FAQ, and glossary.">
+<link rel="icon" href="sunday-logo.jpg">
+<style>
+:root {
+  --bg: #0a0a0f; --bg2: #111118; --card: #16161e; --line: #2a2a35;
+  --text: #e8e8ee; --muted: #9a9aa5; --sun: #f59e0b; --sun-h: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; }
+a { color: var(--sun); text-decoration: none; }
+a:hover { color: var(--sun-h); }
+.vs-nav { background: #000; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 50; }
+.vs-nav-inner { max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 20px; overflow-x: auto; }
+.vs-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 19px; white-space: nowrap; }
+.vs-brand img { border-radius: 6px; }
+.vs-nav-links { display: flex; gap: 2px; white-space: nowrap; }
+.vs-nav-links a { color: #ccc; font-size: 14px; padding: 8px 10px; border-radius: 6px; }
+.vs-nav-links a:hover, .vs-nav-links a.active { background: rgba(245,158,11,.12); color: var(--sun-h); }
+.page-hero { padding: 72px 24px 44px; text-align: center; border-bottom: 1px solid var(--line); background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,158,11,.08), transparent); }
+.page-hero h1 { font-size: clamp(34px, 5vw, 54px); font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.page-hero p { color: var(--muted); font-size: 18px; max-width: 660px; margin: 0 auto; }
+.content { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+.content h2 { font-size: 27px; margin: 52px 0 16px; letter-spacing: -.5px; display: flex; align-items: center; gap: 14px; }
+.content h2:first-child { margin-top: 0; }
+.content h3 { font-size: 19px; margin: 28px 0 10px; color: var(--sun-h); }
+.content h4 { font-size: 16px; margin: 20px 0 8px; color: #fff; }
+.content p { color: #c9c9d4; margin-bottom: 14px; }
+.content ul, .content ol { margin: 0 0 16px 24px; color: #c9c9d4; }
+.content li { margin-bottom: 8px; }
+.section-icon { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--sun-h); background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border: 1px solid rgba(245,158,11,.28); }
+.section-icon svg { width: 24px; height: 24px; }
+code { font-family: var(--mono); background: #1c1c26; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 13.5px; color: var(--sun-h); }
+pre { background: #0d0d14; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; overflow-x: auto; margin: 0 0 20px; }
+pre code { background: none; border: none; padding: 0; color: #d4d4dc; font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 26px; margin: 0 0 20px; }
+.note { border-left: 3px solid var(--sun); background: rgba(245,158,11,.06); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 0 0 20px; }
+.note p { margin: 0; }
+.toc { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; margin-bottom: 44px; }
+.toc strong { display: block; margin-bottom: 12px; color: #fff; }
+.toc ul { list-style: none; margin: 0; columns: 2; }
+.toc li { margin-bottom: 8px; }
+.toc a { color: var(--muted); font-size: 14.5px; }
+.toc a:hover { color: var(--sun-h); }
+table { width: 100%; border-collapse: collapse; margin: 0 0 24px; font-size: 15px; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--sun-h); font-weight: 600; }
+td { color: #c9c9d4; }
+.faq-item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; margin-bottom: 14px; }
+.faq-item h4 { margin: 0 0 8px; color: #fff; font-size: 16.5px; }
+.faq-item p { margin: 0; font-size: 15px; }
+.glossary dt { color: var(--sun-h); font-weight: 600; margin-top: 18px; }
+.glossary dd { color: #c9c9d4; margin: 4px 0 0 0; }
+.vs-footer { border-top: 1px solid var(--line); padding: 32px 24px; background: #000; }
+.vs-footer-inner { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 14px; }
+.vs-footer nav { display: flex; gap: 20px; }
+.vs-footer nav a { color: var(--muted); }
+.vs-footer nav a:hover { color: var(--sun-h); }
+@media (max-width: 720px) { .toc ul { columns: 1; } }
+</style>
+</head>
+<body>
+
+<header class="vs-nav">
+  <div class="vs-nav-inner">
+    <a class="vs-brand" href="index.html"><img src="sunday-logo.jpg" alt="Sunday logo" width="30" height="30"> Sunday</a>
+    <nav class="vs-nav-links">
+      <a href="features.html">Features</a>
+      <a href="docs.html" class="active">Docs</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="blog.html">Blog</a>
+      <a href="learn.html">Learn</a>
+      <a href="events.html">Events</a>
+      <a href="resources.html">Resources</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-hero">
+  <h1>Documentation</h1>
+  <p>The complete guide to Sunday — from your first install to provider configuration, security, and the concepts behind agent-driven development.</p>
+</div>
+
+<div class="content">
+
+<div class="toc">
+  <strong>On this page</strong>
+  <ul>
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#architecture">Architecture overview</a></li>
+    <li><a href="#providers">Provider setup</a></li>
+    <li><a href="#pricing">Plans and pricing</a></li>
+    <li><a href="#security">Security model</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ul>
+</div>
+
+<h2 id="getting-started"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>Getting Started</h2>
+
+<h3>1. Install</h3>
+<p>Download the installer for your platform from the <a href="index.html#download">download section</a>:</p>
+<ul>
+  <li><strong>Windows:</strong> <code>Sunday-UserSetup-1.0.0-beta.1-win-x64.exe</code> (per-user install, recommended) or <code>Sunday-Setup-1.0.0-beta.1-win-x64.exe</code> (all users)</li>
+  <li><strong>macOS:</strong> <code>Sunday-1.0.0-beta.1-mac-arm64.dmg</code> (Apple Silicon)</li>
+  <li><strong>Linux:</strong> <code>Sunday-1.0.0-beta.1-linux-x64.tar.gz</code></li>
+</ul>
+<p>Alternatively, install the <code>sunday-agent</code> extension into stock VS Code from the <code>.vsix</code> file via <strong>Extensions → … → Install from VSIX</strong>.</p>
+
+<h3>2. Sign in</h3>
+<p>On first launch, choose <strong>Sign in with GitHub, Google, or Microsoft</strong>. This creates your Sunday session and activates the free tier — <strong>200 AI requests per day</strong>, no API key, no credit card. Your credentials are stored in your OS keychain, never in plain files.</p>
+
+<h3>3. Run your first agent task</h3>
+<ol>
+  <li>Open a project folder (or create an empty one to experiment).</li>
+  <li>Open the Sunday Agent panel from the activity bar.</li>
+  <li>Type a task, for example: <code>Create a Python script that renames all .txt files in this folder with today's date prefix, and add a README explaining it.</code></li>
+  <li>Watch the agent plan, work, and report back. Review the diff before accepting.</li>
+</ol>
+<div class="note"><p><strong>New to agent workflows?</strong> The <a href="learn.html#first-task">5-minute tutorial</a> walks through this exact flow with screenshots of what to expect at each step.</p></div>
+
+<h2 id="architecture"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></span>Architecture overview</h2>
+<p>Sunday is a VS Code fork with four cooperating layers:</p>
+
+<h4>The IDE (this app)</h4>
+<p>The full editor: workbench, terminal, debugger, and all standard VS Code functionality, plus Sunday's agent panels (chat, swarm Kanban, Mission Control, Artifacts, Second Brain). Built from the VS Code open-source codebase and packaged per-platform via CI.</p>
+
+<h4>The extension (<code>sunday-agent</code>)</h4>
+<p>The agent brain that also runs inside stock VS Code. It handles prompt orchestration, tool calls (file edits, terminal commands, browser control), conflict detection between parallel agents, and the local memory store. Installable standalone from the <code>.vsix</code>.</p>
+
+<h4>The daemon (<code>sundayd</code>)</h4>
+<p>A small local background service that outlives the editor window. It owns scheduled tasks (cron for agents), long-running agent processes, and the Mission Control registry. Because it is separate from the UI process, a scheduled 3am task runs even with the IDE closed, and a renderer crash never takes your agents down with it.</p>
+
+<h4>The hosted gateway</h4>
+<p>The cloud service that makes zero-config possible. It holds provider API keys server-side, enforces per-plan quotas and rate limits, tracks coding streaks, and issues sessions on OAuth sign-in. Your code and prompts are proxied, never stored — see <a href="#security">Security model</a>.</p>
+
+<pre><code>You type a prompt
+      │
+      ▼
+┌─────────────┐   spawns/manages   ┌──────────┐
+│  IDE + ext  │ ◄────────────────► │ sundayd  │  (local daemon: schedule,
+│  (UI/panels) │                    │          │   long tasks, registry)
+└──────┬──────┘                    └──────────┘
+       │  inference requests
+       ▼
+┌──────────────┐
+│   Gateway    │ ──► Providers (OpenRouter / Groq / BYOK)
+│ (auth,quota) │
+└──────────────┘</code></pre>
+
+<h2 id="providers"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>Provider setup</h2>
+<p>Sunday is <strong>API-first</strong>: no model runs on your machine. You have two ways to get inference:</p>
+
+<h4>Option A — Sunday hosted gateway (default, zero config)</h4>
+<p>Sign in and go. The gateway routes your requests across its provider pool (OpenRouter and Groq backends). Your plan's daily quota applies. This is the recommended path for almost everyone.</p>
+
+<h4>Option B — Bring your own key (BYOK)</h4>
+<p>Prefer your own provider account? Add your key in <strong>Settings → Sunday → Providers</strong>:</p>
+<ul>
+  <li><strong>OpenRouter</strong> — paste an OpenRouter API key; you get access to their full model catalog and pay OpenRouter directly.</li>
+  <li><strong>Groq</strong> — paste a Groq API key for their high-speed inference endpoints.</li>
+</ul>
+<p>With BYOK, requests bypass Sunday's quotas entirely — your only limits are your provider's. Keys are stored in the OS keychain, never in settings files or logs.</p>
+<div class="note"><p><strong>Ollama fallback:</strong> a local Ollama endpoint can be configured as a fallback provider for offline-capable models. It is opt-in and off by default.</p></div>
+
+<h2 id="pricing"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>Plans and pricing</h2>
+<p>Billing is handled by <strong>Paddle</strong> (Merchant of Record — they handle GST/tax globally). Prices are GST-inclusive, India-first with UPI support.</p>
+<table>
+  <tr><th>Plan</th><th>Price</th><th>Requests/day</th><th>Agents</th><th>Browser</th></tr>
+  <tr><td><strong>Free</strong></td><td>₹0</td><td>200</td><td>1 agent</td><td>—</td></tr>
+  <tr><td><strong>Basic</strong></td><td>₹149/mo</td><td>500</td><td>2 sequential</td><td>5 sessions/day</td></tr>
+  <tr><td><strong>Smart</strong></td><td>₹349/mo</td><td>1,200</td><td>3 sequential</td><td>15 sessions/day</td></tr>
+  <tr><td><strong>Pro</strong></td><td>₹799/mo</td><td>3,000</td><td>4 parallel</td><td>Unlimited</td></tr>
+</table>
+<p>Streak bonuses stack on top of these quotas: +100/day at a 7-day streak, +500/day at 30 days. Account-switch protection (max 2 accounts per machine per 24h) keeps the free tier fair; paid plans bypass it.</p>
+
+<h2 id="security"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Security model</h2>
+<ul>
+  <li><strong>OAuth sign-in:</strong> GitHub, Google, or Microsoft. Sunday never sees your password; sessions are short-lived and refreshable.</li>
+  <li><strong>Key storage:</strong> provider keys and session tokens live in the OS keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service).</li>
+  <li><strong>Gateway privacy:</strong> prompts are proxied to providers, never stored. Rate-limit counters are the only persisted per-user data, kept in durable storage.</li>
+  <li><strong>Agent sandboxing:</strong> file edits are scoped to your open workspace; terminal commands run with your user privileges and are shown before execution in confirm mode. The browser agent runs in an isolated Chromium profile.</li>
+  <li><strong>Anti-abuse:</strong> max 2 distinct accounts per machine per 24 hours on the free tier; anomaly detection on request patterns.</li>
+  <li><strong>Open source:</strong> the client, extension, and daemon are Apache-2.0. You can audit exactly what runs on your machine.</li>
+</ul>
+
+<h2 id="faq"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>FAQ</h2>
+
+<div class="faq-item"><h4>Is Sunday really free?</h4><p>Yes. The free tier gives you 200 AI requests per day through the Sunday hosted gateway — real models, no credit card, no expiry. Paid plans exist for higher limits, parallel agents, and browser sessions.</p></div>
+
+<div class="faq-item"><h4>Do I need my own API key?</h4><p>No. Sign in with GitHub, Google, or Microsoft and the hosted gateway handles inference. You can optionally add your own OpenRouter or Groq key (BYOK) if you prefer to pay a provider directly and bypass Sunday quotas.</p></div>
+
+<div class="faq-item"><h4>How is Sunday different from VS Code + an AI extension?</h4><p>Sunday is a full fork, which lets it integrate agents at the workbench level: parallel agent orchestration with conflict detection, a persistent daemon for scheduled tasks, Mission Control, and deep Second Brain memory. An extension alone can't own scheduling, cross-agent coordination, or workbench-level UI the same way.</p></div>
+
+<div class="faq-item"><h4>What happens when I hit my daily quota?</h4><p>Requests pause until the quota resets at midnight (your timezone). Streak bonuses (+100/day at 7 days, +500/day at 30 days) raise your effective limit. Upgrading a plan or adding a BYOK key removes the cap immediately.</p></div>
+
+<div class="faq-item"><h4>Can I use Sunday offline?</h4><p>The editor itself works offline like any VS Code fork. AI features need inference — either the hosted gateway/BYOK (online) or a locally configured Ollama endpoint as fallback.</p></div>
+
+<div class="faq-item"><h4>Which platforms are supported?</h4><p>Windows (x64), macOS (Apple Silicon), and Linux (x64). The <code>sunday-agent</code> VSIX also runs inside stock VS Code on any platform VS Code supports.</p></div>
+
+<div class="faq-item"><h4>How do updates work?</h4><p>Sunday checks for updates on startup. One click installs them. Beta-channel installs automatically receive prerelease builds, so testers get fixes fast.</p></div>
+
+<div class="faq-item"><h4>Is my code sent to the cloud?</h4><p>Only the context needed for inference is sent to the model provider — the same as any AI coding assistant. The gateway proxies requests without storing prompts or code. Second Brain memories stay on your machine unless you enable sync.</p></div>
+
+<div class="faq-item"><h4>Can I contribute?</h4><p>Absolutely — Sunday is Apache-2.0. See the <a href="resources.html#contributing">contribution guide</a> and the <a href="https://github.com/Vivek492005/Sunday">GitHub repo</a>. Good first issues are labeled for newcomers.</p></div>
+
+<div class="faq-item"><h4>Who builds Sunday?</h4><p>Sunday is built by Vivek Bartwal. Reach out via <a href="resources.html#support">the support channels</a> — WhatsApp, email, or LinkedIn.</p></div>
+
+<h2 id="glossary"><span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>Glossary</h2>
+<dl class="glossary">
+  <dt>Agent</dt><dd>An autonomous worker that plans and executes a coding task: reading files, editing code, running commands, and reporting results.</dd>
+  <dt>Orchestrator</dt><dd>The planning layer that decomposes your prompt into subtasks, assigns agents, and merges their results.</dd>
+  <dt>Swarm</dt><dd>A set of parallel agents working on cards of a Kanban board generated from a single prompt.</dd>
+  <dt>Second Brain</dt><dd>Sunday's persistent memory store: your preferences, conventions, and project facts, recalled automatically per task.</dd>
+  <dt>Artifact</dt><dd>A rendered output produced by an agent — HTML preview, diagram, or document — shown in the Artifacts panel.</dd>
+  <dt>Mission Control</dt><dd>The dashboard listing every running agent with live logs and pause/resume/stop controls.</dd>
+  <dt>Best-of-N</dt><dd>A mode where N agents solve the same task with different strategies so you can compare and pick the winner.</dd>
+  <dt>sundayd</dt><dd>The local background daemon that owns scheduled tasks and long-running agents independent of the UI.</dd>
+  <dt>Gateway</dt><dd>Sunday's hosted service: authentication, quotas, streak tracking, and provider routing for zero-config inference.</dd>
+  <dt>BYOK</dt><dd>"Bring your own key" — using your personal OpenRouter/Groq API key instead of the hosted gateway quota.</dd>
+  <dt>Streak</dt><dd>Consecutive days of coding activity. Longer streaks earn bonus daily AI requests.</dd>
+  <dt>Takeover mode</dt><dd>Browser-agent feature letting you grab control of the automated browser mid-task, then hand it back.</dd>
+  <dt>Conflict detection</dt><dd>The mechanism that prevents two parallel agents from overwriting each other's edits to the same code region.</dd>
+</dl>
+
+<div class="card" style="margin-top: 48px; text-align: center;">
+  <h3 style="color: #fff; margin-bottom: 8px;">Still stuck?</h3>
+  <p>Ask in the community or contact the founder directly — see <a href="resources.html#support">support channels</a>.</p>
+</div>
+
+</div>
+
+<footer class="vs-footer">
+  <div class="vs-footer-inner">
+    <span>© 2026 Sunday · Apache-2.0</span>
+    <nav>
+      <a href="https://github.com/Vivek492005/Sunday">GitHub</a>
+      <a href="https://github.com/Vivek492005/Sunday/releases">Releases</a>
+      <a href="docs.html">Docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
