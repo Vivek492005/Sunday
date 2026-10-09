@@ -522,49 +522,36 @@
     }
   }
 
-  /* ---- Warp starfield: dense, crisp, pastel (CodePen-style minimal) ---- */
-  // Soft pastel palette — white base with dreamy tints
-  const PASTEL = [
-    [255, 255, 255], [255, 255, 255], [255, 255, 255],
-    [255, 218, 185],  // warm peach
-    [255, 205, 210],  // soft pink
-    [173, 216, 255],  // light sky blue
-    [176, 196, 255]   // powder blue
-  ];
+  /* ---- Warp starfield: CodePen-proven math, pastel palette ---- */
+  const PASTEL = ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFDDC1", "#FFC0CB", "#ADD8E6", "#B0E0E6"];
+  const WARP_SPEED = 5, WARP_DEPTH = 1500;
   function spawnStar(anywhere) {
-    // Disc distribution around center for symmetric warp
     const ang = Math.random() * Math.PI * 2;
-    const rad = Math.sqrt(Math.random()) * 0.75; // denser toward center-ish
+    const dist = Math.sqrt(Math.random()) * (W / 2);
     return {
-      x: Math.cos(ang) * rad, y: Math.sin(ang) * rad,
-      z: anywhere ? 0.15 + Math.random() * 0.85 : 1,
+      x: Math.cos(ang) * dist,
+      y: Math.sin(ang) * dist,
+      z: anywhere ? Math.random() * WARP_DEPTH : WARP_DEPTH,
+      size: (1 - dist / (W / 2)) * 0.1 + 0.5,
       col: PASTEL[Math.random() * PASTEL.length | 0]
     };
   }
   function warpFrame() {
-    // Pure black, fully cleared each frame — crisp, no trails
     ctx.fillStyle = isLight() ? '#f5f2ea' : '#000000';
     ctx.fillRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2;
-    const R = Math.max(W, H) * 0.62; // projection radius
-    const speed = 0.011;
+    const hw = W / 2, hh = H / 2;
     for (const s of stars) {
-      s.z -= speed * (0.35 + s.z); // accelerate as stars approach
-      if (s.z <= 0.02) Object.assign(s, spawnStar(false));
-      const px = cx + (s.x / s.z) * R;
-      const py = cy + (s.y / s.z) * R;
-      if (px < -4 || px > W + 4 || py < -4 || py > H + 4) continue;
-      const near = 1 - s.z; // 0 far → ~1 near
-      const c = s.col;
-      const a = 0.25 + near * 0.75;
-      // Size tied to depth: sub-pixel far → ~2px near
-      const sz = 0.5 + near * near * 1.7;
-      ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a.toFixed(3) + ')';
-      if (sz <= 1.05) {
-        ctx.fillRect(px, py, 1, 1); // fastest path for tiny stars
-      } else {
-        ctx.beginPath(); ctx.arc(px, py, sz * 0.62, 0, 7); ctx.fill();
-      }
+      s.z -= WARP_SPEED * (2 - s.z / WARP_DEPTH);
+      if (s.z <= 0) Object.assign(s, spawnStar(false));
+      const sx = ((s.x / s.z) * W) / 2 + hw;
+      const sy = ((s.y / s.z) * H) / 2 + hh;
+      if (sx < -4 || sx > W + 4 || sy < -4 || sy > H + 4) continue;
+      const radius = (1 - s.z / WARP_DEPTH) * s.size * 3;
+      if (radius <= 0.4) continue;
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.min(radius, 2.6), 0, 7);
+      ctx.fillStyle = s.col;
+      ctx.fill();
     }
   }
   /* ---- aurora (northern lights) frame ---- */
