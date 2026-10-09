@@ -710,3 +710,86 @@
   }, { threshold: 0.12 });
   cards.forEach(function (c) { io.observe(c); });
 })();
+
+/* ============ The Sunday Journey — scroll-driven horizontal story ============ */
+(function() {
+  const wrap = document.querySelector('.journey-wrap');
+  const pin = document.querySelector('.journey-pin');
+  const track = document.querySelector('.journey-track');
+  if (!wrap || !pin || !track) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.innerWidth <= 820) return; // mobile uses fallback stack
+
+  const scenes = Array.from(track.querySelectorAll('.j-scene'));
+  const dots = Array.from(document.querySelectorAll('.j-dot'));
+  const glowPath = document.getElementById('journeyPathGlow');
+  const orbs = document.querySelectorAll('.j-orb');
+  const hint = document.querySelector('.journey-hint');
+  let pathLen = 0;
+  try { pathLen = glowPath.getTotalLength(); } catch (e) { pathLen = 4000; }
+  glowPath.style.strokeDasharray = pathLen;
+  glowPath.style.strokeDashoffset = pathLen;
+
+  let target = 0, current = 0, rafId = null;
+
+  function maxShift() {
+    return Math.max(0, track.scrollWidth - window.innerWidth);
+  }
+
+  function onScroll() {
+    const r = wrap.getBoundingClientRect();
+    const scrollable = wrap.offsetHeight - window.innerHeight;
+    target = Math.min(1, Math.max(0, -r.top / scrollable));
+    if (rafId === null) rafId = requestAnimationFrame(tick);
+  }
+
+  function tick() {
+    rafId = null;
+    // Buttery lerp toward target
+    current += (target - current) * 0.075;
+    if (Math.abs(target - current) < 0.0004) current = target;
+
+    // Horizontal travel
+    track.style.transform = 'translate3d(' + (-current * maxShift()) + 'px,0,0)';
+
+    // Thread draws with progress
+    glowPath.style.strokeDashoffset = pathLen * (1 - current);
+
+    // Parallax orbs drift at different rates
+    orbs.forEach(function (o, i) {
+      const depth = 0.12 + i * 0.09;
+      o.style.transform = 'translate3d(' + (-current * maxShift() * depth) + 'px,' + (Math.sin(current * 6 + i * 2) * 24) + 'px,0)';
+    });
+
+    // Active scene = closest card center to viewport center
+    const trackX = -current * maxShift();
+    const vc = window.innerWidth / 2;
+    let best = 0, bestDist = Infinity;
+    scenes.forEach(function (s, i) {
+      const c = trackX + s.offsetLeft + s.offsetWidth / 2;
+      const d = Math.abs(c - vc);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    scenes.forEach(function (s, i) { s.classList.toggle('active', i === best); });
+    dots.forEach(function (d, i) { d.classList.toggle('on', i === best); });
+
+    // Fade the hint once journey starts
+    if (hint) hint.style.opacity = current > 0.02 ? '0' : '';
+
+    if (current !== target) rafId = requestAnimationFrame(tick);
+  }
+
+  // Dot navigation — smooth scroll to scene position
+  dots.forEach(function (d) {
+    d.addEventListener('click', function() {
+      const i = parseInt(d.dataset.goto, 10);
+      const scrollable = wrap.offsetHeight - window.innerHeight;
+      const y = wrap.offsetTop + scrollable * (i / (scenes.length - 1));
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    });
+  });
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+})();
