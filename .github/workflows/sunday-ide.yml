@@ -68,6 +68,15 @@ name: Sunday IDE
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_extension:
+        description: 'Skip bundling sunday-agent extension (diagnostic build)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   push:
     tags:
       - 'ide-v*'
@@ -372,6 +381,9 @@ jobs:
         # VSIX unzip/copy flow. Make it non-blocking on Windows — the IDE
         # builds fine without the pre-installed extension; users install
         # the VSIX separately. Linux/macOS keep the strict sync.
+        # DIAGNOSTIC: skip_extension=true skips bundling on all platforms
+        # to isolate whether the extension bundle causes startup issues.
+        if: inputs.skip_extension != 'true'
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode" || {
