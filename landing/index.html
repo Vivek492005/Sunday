@@ -6,9 +6,10 @@
 <title>Sunday — The open source AI code editor</title>
 <meta name="description" content="Sunday is the open source AI code editor. Your home for agent-driven development." />
 <link rel="icon" href="sunday-logo.jpg" type="image/jpeg" />
-<link rel="stylesheet" href="styles.css?v=journey2" />
+<link rel="stylesheet" href="styles.css?v=anim1" />
 </head>
 <body>
+<div class="scroll-progress" aria-hidden="true"><span></span></div>
 
 <!-- ============ TOP NAV ============ -->
 <header class="vs-nav">
@@ -106,11 +107,17 @@
 <section class="vs-hero">
   <canvas class="binary-rain" aria-hidden="true"></canvas>
   <div class="vs-hero-inner">
-    <h1>The open source <span class="ai-accent">AI</span> code editor</h1>
+    <h1><span class="typewriter" data-text="The open source AI code editor"></span><span class="type-caret" aria-hidden="true"></span></h1>
     <p class="vs-tagline">Your home for agent-driven development</p>
+    <div class="vs-stats">
+      <div class="vs-stat"><strong><span data-count="200">0</span></strong><span>req/day free</span></div>
+      <div class="vs-stat"><strong><span data-count="12">0</span></strong><span>agent features</span></div>
+      <div class="vs-stat"><strong><span data-count="3">0</span></strong><span>platforms</span></div>
+      <div class="vs-stat"><strong><span data-count="100">0</span>%</strong><span>open source</span></div>
+    </div>
 
     <div class="vs-dl-card">
-      <a href="https://github.com/Vivek492005/Sunday/releases/download/ide-v1.0.0-beta.1/Sunday-UserSetup-1.0.0-beta.1-win-x64.exe" class="vs-dl-btn">
+      <a href="https://github.com/Vivek492005/Sunday/releases/download/ide-v1.0.0-beta.1/Sunday-UserSetup-1.0.0-beta.1-win-x64.exe" class="vs-dl-btn magnetic">
         <span class="vs-win-icon">🪟</span> Download for Windows
       </a>
       <p class="vs-dl-alt"><a href="#">Web</a> ⧉, <a href="#">Insiders edition</a>, or <a href="#download">other platforms</a></p>
@@ -167,6 +174,23 @@
 </section>
 
 <!-- ============ AGENTS ============ -->
+  <!-- Agent terminal demo -->
+  <div class="vs-terminal-demo">
+    <div class="term-window">
+      <div class="term-bar"><span></span><span></span><span></span><em>sunday — agent session</em></div>
+      <div class="term-body" id="termBody"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MARQUEE ============ -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>AI Agents</span><i>✦</i><span>Parallel Execution</span><i>✦</i><span>Second Brain</span><i>✦</i><span>200 req/day Free</span><i>✦</i><span>Open Source</span><i>✦</i><span>Coding Streaks</span><i>✦</i><span>Zero Config</span><i>✦</i><span>Auto Updates</span><i>✦</i>
+    <span>AI Agents</span><i>✦</i><span>Parallel Execution</span><i>✦</i><span>Second Brain</span><i>✦</i><span>200 req/day Free</span><i>✦</i><span>Open Source</span><i>✦</i><span>Coding Streaks</span><i>✦</i><span>Zero Config</span><i>✦</i><span>Auto Updates</span><i>✦</i>
+  </div>
+</div>
+
 <section class="journey" id="agents">
   <div class="journey-intro">
     <h2>Agents that build for you</h2>
@@ -479,6 +503,6 @@
   </div>
 </footer>
 
-<script src="script.js?v=journey2"></script>
+<script src="script.js?v=anim1"></script>
 </body>
 </html>

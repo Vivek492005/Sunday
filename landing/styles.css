@@ -354,3 +354,61 @@ a.vs-dl-option:hover { border-color: var(--sun); }
   .journey-fallback .j-scene { transform: none; opacity: 1; flex: none; }
   .journey-fallback .j-node { display: none; }
 }
+
+/* ============ Animation Pack ============ */
+/* 1. Scroll progress bar */
+.scroll-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999; background: transparent; pointer-events: none; }
+.scroll-progress span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24, #ea580c); transform-origin: 0 50%; transform: scaleX(0); }
+
+/* 2. Typewriter */
+.type-caret { display: inline-block; width: 3px; height: 1em; background: #f59e0b; margin-left: 4px; vertical-align: -0.12em; animation: caretBlink 0.8s step-end infinite; }
+@keyframes caretBlink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* 3. Stats counters */
+.vs-stats { display: flex; gap: 36px; justify-content: center; margin: 28px 0 8px; flex-wrap: wrap; }
+.vs-stat { display: flex; flex-direction: column; align-items: center; }
+.vs-stat strong { font-size: 30px; color: #fff; font-weight: 700; }
+.vs-stat strong span { color: #fbbf24; }
+.vs-stat > span:last-child { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* 4. Terminal demo */
+.vs-terminal-demo { max-width: 620px; margin: 44px auto 0; position: relative; z-index: 1; }
+.term-window { background: #0d0d14; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0,0,0,.7); text-align: left; }
+.term-bar { display: flex; align-items: center; gap: 7px; padding: 12px 16px; background: rgba(255,255,255,.03); border-bottom: 1px solid var(--line); }
+.term-bar span { width: 11px; height: 11px; border-radius: 50%; background: #3a3a44; }
+.term-bar span:nth-child(1) { background: #ff5f57; } .term-bar span:nth-child(2) { background: #febc2e; } .term-bar span:nth-child(3) { background: #28c840; }
+.term-bar em { font-style: normal; font-size: 12px; color: var(--muted); margin-left: 8px; font-family: var(--mono, monospace); }
+.term-body { padding: 18px 20px; font-family: var(--mono, monospace); font-size: 13.5px; line-height: 1.9; min-height: 190px; color: #c9c9d4; }
+.term-body .tp { color: #f59e0b; } .term-body .tg { color: #4ade80; } .term-body .td { color: #7c7c8a; }
+
+/* 5. Marquee */
+.marquee { overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(245,158,11,.03); padding: 16px 0; position: relative; z-index: 1; }
+.marquee-track { display: inline-flex; gap: 28px; align-items: center; white-space: nowrap; animation: marquee 28s linear infinite; will-change: transform; }
+.marquee-track span { font-size: 15px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.marquee-track i { font-style: normal; color: #f59e0b; font-size: 13px; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* 6. Magnetic button */
+.vs-dl-btn.magnetic { transition: transform .25s cubic-bezier(.2,.7,.3,1.4), box-shadow .3s; will-change: transform; display: inline-block; }
+
+/* 7. Spotlight cards */
+.vs-card, .vs-wn-card, .vs-ext-card { position: relative; }
+.vs-card::before, .vs-wn-card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), rgba(245,158,11,.14), transparent 65%);
+  opacity: 0; transition: opacity .35s;
+}
+.vs-card:hover::before, .vs-wn-card:hover::before { opacity: 1; }
+
+/* 8. Tilt on hover (non-journey cards) */
+.tilt { transform-style: preserve-3d; will-change: transform; }
+
+/* 9. Parallax sections */
+.parallax { will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .type-caret { animation: none; }
+  .journey-hint { animation: none; }
+}

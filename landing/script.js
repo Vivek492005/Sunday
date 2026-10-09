@@ -801,3 +801,156 @@
   window.addEventListener('resize', onScroll);
   onScroll();
 })();
+
+/* ============ Animation Pack JS ============ */
+(function() {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 1. Scroll progress bar */
+  const prog = document.querySelector('.scroll-progress span');
+  function updateProgress() {
+    if (!prog) return;
+    const h = document.documentElement;
+    const p = h.scrollTop / (h.scrollHeight - h.clientHeight || 1);
+    prog.style.transform = 'scaleX(' + Math.min(1, Math.max(0, p)) + ')';
+  }
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  updateProgress();
+
+  /* 2. Typewriter for hero h1 */
+  const tw = document.querySelector('.typewriter');
+  function renderTw(upto) {
+    const text = tw.dataset.text || '';
+    const aiPos = text.indexOf('AI');
+    let out = text.slice(0, upto);
+    if (upto >= aiPos + 2) out = out.split('AI').join('<span class="ai-accent">AI</span>');
+    tw.innerHTML = out;
+  }
+  if (tw && !reduced) {
+    const text = tw.dataset.text || '';
+    let i = 0;
+    (function type() {
+      if (i <= text.length) {
+        renderTw(i); i++;
+        setTimeout(type, 34 + Math.random() * 44);
+      } else {
+        const caret = document.querySelector('.type-caret');
+        if (caret) setTimeout(function() { caret.style.display = 'none'; }, 2500);
+      }
+    })();
+  } else if (tw) {
+    renderTw((tw.dataset.text || '').length);
+    const caret = document.querySelector('.type-caret');
+    if (caret) caret.style.display = 'none';
+  }
+
+  /* 3. Number counters */
+  const counters = document.querySelectorAll('[data-count]');
+  if (counters.length && !reduced) {
+    const cio = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        const el = e.target, end = parseInt(el.dataset.count, 10);
+        cio.unobserve(el);
+        const t0 = performance.now(), dur = 1400;
+        (function step(t) {
+          const p = Math.min(1, (t - t0) / dur);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(end * eased);
+          if (p < 1) requestAnimationFrame(step);
+        })(t0);
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(function (c) { cio.observe(c); });
+  } else {
+    counters.forEach(function (c) { c.textContent = c.dataset.count; });
+  }
+
+  /* 4. Terminal demo — agent session simulation */
+  const termBody = document.getElementById('termBody');
+  if (termBody && !reduced) {
+    const lines = [
+      { t: '<span class="tp">$</span> sunday agent "add dark mode to settings"', c: 'cmd' },
+      { t: '<span class="td">◈ swarm: 4 subtasks → kanban</span>', c: 'dim' },
+      { t: '<span class="td">◈ agents: 3 parallel · orchestrator active</span>', c: 'dim' },
+      { t: '<span class="tg">✓</span> theme.css updated <span class="td">(agent-2)</span>', c: 'ok' },
+      { t: '<span class="tg">✓</span> settings.tsx refactored <span class="td">(agent-1)</span>', c: 'ok' },
+      { t: '<span class="tg">✓</span> tests pass 48/48 <span class="td">(verifier)</span>', c: 'ok' },
+      { t: '<span class="tp">$</span> <span class="td">done in 2m 14s — streak +1 🔥</span>', c: 'done' },
+    ];
+    // strip emoji from terminal (keep professional)
+    lines[6].t = '<span class="tp">$</span> <span class="td">done in 2m 14s — streak +1</span>';
+    let li = 0;
+    function nextLine() {
+      if (li >= lines.length) { setTimeout(function() { termBody.innerHTML = ''; li = 0; nextLine(); }, 5000); return; }
+      const div = document.createElement('div');
+      div.innerHTML = lines[li].t;
+      div.style.opacity = '0';
+      div.style.transform = 'translateY(6px)';
+      div.style.transition = 'opacity .35s, transform .35s';
+      termBody.appendChild(div);
+      requestAnimationFrame(function() { div.style.opacity = '1'; div.style.transform = 'none'; });
+      li++;
+      setTimeout(nextLine, 650 + Math.random() * 500);
+    }
+    const tio = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { tio.disconnect(); nextLine(); } });
+    }, { threshold: 0.3 });
+    tio.observe(termBody);
+  }
+
+  /* 5. Magnetic button */
+  const mag = document.querySelector('.magnetic');
+  if (mag && !reduced && window.matchMedia('(pointer: fine)').matches) {
+    mag.addEventListener('mousemove', function (e) {
+      const r = mag.getBoundingClientRect();
+      const x = (e.clientX - r.left - r.width / 2) * 0.28;
+      const y = (e.clientY - r.top - r.height / 2) * 0.32;
+      mag.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(1.04)';
+    });
+    mag.addEventListener('mouseleave', function () { mag.style.transform = ''; });
+  }
+
+  /* 6. Spotlight cards — cursor glow follows mouse */
+  if (!reduced && window.matchMedia('(pointer: fine)').matches) {
+    document.querySelectorAll('.vs-card, .vs-wn-card').forEach(function (card) {
+      card.addEventListener('mousemove', function (e) {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      });
+    });
+  }
+
+  /* 7. Tilt on hover for feature/whatsnew cards */
+  if (!reduced && window.matchMedia('(pointer: fine)').matches) {
+    document.querySelectorAll('.vs-card, .vs-wn-card').forEach(function (card) {
+      card.classList.add('tilt');
+      card.addEventListener('mousemove', function (e) {
+        const r = card.getBoundingClientRect();
+        const rx = ((e.clientY - r.top) / r.height - 0.5) * -10;
+        const ry = ((e.clientX - r.left) / r.width - 0.5) * 12;
+        card.style.transform = 'perspective(800px) rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg) translateY(-6px)';
+      });
+      card.addEventListener('mouseleave', function () { card.style.transform = ''; });
+    });
+  }
+
+  /* 8. Parallax sections — subtle drift on scroll */
+  if (!reduced) {
+    const pEls = document.querySelectorAll('.vs-section > h2, .journey-intro');
+    let pTick = false;
+    window.addEventListener('scroll', function () {
+      if (pTick) return; pTick = true;
+      requestAnimationFrame(function () {
+        pTick = false;
+        const vh = window.innerHeight;
+        pEls.forEach(function (el) {
+          const r = el.getBoundingClientRect();
+          const prog = (r.top + r.height / 2 - vh / 2) / vh; // -0.5..0.5-ish
+          el.style.transform = 'translateY(' + (prog * -26).toFixed(1) + 'px)';
+        });
+      });
+    }, { passive: true });
+  }
+})();
