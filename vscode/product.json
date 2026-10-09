@@ -87,6 +87,40 @@
       }
     }
   ],
+  "defaultChatAgent": {
+    "extensionId": "sunday.sunday-agent",
+    "chatExtensionId": "sunday.sunday-agent",
+    "chatExtensionOutputId": "sunday.sunday-agent.Sunday Agent.log",
+    "documentationUrl": "https://github.com/Vivek492005/Sunday",
+    "termsStatementUrl": "https://github.com/Vivek492005/Sunday/blob/main/docs/TERMS.md",
+    "privacyStatementUrl": "https://github.com/Vivek492005/Sunday/blob/main/docs/PRIVACY.md",
+    "provider": {
+      "default": {
+        "id": "google",
+        "name": "Google"
+      },
+      "google": {
+        "id": "google",
+        "name": "Google"
+      },
+      "github": {
+        "id": "github",
+        "name": "GitHub"
+      },
+      "microsoft": {
+        "id": "microsoft",
+        "name": "Microsoft"
+      }
+    },
+    "providerExtensionId": "sunday.sunday-google-auth",
+    "providerScopes": [
+      [
+        "openid",
+        "profile",
+        "email"
+      ]
+    ]
+  },
   "trustedExtensionAuthAccess": {
     "github": [],
     "github-enterprise": [],
