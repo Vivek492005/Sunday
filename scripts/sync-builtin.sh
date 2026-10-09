@@ -199,10 +199,19 @@ stage_from_vsix_tree() { # stage_from_vsix_tree <src-dir>
 
 if [[ -n "$VSIX" ]]; then
   need_file "$VSIX" "built sunday-agent VSIX (--vsix)"
-  command -v unzip >/dev/null 2>&1 \
-    || die "--vsix needs 'unzip' on PATH to unpack $VSIX (or pass --unpacked DIR instead)"
-  unzip -q "$VSIX" 'extension/*' -d "$STAGE/unzip" \
-    || die "--vsix: failed to unpack $VSIX (not a zip?)"
+  # Cross-platform unzip: prefer `unzip`, fall back to PowerShell on Windows
+  # (Git Bash often lacks unzip).
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$VSIX" 'extension/*' -d "$STAGE/unzip" \
+      || die "--vsix: failed to unpack $VSIX (not a zip?)"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    win_vsix="$(cygpath -w "$VSIX" 2>/dev/null || echo "$VSIX")"
+    win_dest="$(cygpath -w "$STAGE/unzip" 2>/dev/null || echo "$STAGE/unzip")"
+    powershell.exe -NoProfile -NonInteractive -Command "Expand-Archive -Path '$win_vsix' -DestinationPath '$win_dest' -Force" \
+      || die "--vsix: PowerShell Expand-Archive failed for $VSIX"
+  else
+    die "--vsix needs 'unzip' on PATH (or PowerShell on Windows) to unpack $VSIX (or pass --unpacked DIR instead)"
+  fi
   # vsce-built VSIX files live under extension/ inside the archive
   [[ -f "$STAGE/unzip/extension/package.json" ]] \
     || die "--vsix: $VSIX contains no extension/package.json — is this a vsce-built sunday-agent VSIX?"
