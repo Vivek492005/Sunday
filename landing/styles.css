@@ -355,6 +355,92 @@ a.vs-dl-option:hover { border-color: var(--sun); }
   .journey-fallback .j-node { display: none; }
 }
 
+:root {
+  --acc-amber: #f59e0b; --acc-violet: #8b5cf6; --acc-teal: #14b8a6;
+  --acc-rose: #f43f5e; --acc-sky: #38bdf8; --acc-lime: #a3e635;
+}
+
+/* ============ Color Variety System ============ */
+/* Nav links — varied hover underlines */
+.vs-nav-links > a, .vs-drop-btn { position: relative; }
+.vs-nav-links > a::after, .vs-drop-btn::after {
+  content: ""; position: absolute; left: 0; bottom: -4px; height: 2px; width: 0;
+  border-radius: 2px; transition: width .3s;
+}
+.vs-nav-links > a:nth-child(1)::after, .vs-dropdown:nth-child(1) .vs-drop-btn::after { background: var(--acc-amber); }
+.vs-nav-links > a:nth-child(2)::after, .vs-dropdown:nth-child(2) .vs-drop-btn::after { background: var(--acc-violet); }
+.vs-nav-links > a:nth-child(3)::after { background: var(--acc-teal); }
+.vs-nav-links > a:nth-child(4)::after { background: var(--acc-rose); }
+.vs-nav-links > a:nth-child(5)::after, .vs-dropdown:nth-child(6) .vs-drop-btn::after { background: var(--acc-sky); }
+.vs-nav-links > a:nth-child(6)::after { background: var(--acc-lime); }
+.vs-nav-links > a:nth-child(7)::after, .vs-dropdown:nth-child(8) .vs-drop-btn::after { background: var(--acc-amber); }
+.vs-nav-links > a:hover::after, .vs-drop-btn:hover::after { width: 100%; }
+
+/* Feature cards — rotating accent colors */
+.vs-card:nth-child(6n+1) .vs-card-icon { color: #fbbf24; background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border-color: rgba(245,158,11,.28); }
+.vs-card:nth-child(6n+2) .vs-card-icon { color: #a78bfa; background: linear-gradient(135deg, rgba(139,92,246,.16), rgba(124,58,237,.08)); border-color: rgba(139,92,246,.28); }
+.vs-card:nth-child(6n+3) .vs-card-icon { color: #2dd4bf; background: linear-gradient(135deg, rgba(20,184,166,.16), rgba(13,148,136,.08)); border-color: rgba(20,184,166,.28); }
+.vs-card:nth-child(6n+4) .vs-card-icon { color: #fb7185; background: linear-gradient(135deg, rgba(244,63,94,.16), rgba(225,29,72,.08)); border-color: rgba(244,63,94,.28); }
+.vs-card:nth-child(6n+5) .vs-card-icon { color: #38bdf8; background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(2,132,199,.08)); border-color: rgba(56,189,248,.28); }
+.vs-card:nth-child(6n+6) .vs-card-icon { color: #a3e635; background: linear-gradient(135deg, rgba(163,230,53,.14), rgba(101,163,13,.08)); border-color: rgba(163,230,53,.28); }
+.vs-card:nth-child(6n+1):hover { border-color: rgba(245,158,11,.55); box-shadow: 0 18px 44px -18px rgba(245,158,11,.35), 0 4px 14px rgba(0,0,0,.4); }
+.vs-card:nth-child(6n+2):hover { border-color: rgba(139,92,246,.55); box-shadow: 0 18px 44px -18px rgba(139,92,246,.35), 0 4px 14px rgba(0,0,0,.4); }
+.vs-card:nth-child(6n+3):hover { border-color: rgba(20,184,166,.55); box-shadow: 0 18px 44px -18px rgba(20,184,166,.35), 0 4px 14px rgba(0,0,0,.4); }
+.vs-card:nth-child(6n+4):hover { border-color: rgba(244,63,94,.55); box-shadow: 0 18px 44px -18px rgba(244,63,94,.35), 0 4px 14px rgba(0,0,0,.4); }
+.vs-card:nth-child(6n+5):hover { border-color: rgba(56,189,248,.55); box-shadow: 0 18px 44px -18px rgba(56,189,248,.35), 0 4px 14px rgba(0,0,0,.4); }
+.vs-card:nth-child(6n+6):hover { border-color: rgba(163,230,53,.5); box-shadow: 0 18px 44px -18px rgba(163,230,53,.3), 0 4px 14px rgba(0,0,0,.4); }
+
+/* WhatsNew cards — same rotation */
+.vs-wn-card:nth-child(6n+1) .vs-wn-icon { color: #fbbf24; background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(234,88,12,.08)); border-color: rgba(245,158,11,.28); }
+.vs-wn-card:nth-child(6n+2) .vs-wn-icon { color: #a78bfa; background: linear-gradient(135deg, rgba(139,92,246,.16), rgba(124,58,237,.08)); border-color: rgba(139,92,246,.28); }
+.vs-wn-card:nth-child(6n+3) .vs-wn-icon { color: #2dd4bf; background: linear-gradient(135deg, rgba(20,184,166,.16), rgba(13,148,136,.08)); border-color: rgba(20,184,166,.28); }
+.vs-wn-card:nth-child(6n+4) .vs-wn-icon { color: #fb7185; background: linear-gradient(135deg, rgba(244,63,94,.16), rgba(225,29,72,.08)); border-color: rgba(244,63,94,.28); }
+.vs-wn-card:nth-child(6n+5) .vs-wn-icon { color: #38bdf8; background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(2,132,199,.08)); border-color: rgba(56,189,248,.28); }
+.vs-wn-card:nth-child(6n+6) .vs-wn-icon { color: #a3e635; background: linear-gradient(135deg, rgba(163,230,53,.14), rgba(101,163,13,.08)); border-color: rgba(163,230,53,.28); }
+
+/* Stats — varied colors */
+.vs-stat:nth-child(1) strong span { color: #fbbf24; }
+.vs-stat:nth-child(2) strong span { color: #a78bfa; }
+.vs-stat:nth-child(3) strong span { color: #2dd4bf; }
+.vs-stat:nth-child(4) strong span { color: #fb7185; }
+
+/* Download button — gradient */
+.vs-dl-btn.magnetic {
+  background: linear-gradient(135deg, #f59e0b, #ea580c 55%, #c2410c);
+  color: #1a1005 !important; border: none; font-weight: 700;
+  box-shadow: 0 10px 30px -8px rgba(245,158,11,.5);
+}
+.vs-dl-btn.magnetic:hover { box-shadow: 0 14px 40px -8px rgba(245,158,11,.65); }
+
+/* Marquee items — color cycle */
+.marquee-track span:nth-child(4n+1) { color: #fbbf24; }
+.marquee-track span:nth-child(4n+3) { color: #a78bfa; }
+.marquee-track span:nth-child(4n+5) { color: #2dd4bf; }
+.marquee-track span:nth-child(4n+7) { color: #fb7185; }
+
+/* Section headings — subtle gradient */
+.vs-section h2, .journey-intro h2, .vs-whatsnew h2, .vs-contact h2, .vs-download h2 {
+  background: linear-gradient(120deg, #fff 30%, #fcd34d 55%, #fff 80%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+/* Journey scenes — per-scene accent */
+.j-scene:nth-child(10n+1) { --jacc: #f59e0b; } .j-scene:nth-child(10n+2) { --jacc: #8b5cf6; }
+.j-scene:nth-child(10n+3) { --jacc: #14b8a6; } .j-scene:nth-child(10n+4) { --jacc: #f43f5e; }
+.j-scene:nth-child(10n+5) { --jacc: #38bdf8; } .j-scene:nth-child(10n+6) { --jacc: #a3e635; }
+.j-scene:nth-child(10n+7) { --jacc: #fb7185; } .j-scene:nth-child(10n+8) { --jacc: #2dd4bf; }
+.j-scene:nth-child(10n+9) { --jacc: #a78bfa; } .j-scene:nth-child(10n+10) { --jacc: #fbbf24; }
+.j-scene .j-scene-num { color: var(--jacc, #f59e0b); }
+.j-scene.active { border-color: var(--jacc, rgba(245,158,11,.6)); }
+
+/* Scroll progress — rainbow gradient */
+.scroll-progress span { background: linear-gradient(90deg, #f43f5e, #f59e0b, #a3e635, #14b8a6, #38bdf8, #8b5cf6); }
+
+/* Ext cards — varied */
+.vs-ext-card:nth-child(3n+1) .vs-ext-icon { color: #fbbf24; }
+.vs-ext-card:nth-child(3n+2) .vs-ext-icon { color: #a78bfa; }
+.vs-ext-card:nth-child(3n+3) .vs-ext-icon { color: #2dd4bf; }
+
 /* ============ Animation Pack ============ */
 /* 1. Scroll progress bar */
 .scroll-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999; background: transparent; pointer-events: none; }
