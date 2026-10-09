@@ -696,7 +696,7 @@
 
 /* ============ Card scroll-reveal entrance ============ */
 (function() {
-  const cards = document.querySelectorAll('.vs-card');
+  const cards = document.querySelectorAll('.vs-card, .vs-wn-card');
   if (!cards.length) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   cards.forEach(function (c, i) {
