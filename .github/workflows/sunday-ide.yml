@@ -260,6 +260,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Permanent guard: fail in seconds if a cleanup deleted critical
+      # vscode/product.json keys. Incident dd29d944 removed the entire
+      # defaultChatAgent block and shipped a black-screen IDE on all three
+      # platforms (fix: 4730690f). This must never ship silently again.
+      - name: Verify product.json critical keys
+        run: node scripts/verify-product-json.mjs
+
       - uses: pnpm/action-setup@v4
       # pnpm version comes from packageManager in package.json (single source of truth)
 
