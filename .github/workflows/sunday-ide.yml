@@ -520,7 +520,11 @@ jobs:
           if-no-files-found: error
 
       - name: Attach artifacts to release (tags only)
-        if: startsWith(github.ref, 'refs/tags/ide-v')
+        # DISABLED: We manage releases manually for controlled asset naming.
+        # The auto-upload used old naming (SundaySetup-*.exe) causing duplicates
+        # with our manual uploads (Sunday-Setup-*-win-x64.exe).
+        # See: Beta.2/Beta.3 duplicate asset incidents (2026-10-08/09).
+        if: false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
