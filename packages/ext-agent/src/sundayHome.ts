@@ -68,6 +68,30 @@ export class SundayHomeProvider implements vscode.WebviewViewProvider {
         case 'sunday.checkUpdates':
           await vscode.commands.executeCommand('sunday.checkForUpdates');
           break;
+        case 'sunday.openMissionControl':
+          await vscode.commands.executeCommand('sunday.missionControl.open');
+          break;
+        case 'sunday.openUsage':
+          await vscode.commands.executeCommand('sunday.usage.show');
+          break;
+        case 'sunday.openSkills':
+          await vscode.commands.executeCommand('sunday.skills.open');
+          break;
+        case 'sunday.openArtifacts':
+          await vscode.commands.executeCommand('sunday.artifacts.open');
+          break;
+        case 'sunday.openMemory':
+          await vscode.commands.executeCommand('sunday.memory.open');
+          break;
+        case 'sunday.openScheduler':
+          await vscode.commands.executeCommand('sunday.scheduler.open');
+          break;
+        case 'sunday.onboardRepo':
+          await vscode.commands.executeCommand('sunday.onboardRepo');
+          break;
+        case 'sunday.importRepo':
+          await vscode.commands.executeCommand('sunday.github.importRepo');
+          break;
         default:
           this.deps.log(`sunday home: unknown command ${(m as { command?: string }).command}`);
       }
@@ -102,22 +126,67 @@ export class SundayHomeProvider implements vscode.WebviewViewProvider {
       </div>`;
 
     const quickActions = `
-      <div class="section-title">Quick actions</div>
+      <div class="section-title">🤖 Agents</div>
       <div class="actions">
         <button class="action-btn" data-cmd="sunday.focusChat">
           <span class="action-icon">💬</span>
           <span class="action-label">Agent Chat</span>
         </button>
         <button class="action-btn" data-cmd="sunday.openManager">
-          <span class="action-icon">🤖</span>
+          <span class="action-icon">🎛️</span>
           <span class="action-label">Agent Manager</span>
         </button>
+        <button class="action-btn" data-cmd="sunday.openMissionControl">
+          <span class="action-icon">📊</span>
+          <span class="action-label">Mission Control</span>
+        </button>
+      </div>
+      <div class="section-title">🔥 Engagement</div>
+      <div class="actions">
         <button class="action-btn" data-cmd="sunday.openStreak">
           <span class="action-icon">🔥</span>
           <span class="action-label">Streaks</span>
         </button>
+        <button class="action-btn" data-cmd="sunday.openUsage">
+          <span class="action-icon">📈</span>
+          <span class="action-label">Usage</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.openScheduler">
+          <span class="action-icon">⏰</span>
+          <span class="action-label">Scheduler</span>
+        </button>
       </div>
-      <div class="section-title">System</div>
+      <div class="section-title">🧠 Memory & Skills</div>
+      <div class="actions">
+        <button class="action-btn" data-cmd="sunday.openMemory">
+          <span class="action-icon">🧠</span>
+          <span class="action-label">Memory</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.openSkills">
+          <span class="action-icon">🛠️</span>
+          <span class="action-label">Skills</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.openArtifacts">
+          <span class="action-icon">📦</span>
+          <span class="action-label">Artifacts</span>
+        </button>
+      </div>
+      <div class="section-title">📁 Projects</div>
+      <div class="actions">
+        <button class="action-btn" data-cmd="sunday.onboardRepo">
+          <span class="action-icon">🚀</span>
+          <span class="action-label">Onboard Repo</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.importRepo">
+          <span class="action-icon">📥</span>
+          <span class="action-label">Import GitHub</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.accountMenu">
+          <span class="action-icon">👤</span>
+          <span class="action-label">Account</span>
+        </button>
+      </div>
+      <div class="section-title">⚙️ System</div>
       <div class="actions">
         <button class="action-btn" data-cmd="sunday.checkUpdates" style="grid-column: span 3;">
           <span class="action-icon">⬆️</span>
