@@ -444,6 +444,18 @@ jobs:
           set -o pipefail
           npm run gulp core-ci 2>&1 | tee -a "$GITHUB_WORKSPACE/build-${{ matrix.platform }}-${{ matrix.arch }}.log"
 
+      # Permanent guard: the Sunday Google auth extension MUST compile into
+      # vscode/extensions/sunday-google-auth/out/extension.js. Without it the
+      # packaged IDE never registers the 'google' authentication provider and
+      # Google sign-in silently fails on the user's machine (root cause found
+      # 2026-10-10: the extension was missing from the hardcoded compile list
+      # in vscode/build/gulpfile.extensions.ts, so no CI step ever built it).
+      - name: Verify google-auth extension compiled
+        working-directory: vscode
+        run: |
+          test -f extensions/sunday-google-auth/out/extension.js || { echo "FATAL: extensions/sunday-google-auth/out/extension.js missing — Google sign-in would be broken in this build"; exit 1; }
+          echo "sunday-google-auth compiled OK"
+
       # Packages ../VSCode-<platform>-<arch> (sibling of vscode/, i.e. at the
       # repo root of the checkout). The -min-ci variant reuses the bundles
       # from core-ci instead of rebuilding them.

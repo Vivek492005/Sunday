@@ -219,8 +219,20 @@ will reintroduce the black screen — treat this block as load-bearing.
       every removed key gets a `grep` in `vscode/src` for unguarded use.
 - [ ] Confirm `trustedExtensionAuthAccess`, `builtInExtensionsEnabledWithAutoUpdates`,
       `voiceWsUrl` removals (from `8291c957`) are safe — done in this analysis: safe.
-- [ ] Verify `vscode/extensions/sunday-google-auth/dist/extension.js` is produced
+- [x] Verify `vscode/extensions/sunday-google-auth/dist/extension.js` is produced
       by the fork build (check CI build log for the extension compile step).
+      → 2026-10-10 ROOT CAUSE FOUND: it was never produced. The extension was
+      missing from the hardcoded `compilations` list in
+      `vscode/build/gulpfile.extensions.ts` (glob is commented out), so no CI
+      step ever compiled it; `main` pointed at the nonexistent
+      `./dist/extension.js`. Result: the 'google' auth provider never
+      registered in the packaged IDE → Google sign-in silently failed on the
+      user's machine (GitHub sign-in worked because `github-authentication`
+      IS in the compile list). FIXED: added the tsconfig to the compile list,
+      flipped `noEmit` → false, changed `main` to `./out/extension.js`
+      (upstream pipeline output, same as github-authentication), and added a
+      CI guard step (`Verify google-auth extension compiled`) that fails the
+      build fast if `out/extension.js` is missing.
 
 ### Step 3 — Keep everything else as-is
 

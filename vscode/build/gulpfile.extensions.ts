@@ -83,6 +83,11 @@ const compilations = [
 	'extensions/references-view/tsconfig.json',
 	'extensions/search-result/tsconfig.json',
 	'extensions/simple-browser/tsconfig.json',
+	// SUNDAY: compile the Sunday Google auth provider so the packaged IDE
+	// registers the 'google' authentication provider. Without this entry the
+	// extension's main (dist/extension.js) is never built and Google sign-in
+	// silently fails in the installed product.
+	'extensions/sunday-google-auth/tsconfig.json',
 	'extensions/tunnel-forwarding/tsconfig.json',
 	'extensions/typescript-language-features/web/tsconfig.json',
 	'extensions/typescript-language-features/tsconfig.json',

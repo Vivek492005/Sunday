@@ -1,1 +1,1 @@
-{"compilerOptions":{"lib":["ES2024"],"noEmit":true,"outDir":"./out","rootDir":"./src","skipLibCheck":true,"typeRoots":["./node_modules/@types"],"types":["node"]},"extends":"../tsconfig.base.json","include":["src/**/*","../../src/vscode-dts/vscode.d.ts"]}
+{"compilerOptions":{"lib":["ES2024"],"noEmit":false,"outDir":"./out","rootDir":"./src","skipLibCheck":true,"typeRoots":["./node_modules/@types"],"types":["node"]},"extends":"../tsconfig.base.json","include":["src/**/*","../../src/vscode-dts/vscode.d.ts"]}
