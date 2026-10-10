@@ -92,6 +92,30 @@ export class SundayHomeProvider implements vscode.WebviewViewProvider {
         case 'sunday.importRepo':
           await vscode.commands.executeCommand('sunday.github.importRepo');
           break;
+        case 'sunday.setMode':
+          await vscode.commands.executeCommand('sunday.mode.set');
+          break;
+        case 'sunday.designToCode':
+          await vscode.commands.executeCommand('sunday.designToCode');
+          break;
+        case 'sunday.initProject':
+          await vscode.commands.executeCommand('sunday.initProject');
+          break;
+        case 'sunday.cloudTask':
+          await vscode.commands.executeCommand('sunday.cloudTask.submit');
+          break;
+        case 'sunday.bestOfN':
+          await vscode.commands.executeCommand('sunday.bestOfN.run');
+          break;
+        case 'sunday.browserOpen':
+          await vscode.commands.executeCommand('sunday.browser.open');
+          break;
+        case 'sunday.orchestrate':
+          await vscode.commands.executeCommand('sunday.orchestration.run');
+          break;
+        case 'sunday.mcpServers':
+          await vscode.commands.executeCommand('sunday.mcp.startServer');
+          break;
         default:
           this.deps.log(`sunday home: unknown command ${(m as { command?: string }).command}`);
       }
@@ -171,19 +195,58 @@ export class SundayHomeProvider implements vscode.WebviewViewProvider {
           <span class="action-label">Artifacts</span>
         </button>
       </div>
+      <div class="section-title">⚡ Power Tools</div>
+      <div class="actions">
+        <button class="action-btn" data-cmd="sunday.setMode">
+          <span class="action-icon">🎭</span>
+          <span class="action-label">Agent Modes</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.designToCode">
+          <span class="action-icon">🎨</span>
+          <span class="action-label">Design to Code</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.bestOfN">
+          <span class="action-icon">🎯</span>
+          <span class="action-label">Best-of-N</span>
+        </button>
+      </div>
+      <div class="actions" style="margin-top: 8px;">
+        <button class="action-btn" data-cmd="sunday.orchestrate">
+          <span class="action-icon">🐝</span>
+          <span class="action-label">Swarm</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.cloudTask">
+          <span class="action-icon">☁️</span>
+          <span class="action-label">Cloud Tasks</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.browserOpen">
+          <span class="action-icon">🌐</span>
+          <span class="action-label">Agent Browser</span>
+        </button>
+      </div>
+      <div class="actions" style="margin-top: 8px;">
+        <button class="action-btn" data-cmd="sunday.mcpServers">
+          <span class="action-icon">🔌</span>
+          <span class="action-label">MCP Servers</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.initProject">
+          <span class="action-icon">📋</span>
+          <span class="action-label">Templates</span>
+        </button>
+        <button class="action-btn" data-cmd="sunday.accountMenu">
+          <span class="action-icon">👤</span>
+          <span class="action-label">Account</span>
+        </button>
+      </div>
       <div class="section-title">📁 Projects</div>
       <div class="actions">
         <button class="action-btn" data-cmd="sunday.onboardRepo">
           <span class="action-icon">🚀</span>
           <span class="action-label">Onboard Repo</span>
         </button>
-        <button class="action-btn" data-cmd="sunday.importRepo">
+        <button class="action-btn" data-cmd="sunday.importRepo" style="grid-column: span 2;">
           <span class="action-icon">📥</span>
-          <span class="action-label">Import GitHub</span>
-        </button>
-        <button class="action-btn" data-cmd="sunday.accountMenu">
-          <span class="action-icon">👤</span>
-          <span class="action-label">Account</span>
+          <span class="action-label">Import from GitHub</span>
         </button>
       </div>
       <div class="section-title">⚙️ System</div>
