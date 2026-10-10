@@ -129,7 +129,7 @@
       },
       {
         "command": "sunday.github.cloneRepo",
-        "title": "Clone GitHub Repository…",
+        "title": "Clone GitHub Repository\u2026",
         "category": "Sunday"
       },
       {
@@ -175,7 +175,7 @@
       {
         "category": "Sunday",
         "command": "sunday.admin.setPlan",
-        "title": "Sunday Admin: Set User Plan…"
+        "title": "Sunday Admin: Set User Plan\u2026"
       },
       {
         "category": "Sunday",
@@ -195,17 +195,17 @@
       {
         "category": "Sunday",
         "command": "sunday.initProject",
-        "title": "New Project from Template…"
+        "title": "New Project from Template\u2026"
       },
       {
         "category": "Sunday",
         "command": "sunday.mode.set",
-        "title": "Set Agent Mode…"
+        "title": "Set Agent Mode\u2026"
       },
       {
         "category": "Sunday",
         "command": "sunday.memory.applyFrom",
-        "title": "Apply Memories from Another Project…"
+        "title": "Apply Memories from Another Project\u2026"
       },
       {
         "category": "Sunday",
@@ -397,7 +397,7 @@
         "sunday.admin.key": {
           "type": "string",
           "default": "",
-          "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only — NOT for production. Never commit a real key here; prefer workspace settings over user settings."
+          "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only \u2014 NOT for production. Never commit a real key here; prefer workspace settings over user settings."
         },
         "sunday.engagement.streaksEnabled": {
           "type": "boolean",
@@ -454,6 +454,13 @@
           "id": "sunday.browserView",
           "name": "Agent Browser"
         }
+      ],
+      "sunday-home": [
+        {
+          "type": "webview",
+          "id": "sunday.homeView",
+          "name": "Sunday Home"
+        }
       ]
     },
     "menus": {
@@ -461,6 +468,15 @@
         {
           "command": "sunday.checkForUpdates",
           "group": "z_sunday"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sunday-home",
+          "title": "Sunday",
+          "icon": "resources/sunday-icon.svg"
         }
       ]
     }

@@ -13,6 +13,7 @@ import { ChatViewProvider } from './chatView.js';
 import { ManagerViewProvider, ManagerPanelManager } from './managerView.js';
 import { McpViewProvider } from './mcpView.js';
 import { BrowserViewProvider } from './browserPanel.js';
+import { SundayHomeProvider } from './sundayHome.js';
 import {
   WORKSPACE_ENV,
   WORKSPACE_TRUSTED_ENV,
@@ -407,6 +408,9 @@ export async function activate(
     log,
   });
 
+  // -- Sunday Home: dedicated activity-bar panel (sign-in, streaks, actions) --
+  const homeProvider = new SundayHomeProvider({ log });
+
   const pickMcpServer = async (b: HostBridge, title: string) => {
     const { servers } = await b.mcpServersList();
     if (!servers.length) {
@@ -513,6 +517,9 @@ export async function activate(
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.window.registerWebviewViewProvider(BrowserViewProvider.viewType, browserProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.registerWebviewViewProvider(SundayHomeProvider.viewType, homeProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand('sunday.chat.focus', () => {
