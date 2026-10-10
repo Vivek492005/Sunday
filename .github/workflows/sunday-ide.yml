@@ -436,6 +436,9 @@ jobs:
       # per-OS build log; pipefail keeps gulp failures fatal through tee.
       # GITHUB_TOKEN: the build fetches vscode-js-debug via api.github.com;
       # unauthenticated CI IPs get 403 rate limits (run 37137724324, macOS).
+      - name: Install sunday-google-auth dependencies
+        working-directory: vscode/extensions/sunday-google-auth
+        run: npm ci --ignore-scripts || npm install --ignore-scripts
       - name: Compile client (gulp core-ci)
         working-directory: vscode
         env:
