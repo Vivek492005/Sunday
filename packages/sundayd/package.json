@@ -11,7 +11,7 @@
     "@sunday/protocol": "workspace:*",
     "@sunday/skills": "workspace:*",
     "@sunday/tools": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

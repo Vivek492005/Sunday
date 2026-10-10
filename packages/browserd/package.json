@@ -4,7 +4,7 @@
   },
   "dependencies": {
     "@sunday/protocol": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
