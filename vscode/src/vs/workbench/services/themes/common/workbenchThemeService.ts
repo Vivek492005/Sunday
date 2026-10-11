@@ -40,8 +40,10 @@ export enum ThemeSettings {
 }
 
 export namespace ThemeSettingDefaults {
-	export const COLOR_THEME_DARK = 'Dark 2026';
-	export const COLOR_THEME_LIGHT = 'Light 2026';
+	// SUNDAY: fresh installs must open in the Sunday theme, not stock VS Code dark/light.
+	// Theme IDs match vscode/extensions/theme-sunday/package.json contributes.themes[].id.
+	export const COLOR_THEME_DARK = 'Sunday Dark';
+	export const COLOR_THEME_LIGHT = 'Sunday Light';
 	export const COLOR_THEME_HC_DARK = 'Default High Contrast';
 	export const COLOR_THEME_HC_LIGHT = 'Default High Contrast Light';
 
