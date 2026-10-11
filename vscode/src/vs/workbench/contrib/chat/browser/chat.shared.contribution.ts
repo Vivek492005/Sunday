@@ -133,7 +133,11 @@ import { registerChatTitleActions } from './actions/chatTitleActions.js';
 import { registerChatToolActions } from './actions/chatToolActions.js';
 import { ChatTransferContribution } from './actions/chatTransfer.js';
 import { CONFIGURE_DICTATION_INSTRUCTIONS_ACTION_ID, registerConfigureSpeechInstructionsActions } from './actions/configureVoiceInstructionsAction.js';
-import './agentSessions/agentSessions.contribution.js';
+// SUNDAY: VS Code's Copilot-based Agents view removed. It requires the
+// proprietary @github/copilot-sdk backend which cannot work in Sunday.
+// Sunday's own agent (Sunday IDE Agent activity-bar container) is the
+// replacement. User directive 2026-10-11: "vs code walo ko hata do".
+// import './agentSessions/agentSessions.contribution.js';
 import { AgentHostChatDebugContribution } from './chatDebug/agentHostChatDebugProvider.js';
 import { ChatDebugEditor } from './chatDebug/chatDebugEditor.js';
 import { ChatDebugEditorInput, ChatDebugEditorInputSerializer } from './chatDebug/chatDebugEditorInput.js';
