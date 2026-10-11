@@ -60,6 +60,7 @@ import {
 import { registerLoginModal } from './loginModal.js';
 import { registerUserGuide, showUserGuide } from './userGuide.js';
 import { registerSundayChatParticipant } from './lmProvider.js';
+import { registerSundayModelProvider } from './sundayModelProvider.js';
 import { registerStreakEngagement } from './engagement/streakView.js';
 import { registerGitHubCommands } from './githubRepos.js';
 import {
@@ -852,6 +853,20 @@ export async function activate(
     log('chat: @sunday participant registered');
   } catch (err) {
     log(`chat: participant registration skipped (non-fatal): ${(err as Error).message}`);
+  }
+
+  // -- VS Code native chat: register Sunday language models --------------------
+  // Permanent fix for the Copilot dependency: with Sunday's own 4 models
+  // registered as a vscode.lm provider, the built-in Chat works with ZERO
+  // Copilot — no more "GitHub.copilot-chat cannot be installed" errors.
+  // User report 2026-10-11 (Beta.3 screenshot).
+  try {
+    registerSundayModelProvider(context, {
+      getBridge: () => bridge as unknown as { chat?: (req: unknown) => AsyncIterable<{ delta?: string; text?: string }> } | undefined,
+      log,
+    });
+  } catch (err) {
+    log(`chat: model provider registration skipped (non-fatal): ${(err as Error).message}`);
   }
 
   // -- Sunday User Guide (Ctrl+Alt+G) ------------------------------------------
