@@ -18,6 +18,8 @@
 // milestone + at-risk notifications below are explicitly allowed in BOTH
 // modes and must NOT be gated on active mode.
 
+import { StreakViewProvider, type StreakPanelData } from './streakPanel.js';
+
 import * as vscode from 'vscode';
 import {
   ActivityStore,
@@ -164,6 +166,21 @@ export function registerStreakEngagement(
   );
   item.command = STREAK_SHOW_COMMAND;
 
+  /** Colorful animated streak panel (right sidebar, user request 2026-10-11). */
+  const streakPanel = new StreakViewProvider((): StreakPanelData => {
+    const info = refreshStreak(streakStore, tracker.activity, now());
+    return {
+      current: info.current,
+      longest: info.longest,
+      freezesAvailable: info.freezesAvailable,
+      todayIsActive: info.todayIsActive,
+      nextMilestone: info.nextMilestone
+        ? { atDays: info.nextMilestone.atDays, bonus: info.nextMilestone.bonus, daysAway: info.nextMilestone.daysAway }
+        : undefined,
+      vacationActive: info.onVacation,
+    };
+  });
+
   /** Current engagement mode (for documentation/logging; milestones + at-risk
    *  are allowed in BOTH modes, so this is informational here). */
   const mode = (): 'passive' | 'active' => getEngagementMode(getQuietMode());
@@ -217,50 +234,8 @@ export function registerStreakEngagement(
       );
       return;
     }
-    const info = refreshStreak(streakStore, tracker.activity, now());
-    const m = info.nextMilestone;
-    const items: (vscode.QuickPickItem & { action?: string })[] = [
-      {
-        label: `$(flame) Current streak: ${info.current} day${info.current === 1 ? '' : 's'}`,
-        description: info.todayIsActive ? 'today counts!' : 'code today to keep it going',
-      },
-      {
-        label: `$(trophy) Longest streak: ${info.longest}`,
-      },
-      {
-        label: `$(shield) Freezes available: ${info.freezesAvailable}`,
-        description: 'a freeze saves your streak when you miss one day',
-      },
-      ...(m
-        ? [
-            {
-              label: `$(gift) Next reward: +${m.bonus} AI requests/day`,
-              description: `${m.daysAway} day${m.daysAway === 1 ? '' : 's'} to go (${m.atDays}-day streak)`,
-            },
-          ]
-        : [
-            {
-              label: '$(gift) Max reward active: +500 AI requests/day',
-              description: '30-day streak',
-            },
-          ]),
-      ...(info.onVacation
-        ? [{ label: `$(plane) Vacation mode until ${info.vacationUntil}` }]
-        : [
-            {
-              label: '$(plane) Start vacation mode',
-              description: 'pause your streak, up to 14 days/year',
-              action: 'vacation',
-            },
-          ]),
-    ];
-    const picked = await showQuickPick(items, {
-      title: 'Sunday Coding Streak',
-      placeHolder: 'Your streak at a glance',
-    });
-    if (picked?.action === 'vacation') {
-      await startVacationFlow();
-    }
+    // Open the colorful animated streak panel in the sidebar (user request 2026-10-11)
+    await streakPanel.show();
     render();
   };
 
@@ -312,6 +287,7 @@ export function registerStreakEngagement(
     item,
     vscode.commands.registerCommand(STREAK_SHOW_COMMAND, () => void openPanel()),
     vscode.commands.registerCommand(STREAK_VACATION_COMMAND, () => void startVacationFlow()),
+    vscode.window.registerWebviewViewProvider(StreakViewProvider.viewType, streakPanel),
   ];
 
   // Edit activity → streak qualifying minutes.

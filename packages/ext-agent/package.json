@@ -452,6 +452,10 @@
         {
           "id": "sunday.swarmView",
           "name": "Sunday Swarm"
+        },
+        {
+          "id": "sunday.streakView",
+          "name": "🔥 Sunday Streak"
         }
       ],
       "panel": [
