@@ -57,6 +57,7 @@ import {
   GOOGLE_AUTH_EXTENSION_ID,
   GOOGLE_SIGN_OUT_COMMAND,
 } from './accountView.js';
+import { registerLoginModal } from './loginModal.js';
 import { registerStreakEngagement } from './engagement/streakView.js';
 import { registerGitHubCommands } from './githubRepos.js';
 import {

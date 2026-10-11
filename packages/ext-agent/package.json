@@ -113,6 +113,11 @@
         "category": "Sunday"
       },
       {
+        "command": "sunday.account.showLoginModal",
+        "title": "Sign in to Sunday",
+        "category": "Sunday"
+      },
+      {
         "command": "sunday.account.refreshEntitlements",
         "title": "Refresh Sunday Entitlements",
         "category": "Sunday"

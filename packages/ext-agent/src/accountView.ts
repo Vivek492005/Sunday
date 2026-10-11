@@ -17,6 +17,7 @@
 // data lives in the pure functions below (unit-tested in accountView.test.ts).
 // Only `registerAccountStatusBar` touches the real `vscode` API.
 import * as vscode from 'vscode';
+import { showLoginModal } from './loginModal.js';
 
 /** Authentication provider id registered by the sunday-google-auth extension. */
 export const GOOGLE_PROVIDER_ID = 'google';
@@ -317,13 +318,10 @@ export function registerAccountStatusBar(
 
   const showMenu = async (): Promise<void> => {
     if (!state.signedIn) {
-      const pick = await vscode.window.showQuickPick<AccountPickItem>(
-        buildSignedOutPickItems(),
-        { title: 'Sunday Account', placeHolder: 'Sign in to your Sunday account' },
-      );
-      const action = signedOutPickAction(pick);
-      if (action === 'signInGoogle') await signIn('google');
-      else if (action === 'signInGitHub') await signIn('github');
+      // Use the centered Sunday login modal with logo (user request 2026-10-11)
+      const provider = await showLoginModal();
+      if (provider === 'google') await signIn('google');
+      else if (provider === 'github') await signIn('github');
       return;
     }
     const pick = await vscode.window.showQuickPick<AccountPickItem>(
