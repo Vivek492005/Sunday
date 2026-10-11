@@ -439,6 +439,9 @@ jobs:
       - name: Install sunday-google-auth dependencies
         working-directory: vscode/extensions/sunday-google-auth
         run: npm ci --ignore-scripts || npm install --ignore-scripts
+      - name: Compile sunday-google-auth extension
+        working-directory: vscode/extensions/sunday-google-auth
+        run: npx tsc -p tsconfig.json
       - name: Compile client (gulp core-ci)
         working-directory: vscode
         env:
