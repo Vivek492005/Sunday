@@ -122,7 +122,7 @@ function guideHtml(): string {
 <h2>🤖 AI Agent Kaise Use Karein</h2>
 <div class="card">
   <b class="title">Sunday Chat</b>
-  <p>Editor ke top bar me ✨ <b>Open IDE Agent</b> button, ya Sunday Home → Agent Chat. Apna kaam likho ("build a login page") — agent code likhega, files banayega, commands chalayega.</p>
+  <p>Left activity bar me <b>Sunday IDE Agent</b> (✨ icon) — Sunday ka apna dedicated agent window. Ya editor ke top bar me ✨ <b>Open IDE Agent</b> button. Apna kaam likho ("build a login page") — agent code likhega, files banayega, commands chalayega.</p>
   <button class="btn" onclick="cmd('sunday.agent.open')">Open IDE Agent</button>
 </div>
 <div class="card">
@@ -155,7 +155,7 @@ function guideHtml(): string {
 </table>
 
 <h2>🧩 Sunday Features — Detail Me</h2>
-<div class="card"><b class="title">🤖 Agent Chat</b><p>Top bar ke ✨ <b>Open IDE Agent</b> button se khulta hai. Natural language me bolo ("login page banao") — agent files banayega, code likhega, terminal commands chalayega. Har step pe tumse permission leta hai.</p><button class="btn" onclick="cmd('sunday.agent.open')">Open IDE Agent</button></div>
+<div class="card"><b class="title">🤖 Sunday IDE Agent (apna agent window)</b><p>Left bar ka ✨ icon — Sunday ka dedicated agent. Top bar ke <b>Open IDE Agent</b> button se bhi khulta hai. Natural language me bolo ("login page banao") — agent files banayega, code likhega, terminal commands chalayega. Har step pe tumse permission leta hai.</p><button class="btn" onclick="cmd('sunday.agent.open')">Open IDE Agent</button></div>
 <div class="card"><b class="title">👔 Agent Modes (status bar: "Sunday: Architect")</b><p>Neeche-left me mode switcher hai:<br>• <b>Architect</b> — pehle plan banata hai, phir code<br>• <b>Code</b> — seedha code likhta hai<br>• <b>Debug</b> — errors dhundhta aur fix karta hai<br>• <b>Ask</b> — sirf sawalon ke jawab, code change nahi</p></div>
 <div class="card"><b class="title">🐝 Swarm & Manager</b><p><b>Swarm:</b> ek saath kai agents — bada kaam tukdon me baant ke parallel karte hain.<br><b>Manager / Mission Control:</b> lambi tasks ko steps me tod ke track karta hai.</p></div>
 <div class="card"><b class="title">🎨 Design to Code</b><p>Design ki photo ya description do — agent poora UI code bana dega.</p></div>

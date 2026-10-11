@@ -264,6 +264,12 @@
         "title": "Open Sunday User Guide",
         "category": "Sunday",
         "icon": "$(book)"
+      },
+      {
+        "command": "sunday.theme.apply",
+        "title": "Apply Sunday Dark Theme",
+        "category": "Sunday",
+        "icon": "$(color-mode)"
       }
     ],
     "keybindings": [
@@ -449,10 +455,6 @@
     "views": {
       "explorer": [
         {
-          "id": "sunday.chatView",
-          "name": "Sunday Chat"
-        },
-        {
           "id": "sunday.managerView",
           "name": "Sunday Manager"
         },
@@ -484,6 +486,12 @@
           "type": "webview",
           "id": "sunday.homeView",
           "name": "Sunday Home"
+        }
+      ],
+      "sunday-agent": [
+        {
+          "id": "sunday.chatView",
+          "name": "Sunday Chat"
         }
       ]
     },
@@ -522,6 +530,11 @@
           "id": "sunday-home",
           "title": "Sunday",
           "icon": "resources/sunday-icon.svg"
+        },
+        {
+          "id": "sunday-agent",
+          "title": "Sunday IDE Agent",
+          "icon": "resources/sunday-agent-icon.svg"
         }
       ]
     },

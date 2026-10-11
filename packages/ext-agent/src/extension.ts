@@ -888,21 +888,32 @@ export async function activate(
   // status bar never appeared ("bottom bar still the same", user 2026-10-11).
   // Fix: once per install, if the saved theme is a STOCK VS Code theme,
   // switch it to Sunday Dark. Custom/user-picked themes are never touched.
+  //
+  // Also registers `sunday.theme.apply` — one-click "make my IDE Sunday"
+  // for the command palette / guide (user 2026-10-11: "neeche ki baar ka
+  // bhi kuch karo").
+  const STOCK_THEMES = new Set([
+    'Default Dark+', 'Dark 2026', 'Dark Modern', 'Dark (Visual Studio)',
+    'Default Light+', 'Light 2026', 'Light Modern', 'Light (Visual Studio)',
+    'Default High Contrast', 'Default High Contrast (Light)',
+    'Kimbie Dark', 'Monokai', 'Monokai Dimmed', 'Quiet Light',
+    'Red', 'Solarized Dark', 'Solarized Light', 'Tomorrow Night Blue',
+  ]);
+  const applySundayTheme = async (): Promise<void> => {
+    await vscode.workspace.getConfiguration('workbench')
+      .update('colorTheme', 'Sunday Dark', vscode.ConfigurationTarget.Global);
+    log('theme: applied "Sunday Dark"');
+  };
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sunday.theme.apply', () => applySundayTheme()),
+  );
   const THEME_MIGRATED_KEY = 'sunday.themeMigrated.v1';
   if (!context.globalState.get<boolean>(THEME_MIGRATED_KEY)) {
     void context.globalState.update(THEME_MIGRATED_KEY, true);
     try {
-      const STOCK_THEMES = new Set([
-        'Default Dark+', 'Dark 2026', 'Dark Modern', 'Dark (Visual Studio)',
-        'Default Light+', 'Light 2026', 'Light Modern', 'Light (Visual Studio)',
-        'Default High Contrast', 'Default High Contrast (Light)',
-        'Kimbie Dark', 'Monokai', 'Monokai Dimmed', 'Quiet Light',
-        'Red', 'Solarized Dark', 'Solarized Light', 'Tomorrow Night Blue',
-      ]);
       const current = vscode.workspace.getConfiguration('workbench').get<string>('colorTheme', '');
       if (current && STOCK_THEMES.has(current)) {
-        await vscode.workspace.getConfiguration('workbench')
-          .update('colorTheme', 'Sunday Dark', vscode.ConfigurationTarget.Global);
+        await applySundayTheme();
         log(`theme: migrated stock theme "${current}" -> "Sunday Dark"`);
       }
     } catch (err) {
