@@ -14,6 +14,12 @@
       },
       {
         "category": "Sunday",
+        "command": "sunday.agent.open",
+        "title": "Open IDE Agent",
+        "icon": "$(sparkle)"
+      },
+      {
+        "category": "Sunday",
         "command": "sunday.manager.open",
         "title": "Open Agent Manager"
       },
@@ -473,6 +479,13 @@
       ]
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "sunday.agent.open",
+          "group": "navigation",
+          "when": "true"
+        }
+      ],
       "help": [
         {
           "command": "sunday.checkForUpdates",

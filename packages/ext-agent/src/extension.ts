@@ -526,6 +526,10 @@ export async function activate(
     vscode.commands.registerCommand('sunday.chat.focus', () => {
       void vscode.commands.executeCommand('sunday.chatView.focus');
     }),
+    // "Open IDE Agent" — user request 2026-10-11: prominent top-bar button
+    vscode.commands.registerCommand('sunday.agent.open', () => {
+      void vscode.commands.executeCommand('sunday.chatView.focus');
+    }),
     vscode.commands.registerCommand('sunday.manager.open', () => {
       // P-030 Stage 1: reveal the editor-area panel (create-or-reveal).
       // The sidebar WebviewView stays registered for now (backward compat).
