@@ -257,6 +257,12 @@
         "category": "Sunday",
         "command": "sunday.streak.vacation",
         "title": "Streak: Toggle Vacation Mode"
+      },
+      {
+        "command": "sunday.guide.open",
+        "title": "Open Sunday User Guide",
+        "category": "Sunday",
+        "icon": "$(book)"
       }
     ],
     "keybindings": [
@@ -265,6 +271,12 @@
         "key": "ctrl+i",
         "mac": "cmd+i",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "sunday.guide.open",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "true"
       }
     ],
     "configuration": {
@@ -490,6 +502,10 @@
         {
           "command": "sunday.checkForUpdates",
           "group": "z_sunday"
+        },
+        {
+          "command": "sunday.guide.open",
+          "group": "z_sunday"
         }
       ]
     },
@@ -511,6 +527,55 @@
           {
             "name": "model",
             "description": "List available Sunday models"
+          }
+        ]
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "sunday.getStarted",
+        "title": "Get Started with Sunday",
+        "description": "Sunday ki saari khaasiyat \u2014 sign-in, theme, AI agent, streaks \u2014 2 minute me seekho.",
+        "steps": [
+          {
+            "id": "welcome",
+            "title": "Welcome to Sunday \u2600\ufe0f",
+            "description": "Sunday = VS Code ki saari power + AI agents. Pehle sign in karo taaki free AI tier (200 requests/day) activate ho jaye.\n[Sign in to Sunday](command:sunday.account.showMenu)",
+            "media": {
+              "markdown": "resources/guide/welcome.md"
+            }
+          },
+          {
+            "id": "theme",
+            "title": "Theme badlo \ud83c\udfa8",
+            "description": "Sunday Dark (default) ya Sunday Light chuno. Shortcut: Ctrl+K phir Ctrl+T.\n[Theme Chuno](command:workbench.action.selectTheme)",
+            "media": {
+              "markdown": "resources/guide/theme.md"
+            }
+          },
+          {
+            "id": "agent",
+            "title": "AI Agent kholo \ud83e\udd16",
+            "description": "Editor ke top bar me Open IDE Agent button hai. Ya chat me @sunday likho.\n[Open IDE Agent](command:sunday.agent.open)",
+            "media": {
+              "markdown": "resources/guide/agent.md"
+            }
+          },
+          {
+            "id": "streak",
+            "title": "Streak banao \ud83d\udd25",
+            "description": "Roz code karo, streak badhao, rewards jeeto (7/14/30 din pe extra AI requests).\n[Mera Streak](command:sunday.streak.show)",
+            "media": {
+              "markdown": "resources/guide/streak.md"
+            }
+          },
+          {
+            "id": "guide",
+            "title": "Poora User Guide \ud83d\udcd6",
+            "description": "Saare features, models aur shortcuts ek jagah. Shortcut: Ctrl+Alt+G.\n[User Guide Kholo](command:sunday.guide.open)",
+            "media": {
+              "markdown": "resources/guide/guide.md"
+            }
           }
         ]
       }

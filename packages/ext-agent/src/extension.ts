@@ -58,6 +58,7 @@ import {
   GOOGLE_SIGN_OUT_COMMAND,
 } from './accountView.js';
 import { registerLoginModal } from './loginModal.js';
+import { registerUserGuide, showUserGuide } from './userGuide.js';
 import { registerSundayChatParticipant } from './lmProvider.js';
 import { registerStreakEngagement } from './engagement/streakView.js';
 import { registerGitHubCommands } from './githubRepos.js';
@@ -851,6 +852,18 @@ export async function activate(
     log('chat: @sunday participant registered');
   } catch (err) {
     log(`chat: participant registration skipped (non-fatal): ${(err as Error).message}`);
+  }
+
+  // -- Sunday User Guide (Ctrl+Alt+G) ------------------------------------------
+  // Teaches theme switching, features, shortcuts. On the very first run we
+  // open it once so new users discover how everything works (user request
+  // 2026-10-11: "user ko kaise pata chalega theme kaise change karna hai").
+  context.subscriptions.push(registerUserGuide(context));
+  const GUIDE_SEEN_KEY = 'sunday.guideSeen.v1';
+  if (!context.globalState.get<boolean>(GUIDE_SEEN_KEY)) {
+    void context.globalState.update(GUIDE_SEEN_KEY, true);
+    // Slight delay so the IDE finishes loading before the guide appears.
+    setTimeout(() => { try { showUserGuide(context); } catch { /* non-fatal */ } }, 2500);
   }
 
   // -- Engagement: coding streaks (Phase E.1) -----------------------------------
