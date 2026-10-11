@@ -77,6 +77,12 @@
       "percent": 100,
       "status": "done",
       "detail": "Artifacts, Mission Control, Best-of-N, AGENTS.md, PR automation, and 13 more \u2014 1,885 tests total"
+    },
+    {
+      "name": "Beta.3 Release",
+      "percent": 100,
+      "status": "done",
+      "detail": "ide-v1.0.0-beta.3 released 2026-10-11 (commit 6941bb7b, CI run 38116884695): Sunday Dark default theme verified in built code, User Guide auto-opens + Ctrl+Alt+G, google-auth compile fix (explicit tsc), 5 assets live on GitHub (both Windows setups 208.6/208.6 MB, Linux 314.8 MB, macOS 214.3 MB, VSIX 0.55 MB); user install verdict pending."
     }
   ],
   "project": "Sunday IDE",
@@ -85,5 +91,5 @@
     "green": 1,
     "total": 11
   },
-  "updated": "2026-10-10T17:04:19+00:00"
+  "updated": "2026-10-11T07:30:56+00:00"
 }

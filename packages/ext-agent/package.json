@@ -191,7 +191,8 @@
       {
         "category": "Sunday",
         "command": "sunday.checkForUpdates",
-        "title": "Check for Updates"
+        "title": "Check for Sunday Updates",
+        "icon": "$(cloud-download)"
       },
       {
         "category": "Sunday",
@@ -470,10 +471,6 @@
         {
           "id": "sunday.swarmView",
           "name": "Sunday Swarm"
-        },
-        {
-          "id": "sunday.streakView",
-          "name": "\ud83d\udd25 Sunday Streak"
         }
       ],
       "panel": [
@@ -495,6 +492,16 @@
         {
           "command": "sunday.agent.open",
           "group": "navigation",
+          "when": "true"
+        },
+        {
+          "command": "sunday.guide.open",
+          "group": "navigation@sunday",
+          "when": "true"
+        },
+        {
+          "command": "sunday.checkForUpdates",
+          "group": "navigation@sunday",
           "when": "true"
         }
       ],

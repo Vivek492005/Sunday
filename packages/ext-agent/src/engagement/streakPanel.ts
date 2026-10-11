@@ -132,37 +132,42 @@ function streakHtml(data: StreakPanelData): string {
 </html>`;
 }
 
-export class StreakViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = STREAK_VIEW_ID;
-  private view?: vscode.WebviewView;
-  private getData: () => StreakPanelData;
+/**
+ * Opens (or reveals) the Sunday Streak panel as a dedicated side panel.
+ *
+ * User request 2026-10-11: the streak must open as a SEPARATE RIGHT-SIDE
+ * panel (like the agent window) — not buried in the left Explorer tree.
+ * Implemented as a WebviewPanel with ViewColumn.Beside so it docks next
+ * to the editor, colorful/animated/interactive.
+ */
+let streakPanelInstance: vscode.WebviewPanel | undefined;
 
-  constructor(getData: () => StreakPanelData) {
-    this.getData = getData;
+export function openStreakPanel(data: StreakPanelData): void {
+  if (streakPanelInstance) {
+    streakPanelInstance.webview.html = streakHtml(data);
+    streakPanelInstance.reveal(vscode.ViewColumn.Beside);
+    return;
   }
-
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
-    this.view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    this.refresh();
-    webviewView.webview.onDidReceiveMessage((msg: { type?: string }) => {
-      if (msg.type === 'code') {
-        void vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
-      } else if (msg.type === 'vacation') {
-        void vscode.commands.executeCommand('sunday.streak.vacation');
-      }
-    });
-  }
-
-  refresh(): void {
-    if (this.view) {
-      this.view.webview.html = streakHtml(this.getData());
+  streakPanelInstance = vscode.window.createWebviewPanel(
+    'sundayStreakPanel',
+    '🔥 My Sunday Streak',
+    vscode.ViewColumn.Beside,
+    { enableScripts: true, retainContextWhenHidden: true },
+  );
+  streakPanelInstance.webview.html = streakHtml(data);
+  streakPanelInstance.webview.onDidReceiveMessage((msg: { type?: string }) => {
+    if (msg.type === 'code') {
+      void vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
+    } else if (msg.type === 'vacation') {
+      void vscode.commands.executeCommand('sunday.streak.vacation');
     }
-  }
+  });
+  streakPanelInstance.onDidDispose(() => { streakPanelInstance = undefined; });
+}
 
-  /** Reveals the streak view in the sidebar. */
-  async show(): Promise<void> {
-    await vscode.commands.executeCommand(`${STREAK_VIEW_ID}.focus`);
-    this.refresh();
+/** Refreshes the open streak panel (no-op if closed). */
+export function refreshStreakPanel(data: StreakPanelData): void {
+  if (streakPanelInstance) {
+    streakPanelInstance.webview.html = streakHtml(data);
   }
 }

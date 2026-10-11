@@ -881,6 +881,35 @@ export async function activate(
     setTimeout(() => { try { showUserGuide(context); } catch { /* non-fatal */ } }, 2500);
   }
 
+  // -- Theme auto-migration: stock VS Code theme -> Sunday Dark ----------------
+  // Beta.2/Beta.3 shipped the Sunday Dark default, but users upgrading from
+  // an older install already have a `workbench.colorTheme` saved (e.g. from
+  // Beta.2's stock default), which overrides the new default — the yellow
+  // status bar never appeared ("bottom bar still the same", user 2026-10-11).
+  // Fix: once per install, if the saved theme is a STOCK VS Code theme,
+  // switch it to Sunday Dark. Custom/user-picked themes are never touched.
+  const THEME_MIGRATED_KEY = 'sunday.themeMigrated.v1';
+  if (!context.globalState.get<boolean>(THEME_MIGRATED_KEY)) {
+    void context.globalState.update(THEME_MIGRATED_KEY, true);
+    try {
+      const STOCK_THEMES = new Set([
+        'Default Dark+', 'Dark 2026', 'Dark Modern', 'Dark (Visual Studio)',
+        'Default Light+', 'Light 2026', 'Light Modern', 'Light (Visual Studio)',
+        'Default High Contrast', 'Default High Contrast (Light)',
+        'Kimbie Dark', 'Monokai', 'Monokai Dimmed', 'Quiet Light',
+        'Red', 'Solarized Dark', 'Solarized Light', 'Tomorrow Night Blue',
+      ]);
+      const current = vscode.workspace.getConfiguration('workbench').get<string>('colorTheme', '');
+      if (current && STOCK_THEMES.has(current)) {
+        await vscode.workspace.getConfiguration('workbench')
+          .update('colorTheme', 'Sunday Dark', vscode.ConfigurationTarget.Global);
+        log(`theme: migrated stock theme "${current}" -> "Sunday Dark"`);
+      }
+    } catch (err) {
+      log(`theme: migration skipped (non-fatal): ${(err as Error).message}`);
+    }
+  }
+
   // -- Engagement: coding streaks (Phase E.1) -----------------------------------
   // Silent streak-day tracking always runs (passive mode: never interrupt a
   // user who is just editing files). Only milestone celebrations (7/14/30d,

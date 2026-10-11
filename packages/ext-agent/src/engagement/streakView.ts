@@ -18,7 +18,7 @@
 // milestone + at-risk notifications below are explicitly allowed in BOTH
 // modes and must NOT be gated on active mode.
 
-import { StreakViewProvider, type StreakPanelData } from './streakPanel.js';
+import { openStreakPanel, refreshStreakPanel, type StreakPanelData } from './streakPanel.js';
 
 import * as vscode from 'vscode';
 import {
@@ -167,7 +167,7 @@ export function registerStreakEngagement(
   item.command = STREAK_SHOW_COMMAND;
 
   /** Colorful animated streak panel (right sidebar, user request 2026-10-11). */
-  const streakPanel = new StreakViewProvider((): StreakPanelData => {
+  const getPanelData = (): StreakPanelData => {
     const info = refreshStreak(streakStore, tracker.activity, now());
     return {
       current: info.current,
@@ -179,7 +179,7 @@ export function registerStreakEngagement(
         : undefined,
       vacationActive: info.onVacation,
     };
-  });
+  };
 
   /** Current engagement mode (for documentation/logging; milestones + at-risk
    *  are allowed in BOTH modes, so this is informational here). */
@@ -195,6 +195,8 @@ export function registerStreakEngagement(
       item.text = streakLabel(info);
       item.tooltip = streakTooltip(info);
       item.show();
+      // Keep the open streak panel in sync.
+      try { refreshStreakPanel(getPanelData()); } catch { /* non-fatal */ }
       // Milestone celebrations are allowed in BOTH modes (founder directive).
       void checkMilestones(info);
     } catch (err) {
@@ -234,8 +236,9 @@ export function registerStreakEngagement(
       );
       return;
     }
-    // Open the colorful animated streak panel in the sidebar (user request 2026-10-11)
-    await streakPanel.show();
+    // Open the colorful animated streak panel as a separate side panel
+    // (user request 2026-10-11: right-side panel, not the Explorer tree).
+    openStreakPanel(getPanelData());
     render();
   };
 
@@ -287,7 +290,7 @@ export function registerStreakEngagement(
     item,
     vscode.commands.registerCommand(STREAK_SHOW_COMMAND, () => void openPanel()),
     vscode.commands.registerCommand(STREAK_VACATION_COMMAND, () => void startVacationFlow()),
-    vscode.window.registerWebviewViewProvider(StreakViewProvider.viewType, streakPanel),
+    // (streak panel is a WebviewPanel now; no sidebar view registration)
   ];
 
   // Edit activity → streak qualifying minutes.

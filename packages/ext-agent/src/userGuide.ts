@@ -46,7 +46,7 @@ function guideHtml(): string {
   }
   h3 { font-size: 15px; margin: 16px 0 6px; }
   p, li { font-size: 14px; color: #d4c9b0; }
-  ul { padding-left: 20px; margin-bottom: 10px; }
+  ul, ol { padding-left: 20px; margin-bottom: 10px; }
   li { margin-bottom: 5px; }
   kbd {
     background: #2a2318; border: 1px solid ${BORDER}; border-bottom-width: 2px;
@@ -79,7 +79,22 @@ function guideHtml(): string {
 <div class="hero">
   <div class="logo">☀️</div>
   <h1>Sunday User Guide</h1>
-  <p>Har Sunday feature, shortcut aur setting — ek hi jagah. Ye guide kabhi bhi <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> se kholo.</p>
+  <p>Har Sunday feature, shortcut aur setting — ek hi jagah. Ye guide kabhi bhi <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> se kholo, ya top bar ke 📖 button se.</p>
+</div>
+<div class="card">
+  <b class="title">📑 Is Guide Me Kya Hai</b>
+  <ol style="padding-left:20px; margin-top:8px; font-size:14px; color:#d4c9b0;">
+    <li>Shuruaat — sign-in aur Sunday Home</li>
+    <li>Theme — Sunday Dark/Light kaise lagayein</li>
+    <li>AI Agent — chat, @sunday, Open IDE Agent button</li>
+    <li>Models — 4 models, kaunsa kab chunein</li>
+    <li>Streaks — roz ke rewards, freeze, vacation</li>
+    <li>Shortcuts — sabse kaam ke keyboard shortcuts</li>
+    <li>Features — Sunday ki poori feature list, detail me</li>
+    <li>Updates — naya version kaise payein</li>
+    <li>Troubleshooting — aam problems aur unka hal</li>
+    <li>Accessibility</li>
+  </ol>
 </div>
 
 <h2>🚀 Shuruaat (Getting Started)</h2>
@@ -139,25 +154,27 @@ function guideHtml(): string {
   <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>Poore project me search</td></tr>
 </table>
 
-<h2>🧩 Sunday Features — Poori List</h2>
-<ul>
-  <li><b>Agent Chat / Manager / Mission Control</b> — multi-agent kaam</li>
-  <li><b>Agent Modes</b> — Architect, Code, Debug, Ask modes</li>
-  <li><b>Design to Code</b> — design se seedha code</li>
-  <li><b>Best-of-N</b> — ek kaam ke kai solutions, best chuno</li>
-  <li><b>Swarm</b> — kai agents ek saath</li>
-  <li><b>Cloud Tasks</b> — lambi tasks cloud pe</li>
-  <li><b>Agent Browser</b> — agent web browse karke verify karta hai</li>
-  <li><b>MCP Servers</b> — Model Context Protocol tools</li>
-  <li><b>Memory & Skills</b> — agent tumhari preferences yaad rakhta hai</li>
-  <li><b>Scheduler</b> — tasks schedule karo</li>
-  <li><b>Project Templates</b> — ready-made project starters</li>
-  <li><b>Repo Onboarding</b> — naye repo ko samjho ek click me</li>
-</ul>
+<h2>🧩 Sunday Features — Detail Me</h2>
+<div class="card"><b class="title">🤖 Agent Chat</b><p>Top bar ke ✨ <b>Open IDE Agent</b> button se khulta hai. Natural language me bolo ("login page banao") — agent files banayega, code likhega, terminal commands chalayega. Har step pe tumse permission leta hai.</p><button class="btn" onclick="cmd('sunday.agent.open')">Open IDE Agent</button></div>
+<div class="card"><b class="title">👔 Agent Modes (status bar: "Sunday: Architect")</b><p>Neeche-left me mode switcher hai:<br>• <b>Architect</b> — pehle plan banata hai, phir code<br>• <b>Code</b> — seedha code likhta hai<br>• <b>Debug</b> — errors dhundhta aur fix karta hai<br>• <b>Ask</b> — sirf sawalon ke jawab, code change nahi</p></div>
+<div class="card"><b class="title">🐝 Swarm & Manager</b><p><b>Swarm:</b> ek saath kai agents — bada kaam tukdon me baant ke parallel karte hain.<br><b>Manager / Mission Control:</b> lambi tasks ko steps me tod ke track karta hai.</p></div>
+<div class="card"><b class="title">🎨 Design to Code</b><p>Design ki photo ya description do — agent poora UI code bana dega.</p></div>
+<div class="card"><b class="title">🎲 Best-of-N</b><p>Ek sawal ke kai jawab generate karke tumhe best chunne deta hai.</p></div>
+<div class="card"><b class="title">🌐 Agent Browser</b><p>Agent khud web browser khol ke websites check karta hai — tumhara banaya UI asli browser me verify hota hai.</p></div>
+<div class="card"><b class="title">🔌 MCP Servers</b><p>Model Context Protocol — bahari tools (database, APIs, file systems) ko agent se jodo. Sunday Home → MCP me manage karo.</p></div>
+<div class="card"><b class="title">🧠 Memory & Skills</b><p>Agent tumhari coding style, pasandida libraries aur project rules yaad rakhta hai. Sunday Home → Memory me dekho/edit karo.</p></div>
+<div class="card"><b class="title">⏰ Scheduler</b><p>Tasks schedule karo — "roz subah 9 baje tests chalao". Sunday Home → Scheduler.</p></div>
+<div class="card"><b class="title">📦 Project Templates & Repo Onboarding</b><p><b>Templates:</b> ready-made starters (web app, API, etc.).<br><b>Repo Onboarding:</b> koi bhi naya codebase kholo — agent ek summary bana ke samjha dega.</p></div>
 
 <h2>🔄 Updates</h2>
 <p>Sunday Home → <b>Check for Updates</b>, ya Help menu → Check for Updates. Naya version aane par yahin se download hoga.</p>
 <button class="btn" onclick="cmd('sunday.checkForUpdates')">Check for Updates</button>
+
+<h2>🛠️ Troubleshooting</h2>
+<div class="card"><b class="title">Chat me "Language model unavailable"</b><p>Sunday ke models load nahi hue. IDE restart karo. Phir bhi na ho to Sunday Home → Sign in dobara karo.</p></div>
+<div class="card"><b class="title">Theme yellow nahi dikh raha</b><p><kbd>Ctrl</kbd>+<kbd>K</kbd> phir <kbd>Ctrl</kbd>+<kbd>T</kbd> → <b>Sunday Dark</b> select karo.</p><button class="btn" onclick="cmd('workbench.action.selectTheme')">Theme Badlo</button></div>
+<div class="card"><b class="title">Agent jawab nahi de raha</b><p>1) Internet check karo 2) Sign-in check karo (status bar me ✓ Sunday) 3) IDE restart karo.</p></div>
+<div class="card"><b class="title">Streak update nahi ho raha</b><p>Streak usi din count hota hai jis din tum code edit karte ho. Kam se kam ek file edit karo.</p></div>
 
 <h2>♿ Accessibility</h2>
 <ul>

@@ -255,8 +255,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleModelsGet(): Promise<void> {
-    const bridge = await this.deps.ensureBridge();
-    const { models } = await bridge.modelsList();
+    // Fallback models so the picker is never empty (user 2026-10-11:
+    // "models agent window mai load nahi ho rahe"). Used when the bridge
+    // is unreachable; the gateway remains the source of truth otherwise.
+    const FALLBACK_MODELS = [
+      { id: 'auto', provider: 'sunday', label: '⚡ Auto (recommended)' },
+      { id: 'llama-3.3-70b', provider: 'sunday', label: '🧠 Llama 3.3 70B (best quality)' },
+      { id: 'qwen-2.5-coder-32b', provider: 'openrouter', label: '💻 Qwen 2.5 Coder 32B (best for code)' },
+      { id: 'llama-3.1-8b', provider: 'groq', label: '🚀 Llama 3.1 8B (fastest)' },
+    ];
+    let models: Array<{ id: string; provider: string; label: string }>;
+    try {
+      const bridge = await this.deps.ensureBridge();
+      ({ models } = await bridge.modelsList());
+      if (!models || models.length === 0) models = FALLBACK_MODELS;
+    } catch (err) {
+      this.deps.log(`chat view: modelsList failed, using fallback: ${(err as Error).message}`);
+      models = FALLBACK_MODELS;
+    }
     // Task 7 gate: exclude managed models the plan doesn't include, or grey
     // them out when the local daily counter says the quota is spent. Fail
     // open on any entitlement problem — the gateway enforces server-side.
