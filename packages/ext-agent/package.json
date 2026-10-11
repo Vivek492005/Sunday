@@ -461,7 +461,7 @@
         },
         {
           "id": "sunday.streakView",
-          "name": "🔥 Sunday Streak"
+          "name": "\ud83d\udd25 Sunday Streak"
         }
       ],
       "panel": [
@@ -501,7 +501,20 @@
           "icon": "resources/sunday-icon.svg"
         }
       ]
-    }
+    },
+    "chatParticipants": [
+      {
+        "id": "sunday.agent",
+        "name": "Sunday",
+        "description": "Sunday AI coding agent \u2014 ask anything about your code",
+        "commands": [
+          {
+            "name": "model",
+            "description": "List available Sunday models"
+          }
+        ]
+      }
+    ]
   },
   "dependencies": {
     "@sunday/context": "workspace:*",

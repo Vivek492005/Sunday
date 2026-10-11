@@ -58,6 +58,7 @@ import {
   GOOGLE_SIGN_OUT_COMMAND,
 } from './accountView.js';
 import { registerLoginModal } from './loginModal.js';
+import { registerSundayChatParticipant } from './lmProvider.js';
 import { registerStreakEngagement } from './engagement/streakView.js';
 import { registerGitHubCommands } from './githubRepos.js';
 import {
@@ -834,6 +835,23 @@ export async function activate(
       onSignedOut: () => entitlements.notifySignedOut(),
     }),
   );
+
+  // -- VS Code native chat: register @sunday chat participant -----------------
+  // This gives users a working Sunday entry point in the built-in Chat view
+  // via `@sunday <prompt>`. User request 2026-10-11 (native chat showed
+  // "Chat setup failed").
+  try {
+    context.subscriptions.push(
+      registerSundayChatParticipant(context, {
+        getBridge: () => bridge as unknown as { chatStream?: (req: unknown) => AsyncIterable<{ delta?: string; text?: string }> } | undefined,
+        getSelectedModel: () => context.workspaceState.get<string>('sunday.selectedModel', 'auto'),
+        log,
+      }),
+    );
+    log('chat: @sunday participant registered');
+  } catch (err) {
+    log(`chat: participant registration skipped (non-fatal): ${(err as Error).message}`);
+  }
 
   // -- Engagement: coding streaks (Phase E.1) -----------------------------------
   // Silent streak-day tracking always runs (passive mode: never interrupt a

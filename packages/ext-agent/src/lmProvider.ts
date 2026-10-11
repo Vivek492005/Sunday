@@ -1,0 +1,118 @@
+// sunday-agent — VS Code Native Chat Participant.
+//
+// Registers `@sunday` as a chat participant in VS Code's native chat,
+// so users can invoke Sunday AI via `@sunday <prompt>` in the built-in
+// Chat view. This complements (not replaces) Sunday's own chat webview.
+//
+// User request 2026-10-11: native chat shows "Chat setup failed" and only
+// "Auto" in model picker. The participant gives users a working Sunday
+// entry point in the native chat UI.
+
+import * as vscode from 'vscode';
+
+export const SUNDAY_PARTICIPANT_ID = 'sunday.agent';
+
+/** Sunday models available via the participant (shown in `/model` command). */
+export const SUNDAY_PARTICIPANT_MODELS = [
+  { id: 'auto', label: '⚡ Auto (recommended)', ref: 'groq:llama-3.1-8b-instant' },
+  { id: 'llama-3.3-70b', label: '🧠 Llama 3.3 70B (best quality)', ref: 'sunday:meta-llama/llama-3.3-70b-instruct' },
+  { id: 'qwen-2.5-coder-32b', label: '💻 Qwen 2.5 Coder 32B (best for code)', ref: 'openrouter:qwen/qwen-2.5-coder-32b-instruct' },
+  { id: 'llama-3.1-8b', label: '🚀 Llama 3.1 8B (fastest)', ref: 'groq:llama-3.1-8b-instant' },
+] as const;
+
+export interface ChatParticipantDeps {
+  /** Returns the HostBridge for sending chat requests (may be undefined if sidecar not ready). */
+  getBridge: () => { chatStream?: (req: unknown) => AsyncIterable<{ delta?: string; text?: string }> } | undefined;
+  /** Currently selected model id (from workspace state). */
+  getSelectedModel: () => string;
+  log: (msg: string) => void;
+}
+
+/**
+ * Registers the `@sunday` chat participant.
+ * Users type `@sunday <prompt>` in VS Code's native chat.
+ */
+export function registerSundayChatParticipant(
+  context: vscode.ExtensionContext,
+  deps: ChatParticipantDeps,
+): vscode.Disposable {
+  const participant = vscode.chat.createChatParticipant(SUNDAY_PARTICIPANT_ID, async (
+    request: vscode.ChatRequest,
+    chatContext: vscode.ChatContext,
+    stream: vscode.ChatResponseStream,
+    token: vscode.CancellationToken,
+  ) => {
+    const bridge = deps.getBridge() as unknown as {
+      chat?: (req: unknown) => AsyncIterable<{ delta?: string; text?: string }>;
+    } | undefined;
+
+    // Handle /model command to list/switch models
+    if (request.command === 'model') {
+      const models = SUNDAY_PARTICIPANT_MODELS.map((m) => `- **${m.label}**`).join('\n');
+      stream.markdown(`### ☀️ Sunday Models\n\n${models}\n\nModel selection UI coming soon — currently using Auto.`);
+      return;
+    }
+
+    if (!bridge?.chat) {
+      stream.markdown('⚠️ Sunday agent is starting up. Please wait a moment and try again.');
+      return;
+    }
+
+    const modelId = deps.getSelectedModel();
+    const modelEntry = SUNDAY_PARTICIPANT_MODELS.find((m) => m.id === modelId)
+      ?? SUNDAY_PARTICIPANT_MODELS[0];
+    const modelRef = modelEntry.ref;
+
+    // Build message history from the request + context
+    const messages: Array<{ role: string; content: string }> = [];
+    for (const h of chatContext.history) {
+      if (h instanceof vscode.ChatRequestTurn) {
+        messages.push({ role: 'user', content: h.prompt });
+      } else if (h instanceof vscode.ChatResponseTurn) {
+        const text = h.response.map((p) => (p instanceof vscode.ChatResponseMarkdownPart ? p.value.value : '')).join('');
+        if (text) messages.push({ role: 'assistant', content: text });
+      }
+    }
+    messages.push({ role: 'user', content: request.prompt });
+
+    stream.progress(`☀️ Sunday (${modelEntry.label}) thinking…`);
+
+    try {
+      const chatStream = bridge.chat({
+        model: modelRef,
+        messages,
+        stream: true,
+      }) as AsyncIterable<{ delta?: string; text?: string }>;
+
+      for await (const chunk of chatStream) {
+        if (token.isCancellationRequested) break;
+        const text = chunk.delta ?? chunk.text ?? '';
+        if (text) stream.markdown(text);
+      }
+    } catch (err) {
+      deps.log(`chat participant failed: ${(err as Error).message}`);
+      stream.markdown(`❌ Sunday chat failed: ${(err as Error).message}`);
+    }
+  });
+
+  participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'resources', 'sunday-icon.svg');
+  participant.followupProvider = {
+    provideFollowups(
+      _result: vscode.ChatResult,
+      _context: vscode.ChatContext,
+      _token: vscode.CancellationToken,
+    ): vscode.ProviderResult<vscode.ChatFollowup[]> {
+      return [
+        { prompt: 'Explain this code', label: '💡 Explain' },
+        { prompt: 'Find bugs in this code', label: '🐛 Find bugs' },
+        { prompt: 'Optimize this code', label: '⚡ Optimize' },
+      ];
+    },
+  };
+
+  // Register /model command
+  // (declared in package.json under chatParticipants.commands)
+
+  deps.log('chat: @sunday participant registered');
+  return participant;
+}
