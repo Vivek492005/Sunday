@@ -322,6 +322,11 @@ jobs:
           echo "SUNDAY_VERSION=$version" >> "$GITHUB_ENV"
           echo "Building Sunday $version"
 
+      - name: Verify package version matches release
+        # Prevents beta.3→beta.5 incident repeat: package.json version must
+        # match what we're building/releasing.
+        run: node scripts/verify-version.mjs "$SUNDAY_VERSION"
+
       # Upstream installs the fork with npm ci (npm, not pnpm). Skip the
       # electron/playwright binary downloads here — the gulp packaging step
       # fetches Electron itself via build/lib/electron.ts.
