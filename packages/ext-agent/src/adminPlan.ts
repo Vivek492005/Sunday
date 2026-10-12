@@ -18,7 +18,7 @@ export const ADMIN_SET_PLAN_COMMAND = 'sunday.admin.setPlan';
 export const ADMIN_KEY_CONFIG = 'admin.key';
 export const ADMIN_GATEWAY_URL_CONFIG = 'cloudTasks.gatewayUrl';
 
-type PlanId = 'basic' | 'smart' | 'pro';
+type PlanId = 'free' | 'basic' | 'smart' | 'pro';
 
 interface PlanChoice extends vscode.QuickPickItem {
   plan: PlanId;

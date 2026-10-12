@@ -10,8 +10,9 @@
 // and returns undefined when the user is signed out. The dashboard then
 // shows a "sign in required" state instead of failing.
 
-/** Default gateway base URL (same default the auto-updater uses). */
-export const DEFAULT_GATEWAY_URL = 'https://sunday-final-ide.onrender.com';
+// Single source of truth: src/gateway.ts (re-exported here for backward compat)
+import { DEFAULT_GATEWAY_URL } from '../gateway.js';
+export { DEFAULT_GATEWAY_URL };
 
 /** Extension id of the bundled Google auth provider (owns the session JWT). */
 export const GOOGLE_AUTH_EXTENSION_ID = 'sunday.sunday-google-auth';

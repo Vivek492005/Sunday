@@ -26,7 +26,7 @@ export type EntitlementValue = boolean | number | string;
 
 export type Entitlements = Record<EntitlementKey, EntitlementValue>;
 
-export type PlanId = 'basic' | 'smart' | 'pro';
+export type PlanId = 'free' | 'basic' | 'smart' | 'pro';
 
 export interface EntitlementsView {
   user_id: string;

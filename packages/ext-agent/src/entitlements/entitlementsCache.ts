@@ -31,9 +31,12 @@ export const ENTITLEMENTS_GRACE_WINDOW_MS = 72 * 60 * 60 * 1000;
 /** How long a freshly fetched view stays valid without a network call. */
 export const ENTITLEMENTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Gateway fetch timeout. */
-export const ENTITLEMENTS_FETCH_TIMEOUT_MS = 10_000;
-/** Baked-in default when no gateway URL is configured. */
-export const DEFAULT_GATEWAY_URL = 'https://sunday-final-ide.onrender.com';
+export const ENTITLEMENTS_FETCH_TIMEOUT_MS = 15_000;
+/** Retry timeout for Render free-tier cold starts (30-60s spin-up). */
+export const ENTITLEMENTS_FETCH_RETRY_TIMEOUT_MS = 45_000;
+/** Baked-in default when no gateway URL is configured (single source: src/gateway.ts). */
+import { DEFAULT_GATEWAY_URL } from '../gateway.js';
+export { DEFAULT_GATEWAY_URL };
 
 /** All 10 entitlement keys, in contract order. */
 export const ENTITLEMENT_KEYS: readonly EntitlementKey[] = [
@@ -49,7 +52,7 @@ export const ENTITLEMENT_KEYS: readonly EntitlementKey[] = [
   'support.tier',
 ];
 
-const PLANS: readonly PlanId[] = ['basic', 'smart', 'pro'];
+const PLANS: readonly PlanId[] = ['free', 'basic', 'smart', 'pro'];
 const STATUSES: readonly EntitlementsView['status'][] = [
   'active',
   'past_due',
@@ -217,13 +220,33 @@ export class EntitlementsCache implements EntitlementsProvider {
   }
 
   /**
-   * Fetch /me/entitlements with a 10s timeout. Returns a validated
-   * EntitlementsView on success, or undefined on any failure. On 401 the
-   * onUnauthorized callback is invoked (errors swallowed).
+   * Fetch /me/entitlements with timeout + one retry for cold starts.
+   * First attempt: 15s. On timeout/abort (likely Render cold start),
+   * retry once with 45s. Returns a validated EntitlementsView on success,
+   * or undefined on any failure. On 401 the onUnauthorized callback is
+   * invoked (errors swallowed).
    */
   private async fetchView(session: SundaySessionLike): Promise<EntitlementsView | undefined> {
+    // First attempt with standard timeout
+    const first = await this.fetchViewOnce(session, ENTITLEMENTS_FETCH_TIMEOUT_MS, false);
+    if (first !== null) return first; // success or non-timeout failure — no retry
+    // Timeout on first attempt — likely a cold start, retry with longer timeout
+    this.log('fetch timed out, retrying with cold-start timeout');
+    const second = await this.fetchViewOnce(session, ENTITLEMENTS_FETCH_RETRY_TIMEOUT_MS, true);
+    return second === null ? undefined : second; // don't retry twice
+  }
+
+  /**
+   * Single fetch attempt. Returns the view on success, undefined on
+   * non-timeout failure, or null if the attempt timed out (caller may retry).
+   */
+  private async fetchViewOnce(
+    session: SundaySessionLike,
+    timeoutMs: number,
+    isRetry: boolean,
+  ): Promise<EntitlementsView | undefined | null> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ENTITLEMENTS_FETCH_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await this.fetchFn(`${this.gatewayUrl}/me/entitlements`, {
         method: 'GET',
@@ -265,7 +288,12 @@ export class EntitlementsCache implements EntitlementsProvider {
       };
     } catch (err) {
       // Network error, timeout (abort), DNS — never throw; degrade instead.
-      this.log(`fetch failed: ${(err as Error)?.name ?? 'error'}`);
+      const errName = (err as Error)?.name ?? 'error';
+      this.log(`fetch failed: ${errName}`);
+      // Signal timeout to caller for retry (cold start); other errors are final.
+      if (!isRetry && (errName === 'AbortError' || errName === 'TimeoutError')) {
+        return null;
+      }
       return undefined;
     } finally {
       clearTimeout(timer);

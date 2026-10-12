@@ -16,7 +16,9 @@ export const CLOUD_TASK_LIST_COMMAND = 'sunday.cloudTask.list';
 export const CLOUD_TASKS_ENABLED_CONFIG = 'cloudTasks.enabled';
 export const CLOUD_TASKS_GATEWAY_URL_CONFIG = 'cloudTasks.gatewayUrl';
 
-export const DEFAULT_GATEWAY_URL = 'https://sunday-final-ide.onrender.com';
+// Single source of truth: src/gateway.ts (re-exported here for backward compat)
+export { DEFAULT_GATEWAY_URL } from './gateway.js';
+import { DEFAULT_GATEWAY_URL } from './gateway.js';
 export const CLOUD_TASK_POLL_MS = 30_000;
 
 export interface CloudTask {

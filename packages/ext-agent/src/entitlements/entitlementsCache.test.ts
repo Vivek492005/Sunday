@@ -11,6 +11,7 @@ import {
   signedOutView,
   ENTITLEMENT_KEYS,
   ENTITLEMENTS_FETCH_TIMEOUT_MS,
+  ENTITLEMENTS_FETCH_RETRY_TIMEOUT_MS,
   ENTITLEMENTS_GRACE_WINDOW_MS,
   type EntitlementsCacheDeps,
   type EntitlementsGlobalState,
@@ -311,8 +312,9 @@ describe('cache maintenance', () => {
     expect(result.source).toBe('grace');
   });
 
-  it('fetch timeout constant is 10s', () => {
-    expect(ENTITLEMENTS_FETCH_TIMEOUT_MS).toBe(10_000);
+  it('fetch timeout constants: 15s standard, 45s cold-start retry', () => {
+    expect(ENTITLEMENTS_FETCH_TIMEOUT_MS).toBe(15_000);
+    expect(ENTITLEMENTS_FETCH_RETRY_TIMEOUT_MS).toBe(45_000);
   });
 
   it('contract carries exactly 10 entitlement keys', () => {
