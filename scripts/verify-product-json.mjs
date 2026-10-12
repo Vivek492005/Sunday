@@ -55,43 +55,18 @@ const REQUIRED_TOP_LEVEL = [
   'defaultChatAgent',
 ];
 
-// Sub-keys of defaultChatAgent that MUST be present. This is the exact set
-// restored by the black-screen fix (commit 4730690f); deleting any of them
-// risks breaking workbench initialization again.
+// Sub-keys of defaultChatAgent that MUST be present.
+// Updated 2026-10-12: Copilot extension removed from build (commit ce97c304);
+// defaultChatAgent now points to sunday.sunday-agent. Copilot-specific keys
+// (entitlementUrl, chatQuotaExceededContext, etc.) are no longer required.
 const REQUIRED_CHAT_AGENT = [
   'extensionId',
   'chatExtensionId',
-  'chatExtensionOutputId',
-  'chatExtensionOutputExtensionStateCommand',
   'documentationUrl',
   'termsStatementUrl',
   'privacyStatementUrl',
-  'skusDocumentationUrl',
-  'optimizeUsageDocumentationUrl',
-  'publicCodeMatchesUrl',
-  'managePlanUrl',
-  'upgradePlanUrl',
-  'signUpUrl',
   'provider',
   'providerExtensionId',
-  'providerUriSetting',
-  'providerScopes',
-  'entitlementUrl',
-  'entitlementSignupLimitedUrl',
-  'chatQuotaExceededContext',
-  'completionsQuotaExceededContext',
-  'walkthroughCommand',
-  'completionsMenuCommand',
-  'chatRefreshTokenCommand',
-  'generateCommitMessageCommand',
-  'resolveMergeConflictsCommand',
-  'completionsAdvancedSetting',
-  'completionsEnablementSetting',
-  'nextEditSuggestionsSetting',
-  'tokenEntitlementUrl',
-  'mcpRegistryDataUrl',
-  'mcpConnectorsUrl',
-  'managedSettingsUrl',
 ];
 
 function fail(errors) {
