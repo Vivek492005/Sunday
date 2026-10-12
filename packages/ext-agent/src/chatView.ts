@@ -17,6 +17,7 @@ import {
   VOICE_UNSUPPORTED_MESSAGE,
 } from './voice.js';
 import { getEntitlementsView } from './entitlements/provider.js';
+import { SUNDAY_MODELS } from './sundayModels.js';
 import {
   gateModelList,
   isManagedModel,
@@ -215,20 +216,63 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.deps.log(`chat view: blocked send with gated model "${model}"`);
       return;
     }
-    const bridge = await this.deps.ensureBridge();
+    // Phase 3: never fail silently. If the bridge/sidecar is unreachable,
+    // tell the user in plain language instead of swallowing the message.
+    let bridge: HostBridge;
+    try {
+      bridge = await this.deps.ensureBridge();
+    } catch (err) {
+      const msg = (err as Error).message;
+      this.deps.log(`chat view: ensureBridge failed: ${msg}`);
+      this.post({ type: 'sunday/chat/state', activeTurn: null });
+      void vscode.window.showErrorMessage(
+        'Sunday agent se connect nahi ho paya. Apna internet check karo aur dobara try karo.',
+        'Retry',
+      ).then((action) => {
+        if (action === 'Retry') void this.handleSend(text, images, model);
+      });
+      return;
+    }
     if (!this.sessionId) {
-      const { session } = await bridge.sessionCreate({ cwd: this.deps.getCwd() });
-      this.sessionId = session.id;
-      this.deps.log(`chat view: created session ${session.id}`);
+      try {
+        this.sessionId = await this.getOrCreateSession(bridge);
+      } catch (err) {
+        const msg = (err as Error).message;
+        this.deps.log(`chat view: session create failed: ${msg}`);
+        this.post({ type: 'sunday/chat/state', activeTurn: null });
+        void vscode.window.showErrorMessage(
+          'Sunday chat session start nahi ho paya. Dobara try karo.',
+          'Retry',
+        ).then((action) => {
+          if (action === 'Retry') void this.handleSend(text, images, model);
+        });
+        return;
+      }
     }
     // Part B (worker 4): expand @-mentions into context parts and attach
     // pasted images. `chat/send` already accepts a ContentPart[] message.
     const message = await composeChatMessage(t, images, {
       workspaceRoot: this.deps.getCwd(),
     });
-    const { turnId } = await bridge.chatSend({ sessionId: this.sessionId, message, model });
-    this.activeTurnId = turnId;
-    this.post({ type: 'sunday/chat/state', activeTurn: turnId });
+    try {
+      const { turnId } = await bridge.chatSend({ sessionId: this.sessionId, message, model });
+      this.activeTurnId = turnId;
+      this.post({ type: 'sunday/chat/state', activeTurn: turnId });
+    } catch (err) {
+      const msg = (err as Error).message;
+      this.deps.log(`chat view: chatSend failed: ${msg}`);
+      this.post({ type: 'sunday/chat/state', activeTurn: null });
+      // Session may have expired server-side — clear it so the next send
+      // creates a fresh one instead of retrying a dead session forever.
+      this.sessionId = undefined;
+      void vscode.window.showErrorMessage(
+        `Sunday se jawab nahi mil paya: ${msg}`,
+        'Retry',
+      ).then((action) => {
+        if (action === 'Retry') void this.handleSend(text, images, model);
+      });
+      return;
+    }
     // Track managed-model usage for the daily-limit grey-out in the model
     // picker. Local approximation only — the gateway enforces the real
     // quota server-side. Never let counter failures break the send path.
@@ -239,6 +283,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.deps.log(`chat view: usage counter failed: ${(err as Error).message}`);
       }
     }
+  }
+
+  /**
+   * Phase 3: session persistence. The session id is cached per workspace
+   * folder so a webview reload (or extension host restart) restores the
+   * existing daemon session instead of orphaning it and starting fresh.
+   * Falls back to creating a new session when restore fails.
+   */
+  private async getOrCreateSession(bridge: HostBridge): Promise<string> {
+    const cwd = this.deps.getCwd();
+    const key = `sunday.chatSession.${cwd ?? 'default'}`;
+    const state = (this.deps.globalState as unknown as {
+      get<T>(k: string): T | undefined;
+      update(k: string, v: unknown): Thenable<void>;
+    });
+    const cached = state.get<string>(key);
+    if (cached) {
+      try {
+        await bridge.sessionRestore(cached);
+        this.deps.log(`chat view: restored session ${cached}`);
+        return cached;
+      } catch (err) {
+        this.deps.log(`chat view: session restore failed (${(err as Error).message}), creating new`);
+      }
+    }
+    const { session } = await bridge.sessionCreate({ cwd });
+    this.deps.log(`chat view: created session ${session.id}`);
+    try {
+      await state.update(key, session.id);
+    } catch (err) {
+      this.deps.log(`chat view: session persist failed: ${(err as Error).message}`);
+    }
+    return session.id;
   }
 
   private async handleCancel(): Promise<void> {
@@ -258,12 +335,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Fallback models so the picker is never empty (user 2026-10-11:
     // "models agent window mai load nahi ho rahe"). Used when the bridge
     // is unreachable; the gateway remains the source of truth otherwise.
-    const FALLBACK_MODELS = [
-      { id: 'auto', provider: 'sunday', label: '⚡ Auto (recommended)' },
-      { id: 'llama-3.3-70b', provider: 'sunday', label: '🧠 Llama 3.3 70B (best quality)' },
-      { id: 'qwen-2.5-coder-32b', provider: 'openrouter', label: '💻 Qwen 2.5 Coder 32B (best for code)' },
-      { id: 'llama-3.1-8b', provider: 'groq', label: '🚀 Llama 3.1 8B (fastest)' },
-    ];
+    // Phase 3: canonical list from sundayModels.ts (single source of truth).
+    const FALLBACK_MODELS = SUNDAY_MODELS.map((m) => ({
+      id: m.id,
+      provider: m.provider,
+      label: m.label,
+    }));
     let models: Array<{ id: string; provider: string; label: string }>;
     try {
       const bridge = await this.deps.ensureBridge();

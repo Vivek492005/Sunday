@@ -12,60 +12,13 @@
 // Code version (vscode.d.ts), NOT behind a proposed-API gate.
 
 import * as vscode from 'vscode';
+import { SUNDAY_MODELS, findSundayModel, type SundayModel } from './sundayModels.js';
 
-/** The 4 Sunday models, mirrored from the @sunday participant list. */
-export const SUNDAY_LM_MODELS: ReadonlyArray<{
-  id: string;
-  name: string;
-  family: string;
-  version: string;
-  maxInputTokens: number;
-  maxOutputTokens: number;
-  tooltip: string;
-  /** Gateway model ref, e.g. 'sunday:meta-llama/llama-3.3-70b-instruct'. */
-  ref: string;
-}> = [
-  {
-    id: 'auto',
-    name: '⚡ Auto',
-    family: 'sunday-auto',
-    version: '1.0',
-    maxInputTokens: 128000,
-    maxOutputTokens: 8192,
-    tooltip: 'Sunday Auto — speed + quality ka best balance (recommended)',
-    ref: 'groq:llama-3.1-8b-instant',
-  },
-  {
-    id: 'llama-3.3-70b',
-    name: '🧠 Llama 3.3 70B',
-    family: 'sunday-llama',
-    version: '3.3',
-    maxInputTokens: 128000,
-    maxOutputTokens: 8192,
-    tooltip: 'Sunday Llama 3.3 70B — best quality, mushkil problems ke liye',
-    ref: 'sunday:meta-llama/llama-3.3-70b-instruct',
-  },
-  {
-    id: 'qwen-2.5-coder-32b',
-    name: '💻 Qwen 2.5 Coder 32B',
-    family: 'sunday-qwen',
-    version: '2.5',
-    maxInputTokens: 32000,
-    maxOutputTokens: 8192,
-    tooltip: 'Sunday Qwen 2.5 Coder 32B — coding ke liye best',
-    ref: 'openrouter:qwen/qwen-2.5-coder-32b-instruct',
-  },
-  {
-    id: 'llama-3.1-8b',
-    name: '🚀 Llama 3.1 8B',
-    family: 'sunday-llama',
-    version: '3.1',
-    maxInputTokens: 128000,
-    maxOutputTokens: 8192,
-    tooltip: 'Sunday Llama 3.1 8B — sabse fast, chhote kaamon ke liye',
-    ref: 'groq:llama-3.1-8b-instant',
-  },
-];
+/**
+ * The 4 Sunday models — canonical list lives in sundayModels.ts.
+ * Re-exported here for backwards compatibility.
+ */
+export const SUNDAY_LM_MODELS: ReadonlyArray<SundayModel> = SUNDAY_MODELS;
 
 export interface ModelProviderDeps {
   /** Returns the HostBridge for sending chat requests (may be undefined if sidecar not ready). */
@@ -112,7 +65,7 @@ export function registerSundayModelProvider(
       progress: vscode.Progress<vscode.LanguageModelResponsePart>,
       ct: vscode.CancellationToken,
     ): Promise<void> {
-      const entry = SUNDAY_LM_MODELS.find((m) => m.id === model.id) ?? SUNDAY_LM_MODELS[0];
+      const entry = findSundayModel(model.id);
       const bridge = deps.getBridge();
 
       if (!bridge?.chat) {

@@ -9,16 +9,20 @@
 // entry point in the native chat UI.
 
 import * as vscode from 'vscode';
+import { SUNDAY_MODELS, findSundayModel } from './sundayModels.js';
 
 export const SUNDAY_PARTICIPANT_ID = 'sunday.agent';
 
-/** Sunday models available via the participant (shown in `/model` command). */
-export const SUNDAY_PARTICIPANT_MODELS = [
-  { id: 'auto', label: '⚡ Auto (recommended)', ref: 'groq:llama-3.1-8b-instant' },
-  { id: 'llama-3.3-70b', label: '🧠 Llama 3.3 70B (best quality)', ref: 'sunday:meta-llama/llama-3.3-70b-instruct' },
-  { id: 'qwen-2.5-coder-32b', label: '💻 Qwen 2.5 Coder 32B (best for code)', ref: 'openrouter:qwen/qwen-2.5-coder-32b-instruct' },
-  { id: 'llama-3.1-8b', label: '🚀 Llama 3.1 8B (fastest)', ref: 'groq:llama-3.1-8b-instant' },
-] as const;
+/**
+ * Sunday models available via the participant (shown in `/model` command).
+ * Canonical list lives in sundayModels.ts — re-exported here for
+ * backwards compatibility.
+ */
+export const SUNDAY_PARTICIPANT_MODELS = SUNDAY_MODELS.map((m) => ({
+  id: m.id,
+  label: m.label,
+  ref: m.ref,
+}));
 
 export interface ChatParticipantDeps {
   /** Returns the HostBridge for sending chat requests (may be undefined if sidecar not ready). */
@@ -59,8 +63,7 @@ export function registerSundayChatParticipant(
     }
 
     const modelId = deps.getSelectedModel();
-    const modelEntry = SUNDAY_PARTICIPANT_MODELS.find((m) => m.id === modelId)
-      ?? SUNDAY_PARTICIPANT_MODELS[0];
+    const modelEntry = findSundayModel(modelId);
     const modelRef = modelEntry.ref;
 
     // Build message history from the request + context
