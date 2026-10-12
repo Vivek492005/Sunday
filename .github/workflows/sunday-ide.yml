@@ -402,34 +402,11 @@ jobs:
             bash scripts/sync-builtin.sh --vsix "dist-package/sunday-agent-$SUNDAY_VERSION.vsix" --fork "$GITHUB_WORKSPACE/vscode"
           fi
 
-      - name: Install copilot extension dependencies
-        # The built-in copilot extension has its own lockfile; its
-        # @github/copilot SDK must be present for the packaging shim
-        # (prepareBuiltInCopilotRipgrepShim). Upstream installs it via
-        # `npm run copilot:setup`; plain npm ci suffices for the shim.
-        # The root postinstall already ran this once and left BROKEN
-        # .claude symlinks (target vscode/extensions/copilot/.github/…
-        # does not exist); its existsSync guard misses broken links, so
-        # a second postinstall dies with EEXIST. Clear .claude first.
-        working-directory: vscode/extensions/copilot
-        run: |
-          rm -rf .claude
-          npm ci
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Ensure copilot SDK dir for packaging shim
-        # prepareBuiltInCopilotRipgrepShim (run during `gulp vscode-*-min-ci`)
-        # needs two things in the PACKAGED app that .moduleignore strips:
-        # (1) extensions/copilot/node_modules/@github/copilot/sdk/ dir,
-        # (2) a readable version in @github/copilot/package.json.
-        # Patch copilot.ts at workflow time (not committed).
-        # NOTE: macOS uses BSD sed (needs -i ''), Linux/Windows use GNU sed.
-        run: |
-          if [ "$(uname)" = "Darwin" ]; then SED_I="sed -i ''"; else SED_I="sed -i"; fi
-          $SED_I 's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Copilot SDK directory not found at ${copilotSdkBase}`);|fs.mkdirSync(copilotSdkBase, { recursive: true }); // SUNDAY-CI: create on demand|' vscode/build/lib/copilot.ts
-          $SED_I 's|throw new Error(`\[prepareBuiltInCopilotRipgrepShim\] Could not read a version from ${path.join(copilotBase, '"'"'package.json'"'"')}`);|return "1.0.73"; // SUNDAY-CI: match lockfile pin|' vscode/build/lib/copilot.ts
-          grep -q 'SUNDAY-CI' vscode/build/lib/copilot.ts && echo 'copilot.ts patched (mkdir + version fallback)'
+      # NOTE (2026-10-12): Copilot extension intentionally NOT packaged.
+      # Upstream lists 'copilot' in excludedExtensions (build/lib/extensions.ts);
+      # Sunday ships its own agent (@sunday + Sunday IDE Agent window).
+      # The compileCopilotExtensionBuildTask was removed from
+      # build/gulpfile.vscode.ts and build/gulpfile.reh.ts.
 
       # Upstream's own compile step: tsgo typecheck + transpile to out-build
       # + esbuild min bundles (out-vscode-min …). Output is tee'd to the

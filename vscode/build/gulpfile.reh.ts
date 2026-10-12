@@ -23,7 +23,7 @@ import glob from 'glob';
 import { promisify } from 'util';
 import rceditCallback from 'rcedit';
 import { compileApiProposalNamesTask, copyCodiconsTask } from './lib/compilation.ts';
-import { cleanExtensionsBuildTask, compileNonNativeExtensionsBuildTask, compileNativeExtensionsBuildTask, compileExtensionMediaBuildTask, compileCopilotExtensionBuildTask } from './gulpfile.extensions.ts';
+import { cleanExtensionsBuildTask, compileNonNativeExtensionsBuildTask, compileNativeExtensionsBuildTask, compileExtensionMediaBuildTask } from './gulpfile.extensions.ts';
 import * as cp from 'child_process';
 import crypto from 'crypto';
 import log from 'fancy-log';
@@ -565,7 +565,6 @@ function prepareCopilotRipgrepShimTaskREH(platform: string, arch: string, destin
 				compileApiProposalNamesTask,
 				cleanExtensionsBuildTask,
 				compileNonNativeExtensionsBuildTask,
-				compileCopilotExtensionBuildTask,
 				compileExtensionMediaBuildTask,
 				writeISODate('out-build'),
 				minified ? esbuildBundleMinTask : esbuildBundleTask,
