@@ -550,7 +550,7 @@ function prepareCopilotRipgrepShimTaskREH(platform: string, arch: string, destin
 				task.task(`node-${platform}-${arch}`) as task.Task,
 				util.rimraf(path.join(BUILD_ROOT, destinationFolderName)),
 				packageTask(type, platform, arch, sourceFolderName, destinationFolderName),
-				prepareCopilotRipgrepShimTaskREH(platform, arch, destinationFolderName)
+				// SUNDAY: copilot extension not packaged (see ce97c304)
 			];
 
 			if (platform === 'win32') {
