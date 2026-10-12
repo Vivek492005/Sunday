@@ -96,8 +96,10 @@
 1. **Dependency audit pehle, change baad me** — bina map dekhe koi workbench file mat chhedo
 2. **ADD > REMOVE** — naya banao, purana mat todo (jab tak map na kahe safe hai)
 3. **Har release se pehle artifact verification** — khol ke andar dekho, phir release
-4. **User ke screenshots = bug reports** — fix karo, explain mat karo
-5. **100% standard** — partial fix release mat karo
+4. **Har phase ke baad LONG HARD TEST** — comprehensive cross-verification; bina pass kiye phase "done" nahi
+5. **User ke screenshots = bug reports** — fix karo, explain mat karo
+6. **100% standard** — partial fix release mat karo
+7. **Decision chahiye toh pucho** — assume mat karo, user se pucho
 
 ---
 
