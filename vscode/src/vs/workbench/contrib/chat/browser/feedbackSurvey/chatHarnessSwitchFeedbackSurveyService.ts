@@ -144,8 +144,8 @@ export class ChatHarnessSwitchFeedbackSurveyService extends Disposable implement
 			options: [
 				{ id: 'preferLocal', label: localize('chat.harnessSwitchFeedbackSurvey.reason.preferLocal', "I prefer the Local experience"), value: 'preferLocal' },
 				{ id: 'missingFeature', label: localize('chat.harnessSwitchFeedbackSurvey.reason.missingFeature', "A feature I need was unavailable"), value: 'missingFeature' },
-				{ id: 'performance', label: localize('chat.harnessSwitchFeedbackSurvey.reason.performance', "Copilot was too slow"), value: 'performance' },
-				{ id: 'reliability', label: localize('chat.harnessSwitchFeedbackSurvey.reason.reliability', "Copilot did not work as expected"), value: 'reliability' },
+				{ id: 'performance', label: localize('chat.harnessSwitchFeedbackSurvey.reason.performance', "Sunday was too slow"), value: 'performance' },
+				{ id: 'reliability', label: localize('chat.harnessSwitchFeedbackSurvey.reason.reliability', "Sunday did not work as expected"), value: 'reliability' },
 				{ id: 'other', label: localize('chat.harnessSwitchFeedbackSurvey.reason.other', "Something else"), value: 'other' },
 			],
 			allowFreeformInput: false,

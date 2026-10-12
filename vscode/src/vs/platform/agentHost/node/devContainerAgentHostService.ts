@@ -892,7 +892,7 @@ export abstract class DevContainerAgentHostService extends Disposable implements
 			if (/is not running|No such container/i.test(result.stderr)) {
 				return [];
 			}
-			throw new Error(localize('devContainerAgentHost.containerSessionCheckFailed', "Unable to check active VS Code sessions in Dev Container '{0}' (exit {1}): {2}", containerId, result.code, result.stderr.trim()));
+			throw new Error(localize('devContainerAgentHost.containerSessionCheckFailed', "Unable to check active Sunday sessions in Dev Container '{0}' (exit {1}): {2}", containerId, result.code, result.stderr.trim()));
 		}
 		return [...new Set(result.stdout.split('\n').map(value => value.trim()).filter(value => value.length > 0))];
 	}

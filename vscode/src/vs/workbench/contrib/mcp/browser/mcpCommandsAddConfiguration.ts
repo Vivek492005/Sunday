@@ -371,7 +371,7 @@ export class McpAddConfigurationCommand {
 				const resource = await this._copilotGlobalConfigurationService.getConfigurationResource();
 				if (resource) {
 					const selected = await this._quickInputService.pick([
-						{ id: 'copilot', label: localize('mcp.target.copilotGlobal', "Copilot Global"), description: this._label.getUriLabel(resource) },
+						{ id: 'copilot', label: localize('mcp.target.copilotGlobal', "Sunday Global"), description: this._label.getUriLabel(resource) },
 						{ id: 'vscode', label: localize('mcp.target.userConfigurationDeprecated', "User Configuration (deprecated)"), description: this._label.getUriLabel(this._userDataProfileService.currentProfile.mcpResource) },
 					], {
 						title: localize('mcp.target.title', "Add MCP Server"),

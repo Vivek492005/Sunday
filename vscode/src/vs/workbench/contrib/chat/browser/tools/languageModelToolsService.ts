@@ -199,7 +199,7 @@ export class LanguageModelToolsService extends Disposable implements ILanguageMo
 			VSCodeToolReference.vscode,
 			{
 				icon: ThemeIcon.fromId(Codicon.vscode.id),
-				description: localize('copilot.toolSet.vscode.description', 'Use VS Code features'),
+				description: localize('copilot.toolSet.vscode.description', 'Use Sunday features'),
 				deprecated: true,
 			}
 		));

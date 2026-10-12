@@ -56,7 +56,7 @@ export interface ISurveyDefinition {
  */
 export const CopilotPMFSurvey: ISurveyDefinition = {
 	id: 'copilot-pmf',
-	title: localize('survey.copilotPmf.title', "Help Us Improve GitHub Copilot"),
+	title: localize('survey.copilotPmf.title', "Help Us Improve Sunday"),
 	description: localize('survey.copilotPmf.description', "This short survey helps us understand how well Copilot fits into your workflow."),
 	questions: [
 		{
@@ -65,7 +65,7 @@ export const CopilotPMFSurvey: ISurveyDefinition = {
 			required: true,
 			telemetryKey: 'score',
 			asMeasurement: true,
-			label: localize('survey.copilotPmf.q1', "How disappointed would you be if you could no longer use Copilot?"),
+			label: localize('survey.copilotPmf.q1', "How disappointed would you be if you could no longer use Sunday?"),
 			options: [
 				{ id: 'not-at-all', label: localize('survey.copilotPmf.q1.notAtAll', "Not at all") },
 				{ id: 'slightly', label: localize('survey.copilotPmf.q1.slightly', "Slightly") },
@@ -78,7 +78,7 @@ export const CopilotPMFSurvey: ISurveyDefinition = {
 			type: SurveyQuestionType.Radio,
 			id: 'primary-benefit',
 			telemetryKey: 'primaryBenefit',
-			label: localize('survey.copilotPmf.q2', "What has Copilot helped you with most recently?"),
+			label: localize('survey.copilotPmf.q2', "What has Sunday helped you with most recently?"),
 			columns: 2,
 			shuffleOptions: true,
 			options: [
