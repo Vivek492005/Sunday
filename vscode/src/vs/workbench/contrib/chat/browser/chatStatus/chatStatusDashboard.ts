@@ -172,8 +172,8 @@ export class ChatStatusDashboard extends DomWidget {
 			const headerHost = this.options?.titleHeaderContainer ?? this.element;
 			const header = this.renderHeader(headerHost, this._store, planName, toAction({
 				id: 'workbench.action.manageCopilot',
-				label: localize('quotaLabel', "Manage Copilot Settings"),
-				tooltip: localize('quotaTooltip', "Manage Copilot Settings"),
+				label: localize('quotaLabel', "Manage Sunday Settings"),
+				tooltip: localize('quotaTooltip', "Manage Sunday Settings"),
 				class: ThemeIcon.asClassName(Codicon.settings),
 				run: () => this.runCommandAndClose(() => this.openGitHubUrl(GitHubPaths.copilotSettings)),
 			}));
@@ -603,9 +603,9 @@ export class ChatStatusDashboard extends DomWidget {
 		} else if (anonymousUser) {
 			descriptionText = localize('enableMoreDescription', "Sign in to enable more Copilot AI features.");
 		} else if (disabled) {
-			descriptionText = localize('enableDescription', "Enable Copilot to use AI features.");
+			descriptionText = localize('enableDescription', "Enable Sunday to use AI features.");
 		} else {
-			descriptionText = localize('signInDescription', "Sign in to use GitHub Copilot AI features.");
+			descriptionText = localize('signInDescription', "Sign in to use Sunday AI features.");
 		}
 
 		let buttonLabel: string;
@@ -616,7 +616,7 @@ export class ChatStatusDashboard extends DomWidget {
 		} else if (disabled) {
 			buttonLabel = localize('enableCopilotButton', "Enable AI Features");
 		} else {
-			buttonLabel = localize('signInToUseAIFeatures', "Sign in to use GitHub Copilot");
+			buttonLabel = localize('signInToUseAIFeatures', "Sign in to use Sunday");
 		}
 
 		let commandId: string;

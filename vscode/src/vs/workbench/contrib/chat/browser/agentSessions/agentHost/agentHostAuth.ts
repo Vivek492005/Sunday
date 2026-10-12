@@ -835,7 +835,7 @@ async function forceAuthenticationInteractively(
 			telemetrySource: 'agentHost',
 			forceSignInDialog: true,
 			additionalScopes: scopes,
-			dialogTitle: localize('agentHost.signInDialogTitle', "Sign in to use GitHub Copilot"),
+			dialogTitle: localize('agentHost.signInDialogTitle', "Sign in to use Sunday"),
 			disableChatViewReveal: true,
 			returnResult: true,
 		});
@@ -845,7 +845,7 @@ async function forceAuthenticationInteractively(
 			return undefined;
 		}
 		if (!setupResult.success) {
-			throw setupResult.error ?? new Error(localize('agentHost.signInFailed', "Failed to sign in to use GitHub Copilot."));
+			throw setupResult.error ?? new Error(localize('agentHost.signInFailed', "Failed to sign in to use Sunday."));
 		}
 		let sessionResolution = await resolveSessionForProtectedResource(authenticationService, logService, resource, options);
 		if (sessionResolution.kind === 'signedOut' && options.authTokenCache?.getRejectedSession(resource.resource, scopes)) {

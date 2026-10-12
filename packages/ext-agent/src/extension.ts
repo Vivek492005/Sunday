@@ -484,7 +484,7 @@ export async function activate(
     if (!key) return;
     const value = await vscode.window.showInputBox({
       title: 'Sunday MCP: Store Secret',
-      prompt: `Value for "${key.trim()}" (stored in VS Code SecretStorage, never in mcp.json)`,
+      prompt: `Value for "${key.trim()}" (stored in Sunday SecretStorage, never in mcp.json)`,
       password: true,
     });
     if (value === undefined) return;

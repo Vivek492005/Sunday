@@ -77,7 +77,7 @@ export class GrowthSessionController extends Disposable implements IChatSessionI
 
 		return [{
 			resource: GrowthSessionController.SESSION_URI,
-			label: localize('growthSession.label', "Try Copilot"),
+			label: localize('growthSession.label', "Try Sunday"),
 			description: localize('growthSession.description', "GitHub Copilot is available. Try it for free."),
 			status: ChatSessionStatus.NeedsInput,
 			iconPath: Codicon.lightbulb,

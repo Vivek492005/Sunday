@@ -127,7 +127,7 @@ function guideHtml(): string {
 </div>
 <div class="card">
   <b class="title">@sunday (Built-in Chat)</b>
-  <p>VS Code ke apne Chat panel me <code>@sunday tumhara sawal</code> likho. <code>@sunday /model</code> se model list dekho.</p>
+  <p>Sunday ke apne Chat panel me <code>@sunday tumhara sawal</code> likho. <code>@sunday /model</code> se model list dekho.</p>
 </div>
 <h3>Models</h3>
 <table>
@@ -180,7 +180,7 @@ function guideHtml(): string {
 <ul>
   <li>Saare Sunday panels keyboard se navigate hote hain (<kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>)</li>
   <li>High Contrast themes: <kbd>Ctrl</kbd>+<kbd>K</kbd> <kbd>Ctrl</kbd>+<kbd>T</kbd> → "Default High Contrast"</li>
-  <li>Zoom: <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> · Screen reader support VS Code ke saath built-in hai</li>
+  <li>Zoom: <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> · Screen reader support Sunday me built-in hai</li>
 </ul>
 
 <p style="text-align:center; color:${MUTED}; margin-top:36px;">☀️ Sunday — Editing evolved · Guide kabhi bhi: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd></p>
