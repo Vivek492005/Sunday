@@ -33,6 +33,8 @@ function makeDeps(overrides: Partial<InstallerDeps> = {}): InstallerDeps & {
     openPath: vi.fn(async () => undefined),
     showInfoMessage: vi.fn(async () => 'OK'),
     showErrorMessage: vi.fn(async () => undefined),
+    computeSha256: vi.fn(async (_filePath: string) => 'abc123'),
+    deleteFile: vi.fn(async (_filePath: string) => undefined),
     withProgress: async (_title, task) => { await task(() => undefined); },
     log: vi.fn(),
   };
@@ -43,6 +45,8 @@ function makeDeps(overrides: Partial<InstallerDeps> = {}): InstallerDeps & {
     openPath: ReturnType<typeof vi.fn>;
     showInfoMessage: ReturnType<typeof vi.fn>;
     showErrorMessage: ReturnType<typeof vi.fn>;
+    computeSha256: ReturnType<typeof vi.fn>;
+    deleteFile: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -122,5 +126,57 @@ describe('UpdateInstaller', () => {
     await new UpdateInstaller(deps).downloadAndInstall(info);
     const destPath = deps.downloadFile.mock.calls[0][1] as string;
     expect(destPath).toContain('Sunday-Setup-1.0.1-win.exe');
+  });
+
+  describe('download hash verification', () => {
+    const hashedInfo: UpdateInfo = {
+      ...info,
+      sha256: 'ABC123', // mixed case on purpose — comparison is case-insensitive
+    };
+
+    it('installs when the checksum matches', async () => {
+      const deps = makeDeps({ platform: 'win32' });
+      await new UpdateInstaller(deps).downloadAndInstall(hashedInfo);
+      expect(deps.computeSha256).toHaveBeenCalledWith(
+        expect.stringContaining('Sunday-Setup-1.0.1-win.exe'),
+      );
+      expect(deps.spawnDetached).toHaveBeenCalled();
+      expect(deps.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('deletes the file and aborts when the checksum mismatches', async () => {
+      const deps = makeDeps({
+        platform: 'win32',
+        computeSha256: vi.fn(async () => 'deadbeef'),
+      });
+      await expect(
+        new UpdateInstaller(deps).downloadAndInstall(hashedInfo),
+      ).rejects.toThrow('Update verification failed');
+      const destPath = deps.downloadFile.mock.calls[0][1] as string;
+      expect(deps.deleteFile).toHaveBeenCalledWith(destPath);
+      expect(deps.spawnDetached).not.toHaveBeenCalled();
+      expect(deps.quitIde).not.toHaveBeenCalled();
+    });
+
+    it('deletes the file and aborts when hashing fails', async () => {
+      const deps = makeDeps({
+        platform: 'win32',
+        computeSha256: vi.fn(async () => { throw new Error('read error'); }),
+      });
+      await expect(
+        new UpdateInstaller(deps).downloadAndInstall(hashedInfo),
+      ).rejects.toThrow('Update verification failed');
+      expect(deps.deleteFile).toHaveBeenCalled();
+      expect(deps.spawnDetached).not.toHaveBeenCalled();
+    });
+
+    it('installs without verification (with a warning) when the gateway sent no checksum', async () => {
+      const deps = makeDeps({ platform: 'win32' });
+      await new UpdateInstaller(deps).downloadAndInstall(info); // no sha256
+      expect(deps.computeSha256).not.toHaveBeenCalled();
+      expect(deps.deleteFile).not.toHaveBeenCalled();
+      expect(deps.spawnDetached).toHaveBeenCalled();
+      expect(deps.log).toHaveBeenCalledWith(expect.stringContaining('WARNING'));
+    });
   });
 });

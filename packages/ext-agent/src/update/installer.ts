@@ -25,6 +25,10 @@ export interface InstallerDeps {
   openPath: (target: string) => PromiseLike<void>;
   showInfoMessage: (message: string, ...items: string[]) => PromiseLike<string | undefined>;
   showErrorMessage: (message: string) => PromiseLike<void>;
+  /** Compute the SHA-256 hex digest of a file on disk. */
+  computeSha256: (filePath: string) => PromiseLike<string>;
+  /** Delete a file. Used to remove unverified downloads; best-effort. */
+  deleteFile: (filePath: string) => PromiseLike<void>;
   withProgress: (
     title: string,
     task: (report: (pct: number) => void) => PromiseLike<void>,
@@ -54,6 +58,11 @@ export class UpdateInstaller {
       await this.deps.downloadFile(info.downloadUrl!, destPath, report);
     });
 
+    // SECURITY GATE: never execute a download that fails checksum
+    // verification. A mismatch means the file was corrupted or tampered
+    // with — delete it and abort before any install step runs.
+    await this.verifyDownload(info, destPath);
+
     switch (this.deps.platform) {
       case 'win32':
         await this.installWindows(destPath);
@@ -69,9 +78,59 @@ export class UpdateInstaller {
     }
   }
 
+  /**
+   * Verify the downloaded release asset against the SHA-256 checksum the
+   * gateway provided. Throws (after deleting the file) on any mismatch or
+   * hashing failure, so execution/installation never happens.
+   *
+   * When the gateway did not provide a checksum, verification is skipped
+   * with a warning — existing functionality is preserved while the
+   * gateway catches up (follow-up: include `sha256` in /updates/check
+   * responses).
+   */
+  private async verifyDownload(info: UpdateInfo, destPath: string): Promise<void> {
+    const expected = (info.sha256 ?? '').trim().toLowerCase();
+    if (!expected) {
+      this.deps.log(
+        'Sunday update: WARNING — gateway did not provide a SHA-256 checksum; ' +
+          'installing without verification.',
+      );
+      return;
+    }
+    this.deps.log('Sunday update: verifying download checksum...');
+    let actual: string;
+    try {
+      actual = (await this.deps.computeSha256(destPath)).trim().toLowerCase();
+    } catch (e) {
+      await this.removeDownload(destPath);
+      throw new Error(
+        `Update verification failed: could not compute the checksum of the downloaded file (${(e as Error).message}). ` +
+          'The file has been deleted and was not installed.',
+      );
+    }
+    if (actual !== expected) {
+      await this.removeDownload(destPath);
+      throw new Error(
+        'Update verification failed: the downloaded file does not match the expected checksum. ' +
+          'The file has been deleted and was not installed.',
+      );
+    }
+    this.deps.log('Sunday update: checksum verified.');
+  }
+
+  /** Best-effort delete of an unverified download. Never throws. */
+  private async removeDownload(destPath: string): Promise<void> {
+    try {
+      await this.deps.deleteFile(destPath);
+    } catch (e) {
+      this.deps.log(
+        `Sunday update: could not delete unverified download at ${destPath}: ${(e as Error).message}`,
+      );
+    }
+  }
+
   /** NSIS installers upgrade in place: launch detached, then quit the IDE. */
-  private async installWindows(installerPath: string): Promise<void> {
-    await this.deps.showInfoMessage(
+  private async installWindows(installerPath: string): Promise<void> {    await this.deps.showInfoMessage(
       'Sunday installer downloaded. The IDE will close and the installer will start.',
       'OK',
     );

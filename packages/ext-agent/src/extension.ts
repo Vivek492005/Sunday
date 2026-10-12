@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { SidecarManager, BROWSER_ENABLED_ENV, LOCAL_MODEL_ENABLED_ENV, SANDBOX_MODE_ENV, SANDBOX_DOCKER_IMAGE_ENV, type SidecarStatus } from './sidecar.js';
 import { HostBridge } from './hostBridge.js';
 import { ChatViewProvider } from './chatView.js';
@@ -1051,6 +1052,21 @@ export async function activate(
       showInfoMessage: (msg, ...items) =>
         vscode.window.showInformationMessage(msg, ...items).then((v) => v),
       showErrorMessage: (msg) => vscode.window.showErrorMessage(msg).then(() => undefined),
+      computeSha256: async (filePath) => {
+        const hash = createHash('sha256');
+        await new Promise<void>((resolve, reject) => {
+          const stream = fs.createReadStream(filePath);
+          stream.on('data', (chunk) => hash.update(chunk));
+          stream.on('end', () => resolve());
+          stream.on('error', reject);
+        });
+        return hash.digest('hex');
+      },
+      deleteFile: async (filePath) => {
+        await fs.promises.unlink(filePath).catch((e: NodeJS.ErrnoException) => {
+          if (e.code !== 'ENOENT') throw e;
+        });
+      },
       withProgress: (title, task) =>
         vscode.window
           .withProgress(

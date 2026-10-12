@@ -12,6 +12,13 @@ export interface UpdateInfo {
   downloadUrl: string | null;
   releaseNotes: string | null;
   publishedAt: string | null;
+  /**
+   * SHA-256 hex digest of the release asset, provided by the gateway.
+   * The installer verifies the downloaded file against this before
+   * installing. Optional: older gateways may not send it — in that case
+   * the installer logs a warning and installs without verification.
+   */
+  sha256?: string | null;
 }
 
 export interface UpdateServiceDeps {
@@ -42,7 +49,8 @@ function isUpdateInfo(v: unknown): v is UpdateInfo {
     typeof o.updateAvailable === 'boolean' &&
     typeof o.current === 'string' &&
     (o.latest === null || typeof o.latest === 'string') &&
-    (o.downloadUrl === null || typeof o.downloadUrl === 'string')
+    (o.downloadUrl === null || typeof o.downloadUrl === 'string') &&
+    (o.sha256 === undefined || o.sha256 === null || typeof o.sha256 === 'string')
   );
 }
 
