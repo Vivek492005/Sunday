@@ -246,6 +246,7 @@ export function registerAccountStatusBar(
     vscode.StatusBarAlignment.Right,
     ACCOUNT_STATUS_BAR_PRIORITY,
   );
+  item.name = 'Sunday Account';
   item.command = ACCOUNT_MENU_COMMAND;
 
   let state: AccountState = { signedIn: false, plan: DEFAULT_PLAN };

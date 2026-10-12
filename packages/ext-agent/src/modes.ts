@@ -67,7 +67,8 @@ export function registerAgentModes(
 ): void {
   const state = context.workspaceState as unknown as WorkspaceStateLike;
 
-  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
+  item.name = 'Sunday Agent Mode';
   item.command = 'sunday.mode.set';
   item.tooltip = 'Sunday agent mode — click to change';
   const refresh = (): void => {

@@ -101,7 +101,7 @@ export function registerProactiveMode(context: vscode.ExtensionContext): vscode.
   const state: ProactiveModeState = { lastActivityAt: Date.now() };
   const disposables: vscode.Disposable[] = [];
 
-  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 96);
   statusBar.name = 'Sunday Proactive Mode';
   disposables.push(statusBar);
 

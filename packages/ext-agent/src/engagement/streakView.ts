@@ -164,6 +164,7 @@ export function registerStreakEngagement(
     vscode.StatusBarAlignment.Right,
     STREAK_STATUS_BAR_PRIORITY,
   );
+  item.name = 'Sunday Streak';
   item.command = STREAK_SHOW_COMMAND;
 
   /** Colorful animated streak panel (right sidebar, user request 2026-10-11). */

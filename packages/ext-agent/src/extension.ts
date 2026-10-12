@@ -280,7 +280,8 @@ export async function activate(
   };
 
   // -- status bar: sidecar health ------------------------------------------------
-  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 94);
+  statusBar.name = 'Sunday Agent Status';
   statusBar.command = 'sunday.sidecar.status';
   const renderStatusBar = () => {
     const s: SidecarStatus = manager.getStatus();
@@ -1076,7 +1077,8 @@ export async function activate(
     });
   };
 
-  const updateStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  const updateStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 96);
+  updateStatusBar.name = 'Sunday Updates';
   updateStatusBar.command = 'sunday.checkForUpdates';
   context.subscriptions.push(updateStatusBar);
 
