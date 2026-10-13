@@ -139,7 +139,8 @@
     "onboardDeviceAccessRevokedUrl": "https://sunday-ide.com/device-revoked",
     "chatAgentForkUrl": "https://sunday-ide.com/agent-fork",
     "managedSettingsUrl": "https://sunday-ide.com/managed-settings",
-    "agentSessionsUrl": "https://sunday-ide.com/agent-sessions"
+    "agentSessionsUrl": "https://sunday-ide.com/agent-sessions",
+    "providerUriSetting": "sunday.enterpriseUri"
   },
   "trustedExtensionAuthAccess": {
     "github": [],
