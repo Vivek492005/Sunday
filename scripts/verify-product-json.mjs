@@ -56,7 +56,8 @@ const REQUIRED_TOP_LEVEL = [
 ];
 
 // Sub-keys of defaultChatAgent that MUST be present.
-// Updated 2026-10-12: Copilot extension removed from build (commit ce97c304);
+// Updated 2026-10-13: Black screen fix - restored all keys accessed by toDefaultAccountConfig.
+// provider.enterprise is REQUIRED (direct .id access crashes if missing).
 // defaultChatAgent now points to sunday.sunday-agent. Copilot-specific keys
 // (entitlementUrl, chatQuotaExceededContext, etc.) are no longer required.
 const REQUIRED_CHAT_AGENT = [
@@ -67,6 +68,16 @@ const REQUIRED_CHAT_AGENT = [
   'privacyStatementUrl',
   'provider',
   'providerExtensionId',
+  // Added 2026-10-13: black screen fix - toDefaultAccountConfig accesses these directly
+  'providerScopes',
+  'entitlementUrl',
+  'tokenEntitlementUrl',
+  'mcpRegistryDataUrl',
+  'managedSettingsUrl',
+  'completionsAdvancedSetting',
+  'upgradePlanUrl',
+  'chatQuotaExceededContext',
+  'completionsQuotaExceededContext',
 ];
 
 function fail(errors) {

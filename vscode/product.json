@@ -91,8 +91,8 @@
     "extensionId": "sunday.sunday-agent",
     "chatExtensionId": "sunday.sunday-agent",
     "documentationUrl": "https://vivek492005.github.io/Sunday/docs",
-    "termsStatementUrl": "https://vivek492005.github.io/Sunday/docs/terms",
-    "privacyStatementUrl": "https://vivek492005.github.io/Sunday/docs/privacy",
+    "termsStatementUrl": "https://sunday-ide.com/terms",
+    "privacyStatementUrl": "https://sunday-ide.com/privacy",
     "provider": {
       "default": {
         "id": "google",
@@ -113,9 +113,33 @@
       "apple": {
         "id": "apple",
         "name": "Apple"
+      },
+      "enterprise": {
+        "id": "google",
+        "name": "Google"
       }
     },
-    "providerExtensionId": "sunday.sunday-agent"
+    "providerExtensionId": "sunday.sunday-agent",
+    "upgradePlanUrl": "https://sunday-ide.com/pricing",
+    "providerScopes": [
+      "sunday"
+    ],
+    "entitlementUrl": "https://sunday-ide.com/entitlement",
+    "tokenEntitlementUrl": "https://sunday-ide.com/token",
+    "mcpRegistryDataUrl": "https://sunday-ide.com/mcp-registry",
+    "chatQuotaExceededContext": "sunday",
+    "completionsQuotaExceededContext": "sunday",
+    "completionsAdvancedSetting": "sunday.completions",
+    "walkthroughCommand": "sunday.walkthrough",
+    "walkthroughRef": "sunday.walkthrough",
+    "manageSettingsUrl": "https://sunday-ide.com/settings",
+    "managePlanPageUrl": "https://sunday-ide.com/pricing",
+    "manageSubscriptionsUrl": "https://sunday-ide.com/subscriptions",
+    "entitlementSignupLimitedUrl": "https://sunday-ide.com/signup",
+    "onboardDeviceAccessRevokedUrl": "https://sunday-ide.com/device-revoked",
+    "chatAgentForkUrl": "https://sunday-ide.com/agent-fork",
+    "managedSettingsUrl": "https://sunday-ide.com/managed-settings",
+    "agentSessionsUrl": "https://sunday-ide.com/agent-sessions"
   },
   "trustedExtensionAuthAccess": {
     "github": [],
