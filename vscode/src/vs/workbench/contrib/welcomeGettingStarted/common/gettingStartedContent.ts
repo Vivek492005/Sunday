@@ -249,7 +249,7 @@ export const startEntries: GettingStartedStartEntryContent = [
 		icon: Codicon.signIn,
 		content: {
 			type: 'startEntry',
-			command: 'command:sunday.account.showMenu',
+			command: 'command:sunday.account.showLoginModal',
 		}
 	},
 ];

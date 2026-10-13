@@ -400,7 +400,11 @@ export class ChatSetup {
 		}
 
 		const signedInAccount = options?.autoDismissOnSignIn ? this.defaultAccountService.currentDefaultAccount : undefined;
-		if (setupStrategy === ChatSetupStrategy.DefaultSetup && !signedInAccount && this.defaultAccountService.getDefaultAccountAuthenticationProvider().enterprise) {
+		// SUNDAY(P8-P0): Skip VS Code's Copilot enterprise provider flow for Sunday's own agent.
+		// The enterprise key must exist in product.json (black-screen guard in toDefaultAccountConfig),
+		// but Sunday uses its own sign-in (sunday.account.showLoginModal), never the enterprise instance prompt.
+		const isSundayAgent = defaultChat.chatExtensionId === 'sunday.sunday-agent';
+		if (!isSundayAgent && setupStrategy === ChatSetupStrategy.DefaultSetup && !signedInAccount && this.defaultAccountService.getDefaultAccountAuthenticationProvider().enterprise) {
 			setupStrategy = ChatSetupStrategy.SetupWithEnterpriseProvider; // users with a configured provider go through provider setup
 		}
 

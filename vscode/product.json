@@ -233,5 +233,8 @@
     "resourceUrlTemplate": "https://open-vsx.org/vscode/asset/{publisher}/{name}/{version}/Microsoft.VisualStudio.Code.{type}",
     "controlUrl": "",
     "nlsBaseUrl": ""
+  },
+  "configurationDefaults": {
+    "chat.titleBar.signIn.enabled": false
   }
 }

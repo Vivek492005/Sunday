@@ -522,6 +522,16 @@
           "command": "sunday.guide.open",
           "group": "z_sunday"
         }
+      ],
+      "commandPalette": [
+        {
+          "command": "workbench.action.chat.signInIndicator",
+          "when": "false"
+        },
+        {
+          "command": "workbench.action.chat.triggerSetup",
+          "when": "false"
+        }
       ]
     },
     "viewsContainers": {
