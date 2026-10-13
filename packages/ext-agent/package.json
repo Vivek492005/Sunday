@@ -630,6 +630,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "version": "1.0.0-beta.5",
+  "version": "1.0.0-beta.1.a",
   "license": "Apache-2.0"
 }
