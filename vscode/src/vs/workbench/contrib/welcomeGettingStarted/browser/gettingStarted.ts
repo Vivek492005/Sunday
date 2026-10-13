@@ -35,7 +35,7 @@ import { IAccessibilityService } from '../../../../platform/accessibility/common
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { ConfigurationTarget, IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { ContextKeyExpr, ContextKeyExpression, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
-import { IDefaultAccountService } from '../../../../platform/defaultAccount/common/defaultAccount.js';
+// SUNDAY(P7): IDefaultAccountService import removed — no longer needed (was only for Copilot banner)
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
@@ -70,7 +70,7 @@ import { IExtensionService } from '../../../services/extensions/common/extension
 import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
 import { GettingStartedIndexList } from './gettingStartedList.js';
-import { createAgentsBanner } from '../../chat/browser/agentSessions/agentSessionsBanner.js';
+// SUNDAY(P7): createAgentsBanner import removed — replaced with Sunday Agent banner (display-only)
 import { IChatEntitlementService } from '../../../services/chat/common/chatEntitlementService.js';
 import { AccessibilityVerbositySettingId } from '../../accessibility/browser/accessibilityConfiguration.js';
 import { AccessibleViewAction } from '../../accessibility/browser/accessibleViewActions.js';
@@ -198,7 +198,6 @@ export class GettingStartedPage extends EditorPane {
 		@IAccessibilityService private readonly accessibilityService: IAccessibilityService,
 		@IMarkdownRendererService private readonly markdownRendererService: IMarkdownRendererService,
 		@IChatEntitlementService private readonly chatEntitlementService: IChatEntitlementService,
-		@IDefaultAccountService private readonly defaultAccountService: IDefaultAccountService,
 	) {
 
 		super(GettingStartedPage.ID, group, telemetryService, themeService, storageService);
@@ -499,6 +498,23 @@ export class GettingStartedPage extends EditorPane {
 			}
 			case 'openLink': {
 				this.openerService.open(argument);
+				break;
+			}
+			// SUNDAY(P7): Sunday welcome dispatch commands
+			case 'sundayChatFocus': {
+				this.commandService.executeCommand('sunday.chat.focus');
+				break;
+			}
+			case 'sundayOpenHome': {
+				this.commandService.executeCommand('workbench.view.extension.sunday-home');
+				break;
+			}
+			case 'sundaySignIn': {
+				this.commandService.executeCommand('sunday.account.showMenu');
+				break;
+			}
+			case 'sundayMode': {
+				this.commandService.executeCommand('sunday.chat.focus', { mode: argument });
 				break;
 			}
 			default: {
@@ -927,8 +943,43 @@ export class GettingStartedPage extends EditorPane {
 
 		const header = $('.header', {},
 			$('h1.product-name.caption', {}, this.productService.nameLong),
-			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
+			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.sundayTagline', comment: ['Shown as subtitle on the Welcome page.'] }, "Your AI-native IDE."))
 		);
+
+		// SUNDAY(P7): Hero CTAs — Chat with Sunday, Open Sunday Home, Sign in
+		const sundayHeroCtas = $('.sunday-hero-ctas', {},
+			$('button.sunday-cta-primary', { 'x-dispatch': 'sundayChatFocus', 'title': localize('sunday.hero.chatTitle', "Open Sunday Agent chat") },
+				$('span.codicon.codicon-comment-discussion'),
+				$('span', {}, localize('sunday.hero.chat', "Chat with Sunday"))),
+			$('button.sunday-cta', { 'x-dispatch': 'sundayOpenHome', 'title': localize('sunday.hero.homeTitle', "Open Sunday Home dashboard") },
+				$('span.codicon.codicon-home'),
+				$('span', {}, localize('sunday.hero.home', "Open Sunday Home"))),
+			$('button.sunday-cta', { 'x-dispatch': 'sundaySignIn', 'title': localize('sunday.hero.signInTitle', "Sign in to Sunday") },
+				$('span.codicon.codicon-sign-in'),
+				$('span', {}, localize('sunday.hero.signIn', "Sign in"))),
+		);
+
+		// SUNDAY(P7): "Meet your agent" — 4 mode cards
+		const sundayModes = $('.sunday-modes-section', {},
+			$('h2.sunday-modes-title', {}, localize('sunday.modes.title', "Meet your agent")),
+			$('.sunday-mode-cards', {},
+				$('button.sunday-mode-card', { 'x-dispatch': 'sundayMode:auto', 'title': localize('sunday.modes.autoTitle', "Auto mode: Sunday picks the best approach") },
+					$('span.sunday-mode-name', {}, 'Auto'),
+					$('span.sunday-mode-desc', {}, localize('sunday.modes.autoDesc', "Smart agent that adapts"))),
+				$('button.sunday-mode-card', { 'x-dispatch': 'sundayMode:architect', 'title': localize('sunday.modes.architectTitle', "Architect mode: plan before building") },
+					$('span.sunday-mode-name', {}, 'Architect'),
+					$('span.sunday-mode-desc', {}, localize('sunday.modes.architectDesc', "Designs the solution first"))),
+				$('button.sunday-mode-card', { 'x-dispatch': 'sundayMode:implementer', 'title': localize('sunday.modes.implementerTitle', "Implementer mode: build it now") },
+					$('span.sunday-mode-name', {}, 'Implementer'),
+					$('span.sunday-mode-desc', {}, localize('sunday.modes.implementerDesc', "Writes the code"))),
+				$('button.sunday-mode-card', { 'x-dispatch': 'sundayMode:reviewer', 'title': localize('sunday.modes.reviewerTitle', "Reviewer mode: check the work") },
+					$('span.sunday-mode-name', {}, 'Reviewer'),
+					$('span.sunday-mode-desc', {}, localize('sunday.modes.reviewerDesc', "Reviews and improves"))),
+			),
+			$('p.sunday-modes-footnote', {}, localize('sunday.modes.footnote', "4 models via the Sunday gateway · @sunday anywhere · sessions restore across restarts.")),
+		);
+
+		const sundayHero = $('.sunday-hero', {}, sundayHeroCtas, sundayModes);
 
 		const leftColumn = $('.categories-column.categories-column-left', {},);
 		const rightColumn = $('.categories-column.categories-column-right', {},);
@@ -938,19 +989,13 @@ export class GettingStartedPage extends EditorPane {
 		const gettingStartedList = this.buildGettingStartedWalkthroughsList();
 
 		const footerChildren: HTMLElement[] = [];
-		const agentsBanner = createAgentsBanner(
-			{
-				cssClass: 'getting-started-category.agents-banner',
-				source: 'welcomePage',
-			},
-			this.commandService,
-			this.telemetryService,
-			this.configurationService,
-			this.chatEntitlementService,
-			this.defaultAccountService,
+		// SUNDAY(P7): Replaced Copilot agents banner with Sunday Agent banner (display-only)
+		const sundayBannerButton = $('button.sunday-agent-banner-button', { 'x-dispatch': 'sundayChatFocus', 'title': localize('sunday.banner.title', "Chat with your Sunday agent") },
+			$('span.codicon.codicon-sparkle'),
+			$('span.category-title', {}, localize('sunday.banner.label', "☀ Meet your Sunday Agent — 4 modes, 4 models")),
 		);
-		this.categoriesSlideDisposables.add(agentsBanner.disposables);
-		footerChildren.push(agentsBanner.element);
+		const sundayBanner = $('div.getting-started-category.sunday-agent-banner', {}, sundayBannerButton);
+		footerChildren.push(sundayBanner);
 		footerChildren.push($('p.showOnStartup', {},
 			showOnStartupCheckbox.domNode,
 			showOnStartupLabel,
@@ -985,7 +1030,7 @@ export class GettingStartedPage extends EditorPane {
 		gettingStartedList.onDidChange(layoutLists);
 		layoutLists();
 
-		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, leftColumn, rightColumn, footer,));
+		reset(this.categoriesSlide, $('.gettingStartedCategoriesContainer', {}, header, sundayHero, leftColumn, rightColumn, footer,));
 		this.categoriesPageScrollbar?.scanDomNode();
 
 		this.updateCategoryProgress();
@@ -1241,7 +1286,7 @@ export class GettingStartedPage extends EditorPane {
 
 		const gettingStartedList = this.gettingStartedList.value = new GettingStartedIndexList(
 			{
-				title: localize('walkthroughs', "Walkthroughs"),
+				title: localize('walkthroughs', "Sunday Tours"),
 				klass: 'getting-started',
 				limit: 5,
 				footer: $('span.button-link.see-all-walkthroughs', { 'x-dispatch': 'seeAllWalkthroughs', 'tabindex': 0 }, localize('showAll', "More...")),

@@ -221,6 +221,37 @@ export const startEntries: GettingStartedStartEntryContent = [
 			command: 'command:welcome.newWorkspaceChat',
 		}
 	},
+	// SUNDAY(P7): Sunday start entries — ADD > REMOVE
+	{
+		id: 'sunday.welcome.chatWithAgent',
+		title: localize('gettingStarted.sundayChat.title', "Chat with Sunday..."),
+		description: localize('gettingStarted.sundayChat.description', "Open the Sunday Agent chat and start building with AI."),
+		icon: Codicon.commentDiscussion,
+		content: {
+			type: 'startEntry',
+			command: 'command:sunday.chat.focus',
+		}
+	},
+	{
+		id: 'sunday.welcome.openHome',
+		title: localize('gettingStarted.sundayHome.title', "Open Sunday Home..."),
+		description: localize('gettingStarted.sundayHome.description', "Your Sunday dashboard: agents, streaks, memory, skills and more."),
+		icon: Codicon.home,
+		content: {
+			type: 'startEntry',
+			command: 'command:workbench.view.extension.sunday-home',
+		}
+	},
+	{
+		id: 'sunday.welcome.signIn',
+		title: localize('gettingStarted.sundaySignIn.title', "Sign in to Sunday..."),
+		description: localize('gettingStarted.sundaySignIn.description', "Sign in to unlock your free AI tier (200 requests/day)."),
+		icon: Codicon.signIn,
+		content: {
+			type: 'startEntry',
+			command: 'command:sunday.account.showMenu',
+		}
+	},
 ];
 
 const Button = (title: string, href: string) => `[${title}](${href})`;
