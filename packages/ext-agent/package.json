@@ -531,6 +531,10 @@
         {
           "command": "workbench.action.chat.triggerSetup",
           "when": "false"
+        },
+        {
+          "command": "workbench.panel.chat",
+          "when": "false"
         }
       ]
     },
@@ -608,6 +612,12 @@
             }
           }
         ]
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "workbench.panel.chat.view.copilot",
+        "contents": "Sunday Agent lives here.\n[Open Sunday Chat](command:sunday.chat.focus)"
       }
     ]
   },
