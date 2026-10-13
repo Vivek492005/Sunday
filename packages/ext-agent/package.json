@@ -535,6 +535,214 @@
         {
           "command": "workbench.panel.chat",
           "when": "false"
+        },
+        {
+          "command": "sunday.chat.focus",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.agent.open",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.manager.open",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.manager.openWindow",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.turn.stop",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.sidecar.restart",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.sidecar.status",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.mcp.startServer",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.mcp.stopServer",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.mcp.restartServer",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.mcp.storeSecret",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.workspace.trust",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.inlineEdit",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.git.commitMessage",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.terminal.explainError",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.orchestration.run",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.orchestration.stopAll",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.orchestration.openManager",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.browser.open",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.browser.takeover",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.nextEdit.apply",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.account.showMenu",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.account.showLoginModal",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.account.refreshEntitlements",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.github.signIn",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.github.signOut",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.github.cloneRepo",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.cloudTask.submit",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.cloudTask.list",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.bestOfN.run",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.artifacts.open",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.schedule.create",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.schedule.list",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.schedule.delete",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.missionControl",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.admin.setPlan",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.checkForUpdates",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.agentsMd.reload",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.style.infer",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.initProject",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.mode.set",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.memory.applyFrom",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.designToCode",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.onboardRepo",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.usage.show",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.sync.upload",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.sync.download",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.skills.browse",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.streak.show",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.streak.vacation",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.guide.open",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.theme.apply",
+          "group": "sunday"
         }
       ]
     },
