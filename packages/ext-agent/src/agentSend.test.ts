@@ -137,3 +137,47 @@ describe('AgentSender.sendAndCollect', () => {
     expect(res.error).toMatch(/timed out/);
   });
 });
+
+describe('AgentSender F1 pre-run estimate + budget gate', () => {
+  it('notifies onEstimate with a valid range before sending', async () => {
+    const bridge = makeBridge();
+    const seen: Array<{ min: number; max: number }> = [];
+    const sender = new AgentSender({
+      ensureBridge: async () => asBridge(bridge),
+      getCwd: () => '/ws',
+      log: () => undefined,
+      onEstimate: (e) => {
+        seen.push({ min: e.minRequests, max: e.maxRequests });
+      },
+    });
+    await sender.send('implement the feature with tests');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].max).toBeGreaterThan(seen[0].min);
+    expect(bridge.chatSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws with a continue hint when a hard budget is paused', async () => {
+    const bridge = makeBridge();
+    const sender = new AgentSender({
+      ensureBridge: async () => asBridge(bridge),
+      getCwd: () => '/ws',
+      log: () => undefined,
+      getPausedScopes: () => ['day'],
+    });
+    await expect(sender.send('hello')).rejects.toThrow(/budget paused.*day/i);
+    expect(bridge.chatSend).not.toHaveBeenCalled();
+  });
+
+  it('sendAndCollect also runs the pre-send gate', async () => {
+    const bridge = makeBridge();
+    const sender = new AgentSender({
+      ensureBridge: async () => asBridge(bridge),
+      getCwd: () => '/ws',
+      log: () => undefined,
+      getPausedScopes: () => ['task'],
+    });
+    // preSend throws before any bridge work → the async method rejects.
+    await expect(sender.sendAndCollect('prompt', 'm', 20)).rejects.toThrow(/budget paused/i);
+    expect(bridge.chatSend).not.toHaveBeenCalled();
+  });
+});

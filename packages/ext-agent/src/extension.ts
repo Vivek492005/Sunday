@@ -43,6 +43,16 @@ import { registerMemoryPanel } from './memoryPanel.js';
 import { registerRulesView } from './rulesView.js';
 import { registerSwarmWebview } from './swarmWebview.js';
 import { registerUsageCommands } from './usage/usagePanel.js';
+import { registerBurnMeter } from './usage/burnMeter.js';
+import {
+  BudgetTracker,
+  TaskLedger,
+  readBudgetConfig,
+  registerBudgetCommands,
+  type BudgetScope,
+} from './budgets/index.js';
+import { readUsedToday } from './entitlements/usage.js';
+import { dailyRequestLimit } from './entitlements/types.js';
 import { registerSyncCommands } from './sync.js';
 import { registerMarketplaceCommands } from './skills-marketplace/panel.js';
 import { registerProactiveMode } from './proactiveMode.js';
@@ -658,6 +668,12 @@ export async function activate(
 
   log(`sunday-agent v${version} activated`);
 
+  // F1 Cost & Quota Cockpit singletons — function scope so both the senders
+  // (inside the try below) and the registrations (further down) close over
+  // them. Pure logic lives in ./budgets (unit-tested).
+  const budgetTracker = new BudgetTracker(readBudgetConfig(context.globalState));
+  const taskLedger = new TaskLedger();
+
   // -- new feature views (F1-F4) -------------------------------------------------
   // Inline adapters read the same files the daemon-side stores use
   // (~/.sunday/memory/memories.jsonl, ~/.sunday/rules.md) without pulling
@@ -759,6 +775,13 @@ export async function activate(
       },
       getCwd: () => wsRoot,
       log,
+      getPastAvgRequests: () => taskLedger.averageRequests(),
+      getPausedScopes: () => budgetTracker.pausedScopes(),
+      onEstimate: (estimate, message) => {
+        log(
+          `f1: pre-run estimate for "${message.slice(0, 60)}": ${estimate.minRequests}–${estimate.maxRequests} requests`,
+        );
+      },
     });
     registerMemoryApplyFrom(context, {
       store: crossProjectStore,
@@ -772,6 +795,28 @@ export async function activate(
   context.subscriptions.push(registerSwarmWebview(context));
   // Group D2: Sunday Usage dashboard (`sunday.usage.show`).
   context.subscriptions.push(registerUsageCommands(context, { log }));
+  // F1 Cost & Quota Cockpit: burn meter status bar + budget commands.
+  // (budgetTracker/taskLedger singletons were created above with the
+  // senders.) All vscode-free logic lives in ./budgets (unit-tested).
+  for (const d of registerBudgetCommands(context, { tracker: budgetTracker, log })) {
+    context.subscriptions.push(d);
+  }
+  context.subscriptions.push(
+    registerBurnMeter(context, {
+      log,
+      getDailyLimit: () => {
+        try {
+          const view = getCachedView();
+          const lim = view ? dailyRequestLimit(view) : 0;
+          return lim > 0 ? lim : undefined;
+        } catch {
+          return undefined;
+        }
+      },
+      getUsedToday: () => readUsedToday(context.globalState),
+      getResetLabel: () => '00:00 UTC',
+    }),
+  );
   // Group D3: end-to-end encrypted session sync (`sunday.sync.upload` /
   // `sunday.sync.download`). Opt-in via `sunday.sync.enabled`.
   for (const d of registerSyncCommands({ context, log })) context.subscriptions.push(d);

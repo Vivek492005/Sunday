@@ -17,6 +17,12 @@
 import * as vscode from 'vscode';
 import type { HostBridge } from './hostBridge.js';
 import type { ChatEventNotification, ContentPart } from '@sunday/protocol';
+import {
+  estimateTask,
+  formatEstimate,
+  type TaskEstimate,
+  type BudgetScope,
+} from './budgets/index.js';
 
 export interface AgentSendDeps {
   /** Start the sidecar if needed and return the bridge. */
@@ -24,6 +30,16 @@ export interface AgentSendDeps {
   /** cwd for a fresh session (first workspace folder). */
   getCwd: () => string | undefined;
   log: (msg: string) => void;
+  /** F1: rolling average requests/task for the estimator (optional). */
+  getPastAvgRequests?: () => number | undefined;
+  /** F1: notified with the pre-run estimate before each send (optional). */
+  onEstimate?: (estimate: TaskEstimate, message: string) => void;
+  /**
+   * F1: hard-budget gate — return the paused scopes (empty = clear to send).
+   * When non-empty, send() throws with a "continue +N" hint instead of
+   * sending.
+   */
+  getPausedScopes?: () => BudgetScope[];
 }
 
 export interface CollectedTurn {
@@ -52,10 +68,37 @@ export class AgentSender {
   }
 
   /**
+   * F1: pre-run estimate + hard-budget gate. Computes the estimate (logged
+   * and forwarded via onEstimate), then refuses to send when a hard budget
+   * is paused — the user resumes with `sunday.budget.continue`.
+   */
+  private preSend(message: string, model?: string): TaskEstimate {
+    const estimate = estimateTask(message, {
+      modelId: model,
+      pastAvgRequests: this.deps.getPastAvgRequests?.(),
+    });
+    this.deps.log(`agentSend: pre-run estimate ${formatEstimate(estimate)} (${estimate.rationale})`);
+    try {
+      this.deps.onEstimate?.(estimate, message);
+    } catch {
+      /* observer is best-effort */
+    }
+    const paused = this.deps.getPausedScopes?.() ?? [];
+    if (paused.length > 0) {
+      throw new Error(
+        `Sunday budget paused (${paused.join(', ')}). ` +
+          `Run "Sunday: Continue Budget" to add more requests, or raise the limit in "Sunday: Budget Settings".`,
+      );
+    }
+    return estimate;
+  }
+
+  /**
    * Send a message and return the turnId once the daemon accepts it. Focuses
    * the Sunday chat view so the user watches the turn stream.
    */
   async send(message: string, model?: string): Promise<string> {
+    this.preSend(message, model);
     const bridge = await this.deps.ensureBridge();
     const sessionId = await this.session(bridge);
     const { turnId } = await bridge.chatSend({ sessionId, message, model });
@@ -74,6 +117,7 @@ export class AgentSender {
     model: string | undefined,
     timeoutMs = COLLECT_TIMEOUT_MS,
   ): Promise<CollectedTurn> {
+    this.preSend(typeof message === 'string' ? message : '[multimodal message]', model);
     const bridge = await this.deps.ensureBridge();
     const sessionId = await this.session(bridge);
 

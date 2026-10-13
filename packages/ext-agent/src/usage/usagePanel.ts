@@ -97,15 +97,70 @@ export function modelBars(models: UsageSnapshot['by_model']): string {
   return `<div class="models">${rows}</div>`;
 }
 
+/** One budget row for the dashboard (F1). */
+export interface BudgetRow {
+  scope: string;
+  spent: number;
+  soft?: number;
+  hard?: number;
+}
+
+/** Optional F1 extras for the usage dashboard (backward compatible). */
+export interface UsageExtras {
+  /** Budget rows (per scope). */
+  budgets?: BudgetRow[];
+  /** Avg requests per verifier-passing task (undefined = not enough data). */
+  costPerSuccess?: number;
+  /** Successful-task count backing the metric. */
+  successCount?: number;
+  /** Pre-run estimate for the active task, if any. */
+  activeEstimate?: string;
+}
+
+/** Budget progress bars (F1). */
+export function budgetRows(rows: BudgetRow[]): string {
+  if (rows.length === 0) return '';
+  const items = rows
+    .map((r) => {
+      const cap = r.hard ?? r.soft ?? Math.max(r.spent, 1);
+      const pct = Math.min(100, Math.round((r.spent / Math.max(1, cap)) * 100));
+      const over = r.hard !== undefined && r.spent >= r.hard;
+      const warn = !over && r.soft !== undefined && r.spent >= r.soft;
+      const cls = over ? 'bfill over' : warn ? 'bfill warn' : 'bfill';
+      const lim = r.hard !== undefined ? `hard ${r.hard}` : r.soft !== undefined ? `soft ${r.soft}` : 'no limit';
+      return (
+        `<div class="mrow">` +
+        `<span class="mname">${escapeHtml(r.scope)}</span>` +
+        `<span class="mbar"><span class="${cls}" style="width:${Math.max(2, pct)}%"></span></span>` +
+        `<span class="mval">${r.spent} / ${lim}</span>` +
+        `</div>`
+      );
+    })
+    .join('');
+  return `<h3>Budgets</h3><div class="models">${items}</div>`;
+}
+
 /** Pure: dashboard body HTML for a validated snapshot (empty data included). */
-export function renderUsageHtml(s: UsageSnapshot): string {
+export function renderUsageHtml(s: UsageSnapshot, extras: UsageExtras = {}): string {
   const t = s.today;
+  const costCard =
+    extras.costPerSuccess !== undefined
+      ? `<div class="card"><div class="cnum">${extras.costPerSuccess.toFixed(1)}</div><div class="clabel">req / successful task${
+          extras.successCount !== undefined ? ` (${extras.successCount})` : ''
+        }</div></div>`
+      : '';
+  const estimateNote = extras.activeEstimate
+    ? `<p class="note">Active task estimate: ${escapeHtml(extras.activeEstimate)}</p>`
+    : '';
   return `
 <div class="cards">
   <div class="card"><div class="cnum">${t.requests}</div><div class="clabel">requests today</div></div>
   <div class="card"><div class="cnum">${compact(t.tokens_in)}</div><div class="clabel">tokens in today</div></div>
   <div class="card"><div class="cnum">${compact(t.tokens_out)}</div><div class="clabel">tokens out today</div></div>
+  ${costCard}
 </div>
+${estimateNote}
+${budgetRows(extras.budgets ?? [])}
 <h3>Per model</h3>
 ${modelBars(s.by_model)}
 <h3>Last 7 days</h3>
@@ -154,6 +209,9 @@ h3 { font-size: 12px; margin: 16px 0 8px; color: var(--vscode-descriptionForegro
 .mname { flex: 0 0 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .mbar { flex: 1; height: 10px; background: var(--vscode-sideBar-background); border-radius: 5px; overflow: hidden; }
 .mfill { display: block; height: 100%; background: var(--vscode-charts-blue, #3794ff); border-radius: 5px; }
+.bfill { display: block; height: 100%; background: var(--vscode-charts-green, #89d185); border-radius: 5px; }
+.bfill.warn { background: var(--vscode-charts-yellow, #cca700); }
+.bfill.over { background: var(--vscode-charts-red, #f14c4c); }
 .mval { flex: 0 0 130px; text-align: right; font-size: 11px; color: var(--vscode-descriptionForeground); }
 .empty, .note { color: var(--vscode-descriptionForeground); font-size: 11px; }
 .state { max-width: 420px; margin: 32px auto; text-align: center; }

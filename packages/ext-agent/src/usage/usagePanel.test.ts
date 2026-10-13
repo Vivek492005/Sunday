@@ -18,6 +18,7 @@ vi.mock('vscode', () => ({
   ViewColumn: { One: 1 },
 }));
 import {
+  budgetRows,
   compact,
   escapeHtml,
   historyChart,
@@ -127,5 +128,37 @@ describe('helpers', () => {
 
   it('modelBars() shows the empty hint when there are no models', () => {
     expect(modelBars([])).toContain('No requests yet');
+  });
+});
+
+describe('F1 usage extras', () => {
+  it('renderUsageHtml works without extras (backward compatible)', () => {
+    const html = renderUsageHtml(empty);
+    expect(html).toMatch(/requests today/);
+    expect(html).not.toMatch(/Budgets/);
+  });
+
+  it('renders budget rows with warn/over states', () => {
+    const html = budgetRows([
+      { scope: 'task', spent: 3, hard: 10 },
+      { scope: 'day', spent: 160, soft: 150, hard: 200 },
+      { scope: 'session', spent: 250, hard: 200 },
+    ]);
+    expect(html).toMatch(/Budgets/);
+    expect(html).toMatch(/bfill warn/);
+    expect(html).toMatch(/bfill over/);
+  });
+
+  it('renders cost-per-successful-task card when provided', () => {
+    const html = renderUsageHtml(empty, { costPerSuccess: 12.345, successCount: 7 });
+    expect(html).toMatch(/12\.3/);
+    expect(html).toMatch(/successful task/);
+    expect(html).toMatch(/\(7\)/);
+  });
+
+  it('escapes estimate text', () => {
+    const html = renderUsageHtml(empty, { activeEstimate: '<script>x</script>' });
+    expect(html).not.toMatch('<script>x</script>');
+    expect(html).toMatch(/&lt;script&gt;/);
   });
 });

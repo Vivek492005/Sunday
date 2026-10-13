@@ -270,6 +270,21 @@
         "title": "Apply Sunday Dark Theme",
         "category": "Sunday",
         "icon": "$(color-mode)"
+      },
+      {
+        "command": "sunday.budget.continue",
+        "title": "Sunday: Continue Budget (+N requests)",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.budget.settings",
+        "title": "Sunday: Budget Settings",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.usage.burnRefresh",
+        "title": "Sunday: Refresh Burn Meter",
+        "category": "Sunday"
       }
     ],
     "keybindings": [
@@ -742,6 +757,18 @@
         },
         {
           "command": "sunday.theme.apply",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.budget.continue",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.budget.settings",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.usage.burnRefresh",
           "group": "sunday"
         }
       ]
