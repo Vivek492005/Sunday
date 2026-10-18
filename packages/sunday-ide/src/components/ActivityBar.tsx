@@ -15,9 +15,9 @@ import {
 
 const RAIL_ITEMS: { id: RailView; label: string; icon: (p: { size?: number }) => React.ReactNode; live: boolean }[] = [
   { id: 'explorer', label: 'Explorer', icon: ExplorerIcon, live: true },
-  { id: 'search', label: 'Search', icon: SearchIcon, live: false },
+  { id: 'search', label: 'Search', icon: SearchIcon, live: true },
   { id: 'source', label: 'Source Control', icon: BranchIcon, live: false },
-  { id: 'agent', label: 'Sunday Agent', icon: AgentSunIcon, live: false },
+  { id: 'agent', label: 'Sunday Agent', icon: AgentSunIcon, live: true },
   { id: 'extensions', label: 'Extensions', icon: PuzzleIcon, live: false },
 ];
 

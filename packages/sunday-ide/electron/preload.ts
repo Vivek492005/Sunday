@@ -37,6 +37,65 @@ export interface SundayAPI {
   git: {
     branch(dirPath: string): Promise<string | null>;
   };
+  pty: {
+    spawn(id: string, cwd: string, cols: number, rows: number): Promise<{ ok: boolean; error?: string }>;
+    write(id: string, data: string): Promise<void>;
+    resize(id: string, cols: number, rows: number): Promise<void>;
+    kill(id: string): Promise<void>;
+    onData(cb: (info: { id: string; data: string }) => void): () => void;
+    onExit(cb: (info: { id: string; exitCode: number }) => void): () => void;
+  };
+  search: {
+    text(query: string, dirPath: string): Promise<SearchResult[]>;
+  };
+  agent: {
+    send(req: AgentRequest): Promise<AgentReply>;
+    estimate(message: string): Promise<AgentEstimate>;
+    usage(): Promise<AgentUsage>;
+  };
+}
+
+export interface SearchResult {
+  path: string;
+  line: number;
+  column: number;
+  text: string;
+}
+
+export type AgentMode = 'auto' | 'architect' | 'implementer' | 'reviewer';
+
+export interface AgentMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AgentRequest {
+  message: string;
+  mode: AgentMode;
+  model: string;
+  history: AgentMessage[];
+}
+
+export interface AgentReply {
+  content: string;
+  /** When true, the hard budget was hit and the agent paused. */
+  budgetPaused: boolean;
+  /** Requests consumed by this turn (mock). */
+  requestsUsed: number;
+}
+
+export interface AgentEstimate {
+  min: number;
+  max: number;
+  confidence: 'low' | 'medium' | 'high';
+  rationale: string;
+}
+
+export interface AgentUsage {
+  used: number;
+  limit: number;
+  resetAt: string;
+  taskSpend: number;
 }
 
 const api: SundayAPI = {
@@ -72,6 +131,30 @@ const api: SundayAPI = {
   },
   git: {
     branch: (dirPath) => ipcRenderer.invoke('sunday:git:branch', dirPath),
+  },
+  pty: {
+    spawn: (id, cwd, cols, rows) => ipcRenderer.invoke('sunday:pty:spawn', id, cwd, cols, rows),
+    write: (id, data) => ipcRenderer.invoke('sunday:pty:write', id, data),
+    resize: (id, cols, rows) => ipcRenderer.invoke('sunday:pty:resize', id, cols, rows),
+    kill: (id) => ipcRenderer.invoke('sunday:pty:kill', id),
+    onData: (cb) => {
+      const listener = (_e: unknown, info: { id: string; data: string }): void => cb(info);
+      ipcRenderer.on('sunday:pty-data', listener);
+      return () => ipcRenderer.removeListener('sunday:pty-data', listener);
+    },
+    onExit: (cb) => {
+      const listener = (_e: unknown, info: { id: string; exitCode: number }): void => cb(info);
+      ipcRenderer.on('sunday:pty-exit', listener);
+      return () => ipcRenderer.removeListener('sunday:pty-exit', listener);
+    },
+  },
+  search: {
+    text: (query, dirPath) => ipcRenderer.invoke('sunday:search:text', query, dirPath),
+  },
+  agent: {
+    send: (req) => ipcRenderer.invoke('sunday:agent:send', req),
+    estimate: (message) => ipcRenderer.invoke('sunday:agent:estimate', message),
+    usage: () => ipcRenderer.invoke('sunday:agent:usage'),
   },
 };
 

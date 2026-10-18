@@ -1,0 +1,237 @@
+/* Sunday bottom panel (terminal) — 100% Sunday's own design. Sunday tokens only. */
+
+.sunday-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--sunday-bg-deep);
+  border-top: 1px solid var(--sunday-border);
+  font-family: var(--sunday-font);
+  color: var(--sunday-fg);
+}
+
+.sunday-panel-closed { display: none; }
+
+/* ---------------- header ---------------- */
+
+.sunday-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  flex: 0 0 auto;
+  background: var(--sunday-rail);
+  border-bottom: 1px solid var(--sunday-border);
+}
+
+.sunday-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--sunday-fg-dim);
+}
+
+.sunday-panel-hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--sunday-fg-faint);
+  font-size: 11px;
+}
+
+.sunday-panel-hint kbd {
+  font-family: var(--sunday-mono);
+  font-size: 10.5px;
+  background: var(--sunday-hover);
+  border: 1px solid var(--sunday-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--sunday-fg-dim);
+}
+
+.sunday-panel-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+/* ---------------- tab strip ---------------- */
+
+.sunday-panel-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 8px 0;
+  background: var(--sunday-rail);
+  border-bottom: 1px solid var(--sunday-border);
+  overflow-x: auto;
+  flex: 0 0 auto;
+}
+
+.sunday-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  background: var(--sunday-tab-inactive);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--sunday-fg-dim);
+  font-size: 12px;
+  font-family: var(--sunday-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sunday-panel-tab:hover { color: var(--sunday-fg); }
+
+.sunday-panel-tab.active {
+  background: var(--sunday-tab-active);
+  color: var(--sunday-fg);
+  border-color: var(--sunday-border);
+  box-shadow: inset 0 2px 0 var(--sunday-accent);
+}
+
+.sunday-panel-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.sunday-panel-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--sunday-fg-faint);
+  cursor: pointer;
+}
+
+.sunday-panel-tab-close:hover {
+  background: var(--sunday-active);
+  color: var(--sunday-fg);
+}
+
+.sunday-panel-newtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--sunday-fg-dim);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.sunday-panel-newtab:hover {
+  background: var(--sunday-hover);
+  color: var(--sunday-accent);
+}
+
+/* ---------------- body / terminals ---------------- */
+
+.sunday-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.sunday-panel-term {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sunday-panel-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--sunday-fg-faint);
+}
+
+.sunday-panel-empty p { margin: 0; font-size: 12.5px; }
+
+.sunday-term {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.sunday-term-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 8px;
+}
+
+/* keep xterm's own focus ring out; the active tab strip already signals focus */
+.sunday-term-host .xterm:focus { outline: none; }
+
+.sunday-term-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(20, 16, 11, 0.85);
+  z-index: 5;
+}
+
+.sunday-term-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+
+.sunday-term-status {
+  font-size: 12.5px;
+  color: var(--sunday-fg-dim);
+}
+
+.sunday-term-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sunday-fg);
+}
+
+.sunday-term-detail {
+  font-size: 11.5px;
+  color: var(--sunday-fg-dim);
+  font-family: var(--sunday-mono);
+  max-width: 440px;
+  word-break: break-word;
+}
+
+.sunday-term-spin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--sunday-border-strong);
+  border-top-color: var(--sunday-accent);
+  animation: sunday-term-spin 0.8s linear infinite;
+}
+
+@keyframes sunday-term-spin {
+  to { transform: rotate(360deg); }
+}

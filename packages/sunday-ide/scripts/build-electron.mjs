@@ -16,7 +16,7 @@ await build({
   format: 'cjs',
   target: 'node18',
   outfile: path.join(root, 'dist-electron', 'main.cjs'),
-  external: ['electron'],
+  external: ['electron', '@lydell/node-pty', '@lydell/node-pty-*'],
   logLevel: 'info',
 });
 

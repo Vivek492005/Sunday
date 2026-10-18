@@ -1,0 +1,101 @@
+/* Sunday command palette — Sunday design tokens only. No VS Code classes. */
+
+.sunday-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 9, 5, 0.6);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 14vh;
+}
+
+.sunday-palette {
+  width: 580px;
+  max-width: calc(100vw - 64px);
+  background: #262016;
+  border: 1px solid var(--sunday-border-strong);
+  border-radius: var(--sunday-radius);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  font-family: var(--sunday-font);
+}
+
+.sunday-palette-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--sunday-border);
+  color: var(--sunday-fg);
+  font-size: 14px;
+  padding: 14px 16px;
+  outline: none;
+  font-family: var(--sunday-font);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sunday-palette-input::placeholder {
+  color: var(--sunday-fg-faint);
+}
+
+.sunday-palette-input:focus {
+  border-bottom-color: var(--sunday-accent);
+}
+
+.sunday-palette-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.sunday-palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--sunday-fg);
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--sunday-font);
+}
+
+.sunday-palette-item:hover {
+  background: var(--sunday-hover);
+}
+
+.sunday-palette-item.active {
+  background: var(--sunday-active);
+}
+
+.sunday-palette-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sunday-palette-hl {
+  color: var(--sunday-accent);
+  font-weight: 700;
+}
+
+.sunday-palette-hint {
+  color: var(--sunday-fg-faint);
+  font-size: 11px;
+  font-family: var(--sunday-mono);
+  flex: 0 0 auto;
+}
+
+.sunday-palette-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--sunday-fg-faint);
+  font-size: 12.5px;
+}

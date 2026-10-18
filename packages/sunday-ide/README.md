@@ -54,8 +54,15 @@ SUNDAY_SMOKE=1 xvfb-run -a ./node_modules/.bin/electron --no-sandbox .
 
 Set `SUNDAY_SMOKE_SHOT=/path/shot.png` to also capture a screenshot.
 
-## Roadmap (out of MVP scope)
+## Roadmap
 
-Terminal (xterm + node-pty), Search (ripgrep via IPC), Source Control (git UI),
-Agent panel (ext-agent integration), Command palette, Settings UI, packaging
-(electron-builder installers).
+**Wave 2 — done:** Sunday Agent panel (chat, 4 modes, model picker, F1
+estimate chip, burn meter, budget-pause UI, markdown, session persistence;
+main-process agent calls are stubs until Wave 3), Terminal (xterm.js + real
+PTY via `@lydell/node-pty`, multi-tab bottom panel, `Ctrl+\``), Search
+(ripgrep via IPC, `rg` with pure-Node fallback), Command palette
+(`Ctrl+Shift+P`, fuzzy filter, command registry).
+
+**Still ahead:** Source Control UI, Extensions (Open VSX), Settings UI,
+**Wave 3** (real ext-agent/gateway wiring replacing the agent stubs),
+packaging (electron-builder installers).

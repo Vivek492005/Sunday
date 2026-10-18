@@ -33,14 +33,16 @@ function createWindow(): void {
   });
 
   if (isDev) {
-    void loadDevWithRetry(mainWindow, 60);
+    const win = mainWindow;
+    if (win) void loadDevWithRetry(win, 60);
   } else {
     void mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-    if (process.env.SUNDAY_SMOKE === '1') void runSmokeCheck(mainWindow);
+    const win = mainWindow;
+    win?.show();
+    if (process.env.SUNDAY_SMOKE === '1' && win) void runSmokeCheck(win);
   });
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -193,6 +195,257 @@ ipcMain.handle('sunday:git:branch', async (_e, dirPath: string): Promise<string 
     );
   });
 });
+
+// ---------------------------------------------------------------- pty IPC
+
+import type { IPty } from '@lydell/node-pty';
+
+interface PtyEntry {
+  proc: IPty;
+}
+
+const ptySessions = new Map<string, PtyEntry>();
+
+function defaultShell(): string {
+  if (process.platform === 'win32') return process.env.COMSPEC ?? 'cmd.exe';
+  return process.env.SHELL ?? '/bin/bash';
+}
+
+ipcMain.handle(
+  'sunday:pty:spawn',
+  async (_e, id: string, cwd: string, cols: number, rows: number): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (ptySessions.has(id)) {
+        try { ptySessions.get(id)?.proc.kill(); } catch { /* already dead */ }
+        ptySessions.delete(id);
+      }
+      // Lazy require so a missing native module never breaks startup.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pty = require('@lydell/node-pty') as typeof import('@lydell/node-pty');
+      const shell = defaultShell();
+      // Fall back to the user's home dir when no folder is open.
+      let spawnCwd = cwd;
+      if (!spawnCwd) {
+        try {
+          spawnCwd = (await import('node:os')).homedir();
+        } catch {
+          spawnCwd = process.cwd();
+        }
+      }
+      const proc: IPty = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols: Math.max(20, cols || 80),
+        rows: Math.max(10, rows || 24),
+        cwd: spawnCwd,
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>,
+      });
+      ptySessions.set(id, { proc });
+      proc.onData((data: string) => {
+        mainWindow?.webContents.send('sunday:pty-data', { id, data });
+      });
+      proc.onExit(({ exitCode }: { exitCode: number }) => {
+        ptySessions.delete(id);
+        mainWindow?.webContents.send('sunday:pty-exit', { id, exitCode });
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  },
+);
+
+ipcMain.handle('sunday:pty:write', async (_e, id: string, data: string) => {
+  ptySessions.get(id)?.proc.write(data);
+});
+
+ipcMain.handle('sunday:pty:resize', async (_e, id: string, cols: number, rows: number) => {
+  try {
+    ptySessions.get(id)?.proc.resize(Math.max(20, cols), Math.max(10, rows));
+  } catch {
+    // resize on a dead pty — ignore
+  }
+});
+
+ipcMain.handle('sunday:pty:kill', async (_e, id: string) => {
+  try {
+    ptySessions.get(id)?.proc.kill();
+  } catch {
+    // already dead
+  }
+  ptySessions.delete(id);
+});
+
+// ---------------------------------------------------------------- search IPC
+
+export interface SearchResult {
+  path: string;
+  line: number;
+  column: number;
+  text: string;
+}
+
+const SEARCH_MAX_RESULTS = 200;
+
+function nodeSearchFallback(query: string, dirPath: string): Promise<SearchResult[]> {
+  // Pure-Node recursive search used when ripgrep is unavailable.
+  // Skips binary files, node_modules, .git, and dist folders.
+  return (async () => {
+    const results: SearchResult[] = [];
+    const skip = new Set(['node_modules', '.git', 'dist', 'dist-electron', '.hg', '__pycache__']);
+    const q = query.toLowerCase();
+    async function walk(dir: string): Promise<void> {
+      if (results.length >= SEARCH_MAX_RESULTS) return;
+      let names: string[];
+      try {
+        names = await fs.readdir(dir);
+      } catch {
+        return;
+      }
+      for (const name of names) {
+        if (results.length >= SEARCH_MAX_RESULTS) return;
+        if (skip.has(name)) continue;
+        const full = path.join(dir, name);
+        let st;
+        try {
+          st = await fs.stat(full);
+        } catch {
+          continue;
+        }
+        if (st.isDirectory()) {
+          await walk(full);
+        } else if (st.isFile() && st.size < 1024 * 1024) {
+          let buf;
+          try {
+            buf = await fs.readFile(full);
+          } catch {
+            continue;
+          }
+          if (buf.subarray(0, 8192).includes(0)) continue; // binary
+          const text = buf.toString('utf-8');
+          const lines = text.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            const idx = lines[i].toLowerCase().indexOf(q);
+            if (idx >= 0) {
+              results.push({ path: full, line: i + 1, column: idx + 1, text: lines[i].trim().slice(0, 200) });
+              if (results.length >= SEARCH_MAX_RESULTS) return;
+            }
+          }
+        }
+      }
+    }
+    await walk(dirPath);
+    return results;
+  })();
+}
+
+ipcMain.handle(
+  'sunday:search:text',
+  async (_e, query: string, dirPath: string): Promise<SearchResult[]> => {
+    const q = (query ?? '').trim();
+    if (!q || !dirPath) return [];
+    // Prefer ripgrep when available — fast and respects .gitignore.
+    return new Promise((resolve) => {
+      execFile(
+        'rg',
+        [
+          '--json', '--no-heading', '--column', '--max-count', '20',
+          '-g', '!node_modules', '-g', '!.git', '-g', '!dist', '-g', '!dist-electron',
+          q, dirPath,
+        ],
+        { timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        (err, stdout) => {
+          if (!err) {
+            try {
+              const results: SearchResult[] = [];
+              for (const line of stdout.split('\n')) {
+                if (!line.trim()) continue;
+                const obj = JSON.parse(line) as {
+                  type: string;
+                  data?: { path?: { text?: string }; line_number?: number; submatches?: { start: number; match: { text: string } }[]; lines?: { text?: string } };
+                };
+                if (obj.type === 'match' && obj.data?.path?.text && results.length < SEARCH_MAX_RESULTS) {
+                  const sm = obj.data.submatches?.[0];
+                  results.push({
+                    path: obj.data.path.text,
+                    line: obj.data.line_number ?? 1,
+                    column: (sm?.start ?? 0) + 1,
+                    text: (obj.data.lines?.text ?? '').trim().slice(0, 200),
+                  });
+                }
+              }
+              resolve(results);
+              return;
+            } catch {
+              // fall through to Node fallback
+            }
+          }
+          // rg missing or failed — pure-Node fallback
+          void nodeSearchFallback(q, dirPath).then(resolve);
+        },
+      );
+    });
+  },
+);
+
+// ---------------------------------------------------------------- agent IPC (STUB)
+//
+// TODO(Wave 3): wire these to the real Sunday agent loop in
+// `packages/ext-agent` (gateway chat, F1 estimator, usage ledger, budgets).
+// The renderer + preload contracts are final; only this main-process
+// implementation needs swapping. Mock responses below keep the Agent panel
+// fully demoable until then.
+
+const AGENT_MODELS = ['auto', 'llama-3.3-70b', 'qwen-2.5-coder-32b', 'llama-3.1-8b'];
+
+const MOCK_REPLIES: Record<string, string> = {
+  auto: `Here's what I'd do — this is a **mock reply** from the Sunday IDE agent stub.
+
+\`\`\`ts
+// Wave 3 will connect this panel to the real ext-agent loop.
+export async function chat(message: string) {
+  return gateway.chat({ message, mode: 'auto' });
+}
+\`\`\`
+
+Ask me to **explain code**, **write a function**, or **debug an error** — the real agent lands in Wave 3.`,
+  architect: `## Plan (mock)\n\n1. **Survey** the codebase structure first\n2. **Design** the module boundaries\n3. **Propose** 2–3 approaches with trade-offs\n\n> Wave 3 connects this to the real Architect mode.`,
+  implementer: `On it — here's a starter implementation (mock):\n\n\`\`\`python\ndef sunday_hello(name: str) -> str:\n    return f"Hello, {name} — from Sunday IDE!"\n\`\`\`\n\nWave 3 wires this to the real Implementer mode with file edits.`,
+  reviewer: `## Review (mock)\n\n- ✅ Clear naming\n- ⚠️ Missing error handling on the happy path\n- 💡 Consider extracting the retry logic\n\nWave 3 connects this to the real Reviewer mode.`,
+};
+
+ipcMain.handle('sunday:agent:estimate', async (_e, message: string) => {
+  // Mirrors packages/ext-agent F1 estimator heuristic (client-side copy for the stub).
+  const text = message ?? '';
+  let point = 4 + Math.floor(text.length / 400) * 1.5;
+  const codeBlocks = Math.floor((text.match(/```/g) ?? []).length / 2);
+  point += codeBlocks * 3;
+  if (/\b(test|run|build|fix|debug|execute)\b/i.test(text)) point += 3;
+  if (/\b(refactor|migrate|implement|rewrite|scaffold|feature)\b/i.test(text)) point += 4.5;
+  point = Math.max(2, Math.round(point));
+  return {
+    min: Math.max(2, Math.round(point * 0.6)),
+    max: Math.round(point * 1.6),
+    confidence: text.length > 200 ? 'medium' : 'low',
+    rationale: 'stub heuristic — real F1 estimator lands with ext-agent wiring',
+  };
+});
+
+ipcMain.handle('sunday:agent:usage', async () => {
+  // Stub usage — real ledger comes with ext-agent wiring (Wave 3).
+  return { used: 37, limit: 200, resetAt: '00:00 UTC', taskSpend: 4 };
+});
+
+ipcMain.handle(
+  'sunday:agent:send',
+  async (_e, req: { message: string; mode: string; model: string; history: { role: string; content: string }[] }) => {
+    const mode = (req.mode ?? 'auto') as keyof typeof MOCK_REPLIES;
+    const model = AGENT_MODELS.includes(req.model) ? req.model : 'auto';
+    // Simulate latency so the UI streaming/loading states are exercised.
+    await new Promise((r) => setTimeout(r, 900));
+    const content = `${MOCK_REPLIES[mode] ?? MOCK_REPLIES.auto}\n\n_Mode: ${mode} · Model: ${model}_`;
+    return { content, budgetPaused: false, requestsUsed: 3 };
+  },
+);
 
 // ---------------------------------------------------------------- smoke test
 
