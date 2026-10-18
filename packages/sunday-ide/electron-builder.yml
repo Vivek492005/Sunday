@@ -1,0 +1,37 @@
+# Sunday IDE — Windows packaging (electron-builder)
+# Builds Sunday-Setup.exe (NSIS installer) with 100% custom Sunday UI.
+# Zero VS Code workbench — this is Sunday's own shell.
+
+appId: com.sunday.ide
+productName: Sunday
+copyright: Copyright © Sunday
+
+directories:
+  output: dist-installer
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+  - "!**/*.map"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: Sunday-Setup.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sunday
+  artifactName: Sunday-Setup.${ext}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+
+portable:
+  artifactName: Sunday-Portable.${ext}

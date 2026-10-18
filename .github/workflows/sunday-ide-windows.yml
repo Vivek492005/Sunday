@@ -1,0 +1,56 @@
+# Sunday IDE — Windows build (custom shell, NOT the VS Code fork)
+# Builds packages/sunday-ide via electron-builder on windows-latest,
+# runs the full test suite, smoke-tests the packaged app, uploads Sunday-Setup.exe
+
+name: sunday-ide-windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "sunday-ide-v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: packages/sunday-ide
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build renderer + electron
+        run: pnpm build
+
+      - name: Package Windows installer
+        run: pnpm exec electron-builder --win --config electron-builder.yml
+
+      - name: Smoke test packaged app
+        run: |
+          $exe = Get-ChildItem dist-installer/Sunday-Setup.exe | Select-Object -First 1
+          if (-not $exe) { throw "Sunday-Setup.exe not found" }
+          Write-Host "Built: $($exe.FullName) ($([math]::Round($exe.Length/1MB,1)) MB)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sunday-ide-windows
+          path: packages/sunday-ide/dist-installer/Sunday-Setup.exe
