@@ -14,7 +14,7 @@
     "@sunday/tools": "workspace:*",
     "shell-quote": "1.12.0",
     "sunday-agent": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
