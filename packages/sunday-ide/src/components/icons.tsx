@@ -78,6 +78,14 @@ export const DebugIcon = (p: IconProps) => (
   </svg>
 );
 
+export const OpsShieldIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3l7.5 3v5.5c0 4.5-3.2 7.8-7.5 9.5-4.3-1.7-7.5-5-7.5-9.5V6z" />
+    <path d="M12 8v4.5M12 15.5v.5" />
+    <circle cx="12" cy="10.2" r="0.7" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const GearIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="3.2" />

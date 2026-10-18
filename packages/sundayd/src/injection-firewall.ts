@@ -243,6 +243,21 @@ export function detectInjection(content: string): InjectionMarker[] {
   return hits;
 }
 
+/** F10: stable rule metadata for the Sunday IDE security panel (real data). */
+export interface InjectionRuleInfo {
+  rule: string;
+  detail: string;
+  severity: 'block' | 'ask';
+}
+
+export function listInjectionRules(): InjectionRuleInfo[] {
+  return INJECTION_RULES.map((r) => ({
+    rule: r.rule,
+    detail: r.detail,
+    severity: r.severity,
+  }));
+}
+
 /* ---------------------------------------------------------------- decision */
 
 export type FirewallDecision = 'allow' | 'ask' | 'block';

@@ -333,142 +333,14 @@ export async function hybridSearchOut(
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Daemon JSON-RPC client (F6 sessions + real agent chat)
-// ---------------------------------------------------------------------------
-
-interface PendingRpc {
-  resolve: (v: unknown) => void;
-  reject: (e: Error) => void;
-}
-
-let daemonProc: ChildProcess | null = null;
-let daemonReady: Promise<void> | null = null;
-let rpcId = 1;
-const pending = new Map<number | string, PendingRpc>();
-let rpcBuffer = '';
-
-function daemonBin(): string {
-  // packages/sunday-ide/electron -> packages/sundayd/dist/cli.js
-  return path.resolve(__dirname, '..', '..', 'sundayd', 'dist', 'cli.js');
-}
-
-function onDaemonData(chunk: Buffer): void {
-  rpcBuffer += chunk.toString('utf8');
-  let nl: number;
-  while ((nl = rpcBuffer.indexOf('\n')) >= 0) {
-    const line = rpcBuffer.slice(0, nl).trim();
-    rpcBuffer = rpcBuffer.slice(nl + 1);
-    if (!line) continue;
-    try {
-      const msg = parseMessage(line) as unknown as {
-        kind: string;
-        id?: number | string;
-        result?: unknown;
-        error?: { message?: string };
-        method?: string;
-        params?: unknown;
-      };
-      if (msg.kind === 'response' && msg.id !== undefined) {
-        const p = pending.get(msg.id);
-        if (p) {
-          pending.delete(msg.id);
-          if (msg.error) p.reject(new Error(msg.error.message ?? 'daemon RPC error'));
-          else p.resolve(msg.result);
-        }
-      } else if (msg.kind === 'notification') {
-        dispatchDaemonNotification(msg.method ?? '', msg.params);
-      }
-    } catch {
-      // Non-JSONRPC line (daemon logs go to stderr; ignore stdout noise)
-    }
-  }
-}
-
-type ChatEventHandler = (event: { type: string; [k: string]: unknown }) => void;
-const chatEventHandlers = new Set<ChatEventHandler>();
-
-function dispatchDaemonNotification(method: string, params: unknown): void {
-  if (method === 'chat/event') {
-    const p = params as { event?: { type: string; [k: string]: unknown } };
-    const ev = p.event;
-    if (ev) for (const h of chatEventHandlers) h(ev);
-  }
-}
-
-function ensureDaemon(): Promise<void> {
-  if (daemonReady) return daemonReady;
-  daemonReady = new Promise<void>((resolve, reject) => {
-    const bin = daemonBin();
-    if (!fs.existsSync(bin)) {
-      reject(new Error(`sundayd not built at ${bin} — run pnpm --filter @sunday/sundayd build`));
-      return;
-    }
-    const proc = spawn(process.execPath, [bin], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
-    });
-    daemonProc = proc;
-    proc.stdout.on('data', onDaemonData);
-    proc.stderr.on('data', () => {
-      // Daemon logs go to stderr; ignore in normal operation
-    });
-    proc.on('error', (e) => {
-      daemonProc = null;
-      daemonReady = null;
-      reject(e);
-    });
-    proc.on('exit', () => {
-      daemonProc = null;
-      daemonReady = null;
-      for (const [, p] of pending) p.reject(new Error('daemon exited'));
-      pending.clear();
-    });
-    // Handshake: sunday/ping proves the daemon is up and speaking JSON-RPC.
-    const timeout = setTimeout(() => reject(new Error('daemon ping timeout')), 15000);
-    daemonRpc('sunday/ping', {})
-      .then(() => {
-        clearTimeout(timeout);
-        resolve();
-      })
-      .catch((e) => {
-        clearTimeout(timeout);
-        reject(e);
-      });
-  });
-  return daemonReady;
-}
-
-function daemonRpc(method: string, params: unknown, timeoutMs = 60000): Promise<unknown> {
-  return ensureDaemon().then(
-    () =>
-      new Promise<unknown>((resolve, reject) => {
-        if (!daemonProc?.stdin) {
-          reject(new Error('daemon not running'));
-          return;
-        }
-        const id = rpcId++;
-        pending.set(id, { resolve, reject });
-        const timer = setTimeout(() => {
-          pending.delete(id);
-          reject(new Error(`daemon RPC timeout: ${method}`));
-        }, timeoutMs);
-        const origResolve = resolve;
-        const origReject = reject;
-        pending.set(id, {
-          resolve: (v) => {
-            clearTimeout(timer);
-            origResolve(v);
-          },
-          reject: (e) => {
-            clearTimeout(timer);
-            origReject(e);
-          },
-        });
-        daemonProc.stdin.write(JSON.stringify(createRequest(id, method, params)) + '\n');
-      }),
-  );
-}
+// Daemon JSON-RPC client lives in ./daemonClient.ts (extracted so opsBackend.ts
+// can use the daemon RPC without pulling this file's heavy import graph).
+import {
+  daemonRpc,
+  addChatEventHandler,
+  removeChatEventHandler,
+  type ChatEventHandler,
+} from './daemonClient.js';
 
 /** F6: rewind a daemon session to a log entry. Real RPC. */
 export async function sessionRewind(sessionId: string, entryId: string): Promise<unknown> {
@@ -545,7 +417,7 @@ export async function realAgentSend(req: {
   const content = await new Promise<string>((resolve, reject) => {
     let text = '';
     const timeout = setTimeout(() => {
-      chatEventHandlers.delete(handler);
+      removeChatEventHandler(handler);
       reject(new Error('turn timed out after 5 minutes'));
     }, 300000);
     const handler: ChatEventHandler = (ev) => {
@@ -553,15 +425,15 @@ export async function realAgentSend(req: {
       if (ev.type === 'text-delta' && typeof ev.delta === 'string') text += ev.delta;
       else if (ev.type === 'turn-end') {
         clearTimeout(timeout);
-        chatEventHandlers.delete(handler);
+        removeChatEventHandler(handler);
         resolve(text);
       } else if (ev.type === 'turn-error') {
         clearTimeout(timeout);
-        chatEventHandlers.delete(handler);
+        removeChatEventHandler(handler);
         reject(new Error(typeof ev.error === 'string' ? ev.error : 'turn-error'));
       }
     };
-    chatEventHandlers.add(handler);
+    addChatEventHandler(handler);
   });
 
   // F4: track the turn in the context meter (real accounting)

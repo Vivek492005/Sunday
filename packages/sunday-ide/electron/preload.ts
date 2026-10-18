@@ -148,6 +148,21 @@ export interface SundayAPI {
     locked(key: string, workspaceDir?: string): Promise<boolean>;
     audit(limit?: number): Promise<OrgAuditEvent[]>;
   };
+  ops: {
+    routingPolicies(): Promise<RoutePolicyOut[]>;
+    routingRecent(): Promise<RoutingRecentOut>;
+    sessions(): Promise<SessionSummary[]>;
+    sessionLog(sessionId: string): Promise<SessionLogEntryOut[]>;
+    policyInfo(): Promise<PolicyInfoOut>;
+    hooksConsent(): Promise<HookConsentOut[]>;
+    securityStatus(): Promise<SecurityStatusOut>;
+    browserOpen(url: string): Promise<BrowserOpenOut>;
+    browserScreenshot(): Promise<string>;
+    browserVisualDiff(beforePng: string, afterPng: string, threshold?: number): Promise<VisualDiffOut>;
+    browserA11yScan(): Promise<A11yScanOut>;
+    browserViewportMatrix(url: string): Promise<ViewportShot[]>;
+    scoreboard(): Promise<ScoreboardOut>;
+  };
 }
 
 export interface SearchResult {
@@ -351,6 +366,132 @@ export interface OrgAuditEvent {
   summary: string;
 }
 
+/** UI WAVE: Sunday Ops view shapes — mirror electron/opsBackend.ts. */
+export interface RoutePolicyOut {
+  taskClass: string;
+  primary: string;
+  fallbacks: string[];
+  downgrade: string;
+}
+
+export interface RoutingLogEntryOut {
+  seq: number;
+  ts: string;
+  kind: string;
+  taskClass: string;
+  requestedModel: string;
+  primary?: string;
+  chosen?: string;
+  providerId?: string;
+  ok?: boolean;
+  reason?: string;
+  error?: string;
+  latencyMs?: number;
+}
+
+export interface RoutingRecentOut {
+  available: boolean;
+  entries: RoutingLogEntryOut[];
+  note: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  title?: string;
+  cwd?: string;
+  model?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface SessionLogEntryOut {
+  seq: number;
+  id: string;
+  ts: string;
+  type: string;
+  summary: string;
+}
+
+export interface PolicyInfoOut {
+  tiers: string[];
+  profiles: string[];
+  matrix: Record<string, Record<string, string>>;
+  currentProfile: string;
+  profileSource: string;
+}
+
+export interface HookConsentOut {
+  hash: string;
+  workspaceRoot: string;
+  consentedAt: string;
+}
+
+export interface InjectionRuleInfoOut {
+  rule: string;
+  detail: string;
+  severity: 'block' | 'ask';
+}
+
+export interface SecurityStatusOut {
+  firewallRules: InjectionRuleInfoOut[];
+  sinkTiers: { sink: string; tier: string }[];
+  secretScan: { available: boolean; note: string };
+  mcpPins: { available: boolean; note: string };
+}
+
+export interface BrowserOpenOut {
+  ok: boolean;
+  needsApproval?: boolean;
+  origin?: string;
+}
+
+export interface VisualDiffOut {
+  diffPixels: number;
+  totalPixels: number;
+  diffRatio: number;
+  diffPath?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface A11yViolationOut {
+  id: string;
+  impact: string | null;
+  description: string;
+  nodes: number;
+}
+
+export interface A11yScanOut {
+  url?: string;
+  violations: A11yViolationOut[];
+  passes: number;
+}
+
+export interface ViewportShot {
+  name: string;
+  width: number;
+  height: number;
+  path?: string;
+  png?: string;
+}
+
+export interface ScoreboardRow {
+  model: string;
+  runs: number;
+  passRate: string;
+  toolReliability: string;
+  medianTime: string;
+  costPerSuccess: string;
+  loopTriggerRate: string;
+}
+
+export interface ScoreboardOut {
+  found: boolean;
+  generatedAt?: string;
+  rows: ScoreboardRow[];
+  note: string;
+}
+
 const api: SundayAPI = {
   window: {
     minimize: () => ipcRenderer.invoke('sunday:window:minimize'),
@@ -482,6 +623,22 @@ const api: SundayAPI = {
     load: (workspaceDir?: string) => ipcRenderer.invoke('sunday:org:load', workspaceDir),
     locked: (key: string, workspaceDir?: string) => ipcRenderer.invoke('sunday:org:locked', key, workspaceDir),
     audit: (limit?: number) => ipcRenderer.invoke('sunday:org:audit', limit),
+  },
+  ops: {
+    routingPolicies: () => ipcRenderer.invoke('sunday:routing:policies'),
+    routingRecent: () => ipcRenderer.invoke('sunday:routing:recent'),
+    sessions: () => ipcRenderer.invoke('sunday:session:list'),
+    sessionLog: (sessionId: string) => ipcRenderer.invoke('sunday:session:log', sessionId),
+    policyInfo: () => ipcRenderer.invoke('sunday:policy:info'),
+    hooksConsent: () => ipcRenderer.invoke('sunday:hooks:consent'),
+    securityStatus: () => ipcRenderer.invoke('sunday:security:status'),
+    browserOpen: (url: string) => ipcRenderer.invoke('sunday:browser:open', url),
+    browserScreenshot: () => ipcRenderer.invoke('sunday:browser:screenshot'),
+    browserVisualDiff: (beforePng: string, afterPng: string, threshold?: number) =>
+      ipcRenderer.invoke('sunday:browser:visual-diff', beforePng, afterPng, threshold),
+    browserA11yScan: () => ipcRenderer.invoke('sunday:browser:a11y-scan'),
+    browserViewportMatrix: (url: string) => ipcRenderer.invoke('sunday:browser:viewport-matrix', url),
+    scoreboard: () => ipcRenderer.invoke('sunday:eval:scoreboard'),
   },
 };
 

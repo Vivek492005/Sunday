@@ -11,6 +11,7 @@ import {
   AgentSunIcon,
   PuzzleIcon,
   DebugIcon,
+  OpsShieldIcon,
   GearIcon,
 } from './icons';
 
@@ -21,6 +22,7 @@ const RAIL_ITEMS: { id: RailView; label: string; icon: (p: { size?: number }) =>
   { id: 'agent', label: 'Sunday Agent', icon: AgentSunIcon, live: true },
   { id: 'extensions', label: 'Extensions', icon: PuzzleIcon, live: true },
   { id: 'debug', label: 'Run & Debug', icon: DebugIcon, live: true },
+  { id: 'ops', label: 'Sunday Ops', icon: OpsShieldIcon, live: true },
 ];
 
 export function ActivityBar() {

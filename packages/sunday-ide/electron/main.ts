@@ -587,6 +587,64 @@ ipcMain.handle('sunday:org:audit', async (_e, limit?: number) =>
   getOrgAuditEvents(typeof limit === 'number' ? limit : 20),
 );
 
+// ---------------------------------------------------------------- OPS IPC
+//
+// UI WAVE: the "Sunday Ops" view — one visible panel per F that had a
+// working backend but no IDE UI. Implemented in ./opsBackend.ts. NO STUBS.
+
+import {
+  getRoutePolicies,
+  getRoutingRecent,
+  listSessions,
+  sessionLogEntries,
+  getPolicyInfo,
+  getHooksConsent,
+  getSecurityStatus,
+  browserVisualDiff,
+  browserScreenshot,
+  browserOpen,
+  browserA11yScan,
+  browserViewportMatrix,
+  getScoreboard,
+} from './opsBackend.js';
+
+// F3: real route policy table.
+ipcMain.handle('sunday:routing:policies', async () => getRoutePolicies());
+
+// F3: recent routing decisions (honest "unavailable" when the daemon lacks the RPC).
+ipcMain.handle('sunday:routing:recent', async () => getRoutingRecent());
+
+// F6: real daemon session list + event log.
+ipcMain.handle('sunday:session:list', async () => listSessions());
+ipcMain.handle('sunday:session:log', async (_e, sessionId: string) =>
+  sessionLogEntries(sessionId),
+);
+
+// F7: real tier table + profile matrix + current profile.
+ipcMain.handle('sunday:policy:info', async () => getPolicyInfo());
+
+// F8: real hash-pinned hook consents.
+ipcMain.handle('sunday:hooks:consent', async () => getHooksConsent());
+
+// F10: real firewall config.
+ipcMain.handle('sunday:security:status', async () => getSecurityStatus());
+
+// F11: real browser-verified UI loop.
+ipcMain.handle('sunday:browser:open', async (_e, url: string) => browserOpen(url));
+ipcMain.handle('sunday:browser:screenshot', async () => browserScreenshot());
+ipcMain.handle(
+  'sunday:browser:visual-diff',
+  async (_e, beforePng: string, afterPng: string, threshold?: number) =>
+    browserVisualDiff(beforePng, afterPng, threshold),
+);
+ipcMain.handle('sunday:browser:a11y-scan', async () => browserA11yScan());
+ipcMain.handle('sunday:browser:viewport-matrix', async (_e, url: string) =>
+  browserViewportMatrix(url),
+);
+
+// F12: real eval scoreboard (parsed docs/SCOREBOARD.md).
+ipcMain.handle('sunday:eval:scoreboard', async () => getScoreboard());
+
 // ---------------------------------------------------------------- settings IPC
 //
 // Persisted at ~/.sunday-ide/settings.json. Wave 3: Editor, Terminal,

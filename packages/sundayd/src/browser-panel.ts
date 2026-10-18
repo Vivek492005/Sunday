@@ -216,6 +216,65 @@ export function registerBrowserPanelMethods(daemon: BrowserPanelDaemon, manager:
         throw toRpcError(e);
       }
     },
+
+    // ------------------------------------------------- F11: browser-verified
+    // UI loop. The Sunday IDE "Ops" view drives these directly so every F11
+    // check is one click away; the agent tools (browser_visual_diff etc.)
+    // call the same browserd RPCs. Same origin-approval policy as the panel
+    // open: browserd enforces it, these handlers only proxy.
+
+    'browser/panel/visual-diff': async (params) => {
+      try {
+        const p = parseParams('browser/panel/visual-diff', params) as {
+          beforePng?: string;
+          afterPng?: string;
+          threshold?: number;
+        };
+        requireEnabled(manager);
+        await manager.ensureReady();
+        if (!p.beforePng || !p.afterPng) {
+          throw new RpcError(ErrorCode.InvalidParams, 'beforePng and afterPng are required');
+        }
+        return await manager.rpc('browser/visual-diff', {
+          beforePng: p.beforePng,
+          afterPng: p.afterPng,
+          ...(typeof p.threshold === 'number' ? { threshold: p.threshold } : {}),
+        });
+      } catch (e) {
+        throw toRpcError(e);
+      }
+    },
+
+    'browser/panel/accessibility-scan': async (params) => {
+      try {
+        parseParams('browser/panel/accessibility-scan', params);
+        requireEnabled(manager);
+        await manager.ensureReady();
+        return await manager.rpc('browser/accessibility-scan', {});
+      } catch (e) {
+        throw toRpcError(e);
+      }
+    },
+
+    'browser/panel/viewport-matrix': async (params) => {
+      try {
+        const p = parseParams('browser/panel/viewport-matrix', params) as {
+          url?: string;
+          viewports?: { name: string; width: number; height: number }[];
+        };
+        requireEnabled(manager);
+        await manager.ensureReady();
+        if (!p.url) {
+          throw new RpcError(ErrorCode.InvalidParams, 'url is required');
+        }
+        return await manager.rpc('browser/viewport-matrix', {
+          url: p.url,
+          ...(Array.isArray(p.viewports) ? { viewports: p.viewports } : {}),
+        });
+      } catch (e) {
+        throw toRpcError(e);
+      }
+    },
   };
 
   for (const [method, handler] of Object.entries(handlers)) {

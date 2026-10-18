@@ -61,4 +61,57 @@ export const BROWSER_PANEL_METHODS = {
     params: z.object({}),
     result: z.object({ ok: z.literal(true) }),
   },
+  // ------------------------------------------------- F11: browser-verified
+  // UI loop (Sunday IDE Ops view). Same browserd RPCs the agent tools call.
+  /** Pixel-compare two screenshots (base64 PNGs). */
+  'browser/panel/visual-diff': {
+    params: z.object({
+      beforePng: z.string().min(1),
+      afterPng: z.string().min(1),
+      threshold: z.number().min(0).max(1).optional(),
+    }),
+    result: z.object({
+      diffPixels: z.number(),
+      totalPixels: z.number(),
+      diffRatio: z.number(),
+      diffPng: z.string().optional(),
+      diffPath: z.string().optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+    }).passthrough(),
+  },
+  /** axe-core accessibility scan of the current page. */
+  'browser/panel/accessibility-scan': {
+    params: z.object({}),
+    result: z.object({
+      violations: z.array(z.object({
+        id: z.string(),
+        impact: z.string().nullable(),
+        description: z.string(),
+        nodes: z.number(),
+      })).optional(),
+      passes: z.number().optional(),
+      url: z.string().optional(),
+    }).passthrough(),
+  },
+  /** Capture a URL across the mobile/tablet/desktop viewport matrix. */
+  'browser/panel/viewport-matrix': {
+    params: z.object({
+      url: z.string().min(1),
+      viewports: z.array(z.object({
+        name: z.string(),
+        width: z.number(),
+        height: z.number(),
+      })).min(1).max(8).optional(),
+    }),
+    result: z.object({
+      shots: z.array(z.object({
+        name: z.string(),
+        width: z.number(),
+        height: z.number(),
+        path: z.string().optional(),
+        png: z.string().optional(),
+      })).optional(),
+    }).passthrough(),
+  },
 } as const;

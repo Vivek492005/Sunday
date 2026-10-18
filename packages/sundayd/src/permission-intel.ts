@@ -143,6 +143,13 @@ export interface PlanHandle {
 
 type TierPolicy = Record<RiskTier, IntelDecision>;
 
+/** F7: profile → tier → decision matrix for the Sunday IDE policy panel. */
+export type ProfileTierMatrix = Record<PolicyProfile, TierPolicy>;
+
+export function getProfileDefaults(): ProfileTierMatrix {
+  return PROFILE_DEFAULTS;
+}
+
 const PROFILE_DEFAULTS: Record<PolicyProfile, TierPolicy> = {
   cautious: {
     'read-only': 'allow',

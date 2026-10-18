@@ -19,6 +19,7 @@ import { Debug } from './components/Sidebar/Debug';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { ImportModal } from './components/Import/ImportModal';
 import { AgentPanel } from './components/Agent/AgentPanel';
+import { OpsView } from './components/Ops/OpsView';
 import { EditorArea } from './components/Editor/EditorArea';
 import { Panel } from './components/Panel/Panel';
 import { CommandPalette } from './components/CommandPalette';
@@ -104,6 +105,51 @@ function Shell() {
       run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'debug' }),
     });
     registerCommand({
+      id: 'sunday.viewOps',
+      title: 'View: Sunday Ops',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsRouting',
+      title: 'Sunday: Open Ops > Routing (F3)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsSessions',
+      title: 'Sunday: Open Ops > Sessions (F6)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsPermissions',
+      title: 'Sunday: Open Ops > Permissions (F7)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsHooks',
+      title: 'Sunday: Open Ops > Hooks (F8)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsEvidence',
+      title: 'Sunday: Open Ops > Evidence (F9)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsSecurity',
+      title: 'Sunday: Open Ops > Security (F10)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsBrowser',
+      title: 'Sunday: Open Ops > Browser (F11)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
+      id: 'sunday.opsScoreboard',
+      title: 'Sunday: Open Ops > Scoreboard (F12)',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }),
+    });
+    registerCommand({
       id: 'sunday.openSettings',
       title: 'Open Settings',
       hint: 'Ctrl+,',
@@ -162,6 +208,7 @@ function Shell() {
           {state.railView === 'agent' && <AgentPanel />}
           {state.railView === 'extensions' && <Extensions />}
           {state.railView === 'debug' && <Debug />}
+          {state.railView === 'ops' && <OpsView />}
         </div>
         <EditorArea />
       </div>
