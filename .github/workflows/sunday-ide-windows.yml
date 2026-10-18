@@ -37,6 +37,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace dependencies
+        # @sunday/* packages ship dist/ as their main/types entry — they must
+        # be built before sunday-ide typechecks against them.
+        working-directory: .
+        run: pnpm --filter "@sunday/*" build
+
       - name: Typecheck
         run: pnpm typecheck
 
