@@ -10,3 +10,4 @@ packages/hosted-gateway/data/
 
 # Copilot extension test simulation cache (test artifacts — never commit)
 vscode/extensions/copilot/test/simulation/cache/
+dist-electron/
