@@ -1,11 +1,10 @@
 /**
  * Typed access to the Sunday agent bridge (`window.sunday.agent`).
  *
- * NOTE: the main-process implementation is currently a STUB with mock
- * responses (see electron/main.ts `sunday:agent:*` handlers).
- * TODO(Wave 3): wire to the real Sunday agent loop in `packages/ext-agent`
- * (gateway chat, F1 estimator, usage ledger, budget enforcement).
- * The contracts below are final — only the main-process side changes.
+ * INTEGRATION WAVE: the main-process side is now REAL — F1 estimator/
+ * ledger/budgets, F2 loop guard, F4 context cockpit, F5 hybrid search,
+ * F6 daemon sessions, F7 policy, F8 hooks, F9 evidence. See
+ * electron/agentBackend.ts. No stubs.
  */
 import type {
   SundayAPI,
@@ -15,6 +14,13 @@ import type {
   AgentReply,
   AgentEstimate,
   AgentUsage,
+  ContextUsage,
+  PinnedFact,
+  CompactionPreview,
+  PolicyEval,
+  HookInfo,
+  EvidenceSummary,
+  LoopGuardStatus,
 } from '../../electron/preload';
 
 declare global {
@@ -82,12 +88,58 @@ export const agentService = {
   send(req: AgentRequest): Promise<AgentReply> {
     return bridge().agent.send(req);
   },
-  estimate(message: string): Promise<AgentEstimate> {
-    return bridge().agent.estimate(message);
+  estimate(message: string, model?: string): Promise<AgentEstimate> {
+    return bridge().agent.estimate(message, model);
   },
   usage(): Promise<AgentUsage> {
     return bridge().agent.usage();
   },
+  budgetContinue(scope: string, n: number): Promise<AgentUsage> {
+    return bridge().agent.budgetContinue(scope, n);
+  },
+  // F2
+  loopGuardStatus(): Promise<LoopGuardStatus> {
+    return bridge().loopguard.status();
+  },
+  // F4
+  contextMeter(): Promise<ContextUsage> {
+    return bridge().context.meter();
+  },
+  pinFact(text: string): Promise<PinnedFact> {
+    return bridge().context.pin(text);
+  },
+  unpinFact(id: string): Promise<boolean> {
+    return bridge().context.unpin(id);
+  },
+  listPins(): Promise<PinnedFact[]> {
+    return bridge().context.pins();
+  },
+  // F7
+  evaluatePolicy(command: string, cwd: string): Promise<PolicyEval> {
+    return bridge().policy.evaluate(command, cwd);
+  },
+  // F8
+  listHooks(workspaceDir?: string): Promise<HookInfo[]> {
+    return bridge().hooks.list(workspaceDir);
+  },
+  // F9
+  evidence(diffText: string, goal: string): Promise<EvidenceSummary> {
+    return bridge().evidence.get(diffText, goal);
+  },
 };
 
-export type { AgentMode, AgentMessage, AgentRequest, AgentReply, AgentEstimate, AgentUsage };
+export type {
+  AgentMode,
+  AgentMessage,
+  AgentRequest,
+  AgentReply,
+  AgentEstimate,
+  AgentUsage,
+  ContextUsage,
+  PinnedFact,
+  CompactionPreview,
+  PolicyEval,
+  HookInfo,
+  EvidenceSummary,
+  LoopGuardStatus,
+};

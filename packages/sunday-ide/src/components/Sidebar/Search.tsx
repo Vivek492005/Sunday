@@ -71,11 +71,34 @@ export function Search() {
     setSearching(false);
   }, [state.rootFolder]);
 
+  const [hybridMode, setHybridMode] = useState(true);
+  const [hybridWhys, setHybridWhys] = useState<Map<string, string>>(new Map());
+
   const runSearch = useCallback(async (q: string, dir: string) => {
     const my = ++seq.current;
     setSearching(true);
     setError(null);
     try {
+      // F5: try hybrid retrieval first (explainable); fall back to ripgrep
+      // when no workspace index exists.
+      if (hybridMode) {
+        try {
+          const hres = await searchService.hybrid(q, dir);
+          if (seq.current !== my) return;
+          const whyMap = new Map<string, string>();
+          const mapped = hres.map((h) => {
+            whyMap.set(`${h.path}:${h.line}`, h.why);
+            return { path: h.path, line: h.line, column: 0, text: h.text };
+          });
+          setHybridWhys(whyMap);
+          setResults(mapped);
+          setSearchedQuery(q);
+          return;
+        } catch {
+          // No index — fall through to ripgrep
+        }
+      }
+      setHybridWhys(new Map());
       const res = await searchService.text(q, dir);
       if (seq.current !== my) return;
       setResults(res ?? []);
@@ -87,7 +110,7 @@ export function Search() {
     } finally {
       if (seq.current === my) setSearching(false);
     }
-  }, []);
+  }, [hybridMode]);
 
   // debounce 300ms
   useEffect(() => {
@@ -186,6 +209,15 @@ export function Search() {
 
       <div className="sunday-search-body">
         {error && <div className="sunday-search-error">{error}</div>}
+
+        <label className="sunday-search-hybrid-toggle" title="F5 hybrid retrieval: TF-IDF + symbol graph + embeddings (falls back to ripgrep)">
+          <input
+            type="checkbox"
+            checked={hybridMode}
+            onChange={(e) => setHybridMode(e.target.checked)}
+          />
+          Smart search
+        </label>
 
         {showHint && (
           <div className="sunday-search-hint">

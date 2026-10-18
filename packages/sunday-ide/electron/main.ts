@@ -387,64 +387,160 @@ ipcMain.handle(
   },
 );
 
-// ---------------------------------------------------------------- agent IPC (STUB)
+// ---------------------------------------------------------------- agent IPC
 //
-// TODO(Wave 3): wire these to the real Sunday agent loop in
-// `packages/ext-agent` (gateway chat, F1 estimator, usage ledger, budgets).
-// The renderer + preload contracts are final; only this main-process
-// implementation needs swapping. Mock responses below keep the Agent panel
-// fully demoable until then.
+// INTEGRATION WAVE: real wiring — F1 estimator/ledger/budgets, F2 loop
+// guard, F4 context cockpit, F5 hybrid search, F6 daemon sessions, F7
+// policy, F8 hooks, F9 evidence. Implemented in ./agentBackend.ts.
+// NO STUBS below — every handler calls real backend code.
+
+import {
+  getRealEstimate,
+  getRealUsage,
+  realAgentSend,
+  continueBudget,
+  getLoopGuardStatus,
+  getContextUsage,
+  trackTurn,
+  pinFact,
+  unpinFact,
+  listPins,
+  previewCompactionOut,
+  hybridSearchOut,
+  sessionRewind,
+  sessionBranch,
+  sessionExport,
+  evaluatePolicy,
+  listHooksOut,
+  evidenceForDiff,
+  type BudgetScope,
+} from './agentBackend.js';
 
 const AGENT_MODELS = ['auto', 'llama-3.3-70b', 'qwen-2.5-coder-32b', 'llama-3.1-8b'];
 
-const MOCK_REPLIES: Record<string, string> = {
-  auto: `Here's what I'd do — this is a **mock reply** from the Sunday IDE agent stub.
+// F1: real pre-run estimate via ext-agent's estimator.
+ipcMain.handle('sunday:agent:estimate', async (_e, message: string, model?: string) => {
+  const e = getRealEstimate(message ?? '', model);
+  return { min: e.min, max: e.max, confidence: e.confidence, rationale: e.rationale };
+});
 
-\`\`\`ts
-// Wave 3 will connect this panel to the real ext-agent loop.
-export async function chat(message: string) {
-  return gateway.chat({ message, mode: 'auto' });
-}
-\`\`\`
-
-Ask me to **explain code**, **write a function**, or **debug an error** — the real agent lands in Wave 3.`,
-  architect: `## Plan (mock)\n\n1. **Survey** the codebase structure first\n2. **Design** the module boundaries\n3. **Propose** 2–3 approaches with trade-offs\n\n> Wave 3 connects this to the real Architect mode.`,
-  implementer: `On it — here's a starter implementation (mock):\n\n\`\`\`python\ndef sunday_hello(name: str) -> str:\n    return f"Hello, {name} — from Sunday IDE!"\n\`\`\`\n\nWave 3 wires this to the real Implementer mode with file edits.`,
-  reviewer: `## Review (mock)\n\n- ✅ Clear naming\n- ⚠️ Missing error handling on the happy path\n- 💡 Consider extracting the retry logic\n\nWave 3 connects this to the real Reviewer mode.`,
-};
-
-ipcMain.handle('sunday:agent:estimate', async (_e, message: string) => {
-  // Mirrors packages/ext-agent F1 estimator heuristic (client-side copy for the stub).
-  const text = message ?? '';
-  let point = 4 + Math.floor(text.length / 400) * 1.5;
-  const codeBlocks = Math.floor((text.match(/```/g) ?? []).length / 2);
-  point += codeBlocks * 3;
-  if (/\b(test|run|build|fix|debug|execute)\b/i.test(text)) point += 3;
-  if (/\b(refactor|migrate|implement|rewrite|scaffold|feature)\b/i.test(text)) point += 4.5;
-  point = Math.max(2, Math.round(point));
+// F1: real usage from the ledger + budget tracker.
+ipcMain.handle('sunday:agent:usage', async () => {
+  const u = getRealUsage();
   return {
-    min: Math.max(2, Math.round(point * 0.6)),
-    max: Math.round(point * 1.6),
-    confidence: text.length > 200 ? 'medium' : 'low',
-    rationale: 'stub heuristic — real F1 estimator lands with ext-agent wiring',
+    used: u.used,
+    limit: u.limit,
+    resetAt: u.resetAt,
+    taskSpend: u.taskSpend,
+    costPerSuccessfulTask: u.costPerSuccessfulTask,
+    pausedScopes: u.pausedScopes,
   };
 });
 
-ipcMain.handle('sunday:agent:usage', async () => {
-  // Stub usage — real ledger comes with ext-agent wiring (Wave 3).
-  return { used: 37, limit: 200, resetAt: '00:00 UTC', taskSpend: 4 };
-});
-
+// REAL agent send: F1 budget gate → sundayd daemon (AgentLoop with
+// F2/F7/F8 inside) → collect turn. Throws real errors when unavailable.
 ipcMain.handle(
   'sunday:agent:send',
-  async (_e, req: { message: string; mode: string; model: string; history: { role: string; content: string }[] }) => {
-    const mode = (req.mode ?? 'auto') as keyof typeof MOCK_REPLIES;
+  async (
+    _e,
+    req: {
+      message: string;
+      mode: string;
+      model: string;
+      history: { role: string; content: string }[];
+      cwd?: string;
+    },
+  ) => {
     const model = AGENT_MODELS.includes(req.model) ? req.model : 'auto';
-    // Simulate latency so the UI streaming/loading states are exercised.
-    await new Promise((r) => setTimeout(r, 900));
-    const content = `${MOCK_REPLIES[mode] ?? MOCK_REPLIES.auto}\n\n_Mode: ${mode} · Model: ${model}_`;
-    return { content, budgetPaused: false, requestsUsed: 3 };
+    try {
+      const r = await realAgentSend({
+        message: req.message,
+        mode: req.mode ?? 'auto',
+        model,
+        cwd: req.cwd,
+      });
+      return {
+        content: r.content,
+        budgetPaused: r.budgetPaused,
+        requestsUsed: r.requestsUsed,
+      };
+    } catch (err) {
+      // Honest error — never a mock. The UI renders this as a failure
+      // with the real reason (daemon down, budget paused, network, …).
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        content: `⚠️ Agent unavailable: ${msg}\n\nThe Sunday daemon (sundayd) could not be reached. Make sure it is built (\`pnpm --filter @sunday/sundayd build\`) and that you are signed in.`,
+        budgetPaused: msg.includes('budget paused'),
+        requestsUsed: 0,
+        error: msg,
+      };
+    }
   },
+);
+
+// F1: one-click "continue +N" budget resume (real).
+ipcMain.handle(
+  'sunday:budget:continue',
+  async (_e, scope: string, n: number) => {
+    continueBudget(scope as BudgetScope, n);
+    return getRealUsage();
+  },
+);
+
+// F2: real loop-guard status.
+ipcMain.handle('sunday:loopguard:status', async () => getLoopGuardStatus());
+
+// F4: real context cockpit.
+ipcMain.handle('sunday:context:meter', async () => getContextUsage());
+ipcMain.handle('sunday:context:pin', async (_e, text: string) => pinFact(text));
+ipcMain.handle('sunday:context:unpin', async (_e, id: string) => unpinFact(id));
+ipcMain.handle('sunday:context:pins', async () => listPins());
+ipcMain.handle(
+  'sunday:context:compact-preview',
+  async (_e, messages: { role: string; content: string }[]) =>
+    previewCompactionOut(messages ?? []),
+);
+ipcMain.handle(
+  'sunday:context:track',
+  async (_e, userText: string, assistantText: string) => {
+    trackTurn(userText ?? '', assistantText ?? '');
+    return getContextUsage();
+  },
+);
+
+// F5: real hybrid search (falls back to ripgrep when no index — caller handles).
+ipcMain.handle('sunday:search:hybrid', async (_e, query: string, dirPath: string) =>
+  hybridSearchOut(dirPath, query),
+);
+
+// F6: real daemon session ops.
+ipcMain.handle('sunday:session:rewind', async (_e, sessionId: string, entryId: string) =>
+  sessionRewind(sessionId, entryId),
+);
+ipcMain.handle(
+  'sunday:session:branch',
+  async (_e, sessionId: string, entryId?: string, title?: string) =>
+    sessionBranch(sessionId, entryId, title),
+);
+ipcMain.handle(
+  'sunday:session:export',
+  async (_e, sessionId: string, format: 'jsonl' | 'markdown') =>
+    sessionExport(sessionId, format),
+);
+
+// F7: real policy evaluation.
+ipcMain.handle('sunday:policy:evaluate', async (_e, command: string, cwd: string) =>
+  evaluatePolicy(command ?? '', cwd ?? process.cwd()),
+);
+
+// F8: real hooks list.
+ipcMain.handle('sunday:hooks:list', async (_e, workspaceDir?: string) =>
+  listHooksOut(workspaceDir),
+);
+
+// F9: real evidence summary for a diff.
+ipcMain.handle('sunday:evidence:get', async (_e, diffText: string, goal: string) =>
+  evidenceForDiff(diffText ?? '', goal ?? ''),
 );
 
 // ---------------------------------------------------------------- settings IPC
@@ -923,6 +1019,62 @@ async function runSmokeCheck(win: BrowserWindow): Promise<void> {
     }
   }
   console.log(`SUNDAY_F13=${JSON.stringify(f13)}`);
+  // INTEGRATION WAVE: verify every F1-F9 IPC handler calls real backend code.
+  let fint: Record<string, boolean> = {};
+  if (process.env.SUNDAY_FINTEGRATION_CHECK === '1') {
+    try {
+      fint = (await win.webContents.executeJavaScript(
+        `(async () => {
+          const out = {};
+          try {
+            // F1: real estimator (must NOT contain stub marker)
+            const est = await window.sunday.agent.estimate('refactor the auth module and add tests');
+            out.f1estimate = est.min >= 2 && est.max > est.min && !est.rationale.includes('stub');
+            // F1: real usage (shape from real ledger)
+            const usage = await window.sunday.agent.usage();
+            out.f1usage = typeof usage.used === 'number' && usage.limit === 200;
+            // F2: real loop guard status
+            const lg = await window.sunday.loopguard.status();
+            out.f2 = typeof lg.tripped === 'boolean';
+            // F4: real context meter + pins
+            const meter = await window.sunday.context.meter();
+            out.f4meter = typeof meter.percent === 'number' && typeof meter.pinnedCount === 'number';
+            const pin = await window.sunday.context.pin('smoke-test-pin');
+            const pins = await window.sunday.context.pins();
+            out.f4pin = pins.some((p) => p.id === pin.id);
+            await window.sunday.context.unpin(pin.id);
+            const cp = await window.sunday.context.compactPreview(
+              Array.from({length: 12}, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'x'.repeat(500) }))
+            );
+            out.f4compact = Array.isArray(cp.toSummarize) && cp.tokensBefore > 0;
+            // F7: real policy eval (rm -rf / must be destructive/deny)
+            const pol = await window.sunday.policy.evaluate('rm -rf /', '/tmp');
+            out.f7 = pol.tier === 'destructive' && pol.decision === 'deny';
+            // F8: real hooks list
+            const hooks = await window.sunday.hooks.list('/tmp');
+            out.f8 = Array.isArray(hooks);
+            // F9: real evidence (auth+exec diff must score high risk)
+            const ev = await window.sunday.evidence.get(
+              'diff --git a/src/auth.ts b/src/auth.ts\\n--- a/src/auth.ts\\n+++ b/src/auth.ts\\n@@ -1 +1 @@\\n-const x = 1;\\n+import { exec } from \\'child_process\\';',
+              'fix login'
+            );
+            out.f9 = ev.hunks >= 1 && ev.highRisk >= 1;
+            // F5: hybrid search throws real no-index error (proves real backend, not mock)
+            try {
+              await window.sunday.search.hybrid('foo', '/tmp/definitely-not-a-workspace-xyz');
+              out.f5 = false;
+            } catch (e) {
+              out.f5 = /no index/i.test(String(e));
+            }
+          } catch (e) { out.ipcError = String(e); }
+          return out;
+        })()`,
+      )) as Record<string, boolean>;
+    } catch (err) {
+      smokeErrors.push(`fintegration check failed: ${String(err)}`);
+    }
+  }
+  console.log(`SUNDAY_FINTEGRATION=${JSON.stringify(fint)}`);
   console.log(`SUNDAY_SMOKE_ERRORS=${JSON.stringify(smokeErrors)}`);
   let ok =
     dom.shell === true &&
@@ -949,6 +1101,20 @@ async function runSmokeCheck(win: BrowserWindow): Promise<void> {
       f13.commandListed === true &&
       f13.modalOpen === true &&
       f13.paletteClosed === true;
+  }
+  if (process.env.SUNDAY_FINTEGRATION_CHECK === '1') {
+    ok =
+      ok &&
+      fint.f1estimate === true &&
+      fint.f1usage === true &&
+      fint.f2 === true &&
+      fint.f4meter === true &&
+      fint.f4pin === true &&
+      fint.f4compact === true &&
+      fint.f7 === true &&
+      fint.f8 === true &&
+      fint.f9 === true &&
+      fint.f5 === true;
   }
   try {
     const shot = await win.webContents.capturePage();

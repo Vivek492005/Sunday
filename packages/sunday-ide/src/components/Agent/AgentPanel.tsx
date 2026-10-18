@@ -23,6 +23,7 @@ import type {
   AgentMessage,
   AgentMode,
   AgentUsage,
+  ContextUsage,
 } from '../../services/agentService';
 import { Markdown } from './markdown';
 import './agent.css';
@@ -44,17 +45,23 @@ export function AgentPanel() {
   const [estimate, setEstimate] = useState<AgentEstimate | null>(null);
   const [usage, setUsage] = useState<AgentUsage | null>(null);
   const [budgetPaused, setBudgetPaused] = useState(false);
+  const [ctxUsage, setCtxUsage] = useState<ContextUsage | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const lastUserMessage = useRef<string>('');
 
-  /* ---------------- usage (burn meter) ---------------- */
+  /* ---------------- usage (burn meter) + F4 context meter ---------------- */
 
   const refreshUsage = useCallback(async () => {
     try {
       setUsage(await agentService.usage());
     } catch {
       setUsage(null); // bridge unavailable — hide the meter
+    }
+    try {
+      setCtxUsage(await agentService.contextMeter());
+    } catch {
+      setCtxUsage(null);
     }
   }, []);
 
@@ -205,7 +212,7 @@ export function AgentPanel() {
         ))}
       </div>
 
-      {/* burn meter */}
+      {/* burn meter (F1) */}
       {usage && (
         <div className="sunday-agent-burn">
           <span className="sunday-agent-usage-pill">
@@ -215,6 +222,21 @@ export function AgentPanel() {
             <div
               className={`sunday-agent-burn-fill${burnHot ? ' hot' : ''}`}
               style={{ width: `${usagePct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* context meter (F4) */}
+      {ctxUsage && ctxUsage.limit > 0 && (
+        <div className="sunday-agent-ctx" title={Object.entries(ctxUsage.breakdown).map(([k, v]) => `${k}: ${v}`).join(', ')}>
+          <span className="sunday-agent-ctx-pill">
+            ctx {Math.round(ctxUsage.percent)}% · 📌 {ctxUsage.pinnedCount}
+          </span>
+          <div className="sunday-agent-burn-bar">
+            <div
+              className="sunday-agent-burn-fill ctx"
+              style={{ width: `${Math.min(100, ctxUsage.percent)}%` }}
             />
           </div>
         </div>
