@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { buildIndex } from './indexer.js';
-import { searchWorkspaceIndex, tokenize } from './search.js';
+import { searchWorkspaceIndex, tokenize, fuse, hybridSearch } from './search.js';
 
 let root: string;
 let home: string;
@@ -97,6 +97,94 @@ describe('searchWorkspaceIndex', () => {
     const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-empty-'));
     try {
       expect(() => searchWorkspaceIndex(empty, 'x')).toThrow(/run context\/index first/);
+    } finally {
+      fs.rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it('populates an explainable `why` on every hit', () => {
+    const hits = searchWorkspaceIndex(root, 'zephyr');
+    expect(hits.length).toBeGreaterThan(0);
+    for (const h of hits) {
+      expect(typeof h.why).toBe('string');
+      expect(h.why.length).toBeGreaterThan(0);
+      expect(h.why).toContain('TF-IDF');
+    }
+  });
+});
+
+describe('fuse (Reciprocal Rank Fusion)', () => {
+  it('a doc ranked #1 in two lists beats a doc ranked #1 in one', () => {
+    const lists = [
+      [{ key: 'a', why: 's1' }, { key: 'b', why: 's1' }],
+      [{ key: 'b', why: 's2' }, { key: 'c', why: 's2' }],
+    ];
+    const fused = fuse(lists, 3);
+    expect(fused[0]!.key).toBe('b');
+    expect(fused[0]!.whys).toContain('s1');
+    expect(fused[0]!.whys).toContain('s2');
+  });
+
+  it('is deterministic and deduplicates whys', () => {
+    const lists = [
+      [{ key: 'a', why: 'x' }],
+      [{ key: 'a', why: 'x' }],
+    ];
+    const a = fuse(lists, 5);
+    const b = fuse(lists, 5);
+    expect(a).toEqual(b);
+    expect(a[0]!.whys).toEqual(['x']);
+  });
+
+  it('respects k', () => {
+    const lists = [[{ key: 'a', why: 'x' }, { key: 'b', why: 'x' }, { key: 'c', why: 'x' }]];
+    expect(fuse(lists, 2)).toHaveLength(2);
+  });
+});
+
+describe('hybridSearch', () => {
+  async function saveGraphFor(files: string[]): Promise<void> {
+    const { buildSymbolGraph, saveSymbolGraph } = await import('./symbols.js');
+    const inputs = files.map((p) => ({
+      path: p,
+      text: fs.readFileSync(path.join(root, p), 'utf8'),
+    }));
+    saveSymbolGraph(await buildSymbolGraph(root, inputs));
+  }
+
+  it('returns explainable hits fusing TF-IDF + symbols', async () => {
+    await saveGraphFor(['zephyr.ts', 'generic.ts']);
+    const hits = await hybridSearch(root, 'zephyrHandshake');
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0]!.path).toBe('zephyr.ts');
+    for (const h of hits) {
+      expect(h.why.length).toBeGreaterThan(0);
+    }
+    // The symbol signal should explain the definition match.
+    expect(hits.some((h) => h.why.includes('defines symbol'))).toBe(true);
+  });
+
+  it('surfaces referencing files via the symbol signal', async () => {
+    write('caller.ts', 'import { zephyrHandshake } from "./zephyr";\nzephyrHandshake();\n');
+    buildIndex(root);
+    await saveGraphFor(['zephyr.ts', 'caller.ts']);
+    const hits = await hybridSearch(root, 'zephyrHandshake');
+    const paths = hits.map((h) => h.path);
+    expect(paths).toContain('caller.ts');
+    const callerHit = hits.find((h) => h.path === 'caller.ts');
+    expect(callerHit!.why).toContain('references symbol');
+  });
+
+  it('works with no symbol graph (TF-IDF only)', async () => {
+    const hits = await hybridSearch(root, 'zephyr', { noSymbols: true });
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0]!.path).toBe('zephyr.ts');
+  });
+
+  it('throws a helpful error when no index exists', async () => {
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-empty-'));
+    try {
+      await expect(hybridSearch(empty, 'x')).rejects.toThrow(/run context\/index first/);
     } finally {
       fs.rmSync(empty, { recursive: true, force: true });
     }

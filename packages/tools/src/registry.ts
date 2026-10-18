@@ -5,6 +5,7 @@ import { generateCommandTool } from './gen-command.js';
 import { ghPrCreateTool, ghPrReviewTool } from './pr.js';
 import { runTerminalTool } from './terminal.js';
 import { searchTool } from './search.js';
+import { symbolTools } from './symbols.js';
 import { validateArgs } from './validate.js';
 import { createArtifactTool } from './artifact.js';
 import { err, type Tool, type ToolContext, type ToolResult } from './types.js';
@@ -75,6 +76,8 @@ export function createDefaultTools(): Tool[] {
     generateCommandTool,
     // A3: durable user-facing artifacts (HTML/Markdown/Mermaid).
     createArtifactTool,
+    // F5: symbol-graph tools (read-only).
+    ...symbolTools,
   ];
 }
 
