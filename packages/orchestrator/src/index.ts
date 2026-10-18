@@ -12,5 +12,6 @@ export * from './state.js';
 export * from './merge.js';
 export * from './background.js';
 export * from './best-of-n.js';
+export * from './evidence.js';
 export { decompose, summarizePlan } from './decompose.js';
 export type { DecomposeOptions } from './decompose.js';
