@@ -27,6 +27,12 @@ import { ToolRegistry, createDefaultRegistry as createDefaultTools, type Sandbox
 import { RpcError, StdioTransport, type ServerTransport } from './transport.js';
 import { sandboxConfigFromEnv } from './sandbox.js';
 import { SessionStore, defaultSessionsDir, type StoredSession } from './sessions.js';
+import {
+  listSettingsSnapshots,
+  maybeSnapshotOnUpgrade,
+  restoreSettingsSnapshot,
+  snapshotSettings,
+} from './settingsSnapshots.js';
 import { PolicyGate, syncDangerousFlags, type PolicyOptions } from './policy.js';
 import {
   canonicalizeWorkspaceRoot,
@@ -195,6 +201,18 @@ function publicSession(s: StoredSession): Session {
   return rest;
 }
 
+/** Read this package's version for the F6 upgrade-snapshot marker. */
+async function readPackageVersion(): Promise<string> {
+  try {
+    const require = createRequire(import.meta.url);
+    const pkg = require('../package.json') as { version?: string };
+    if (typeof pkg.version === 'string' && pkg.version) return pkg.version;
+  } catch {
+    // fall through
+  }
+  return '0.0.0-unknown';
+}
+
 /**
  * sundayd — the Sunday sidecar daemon (§6.3). Speaks JSON-RPC over stdio,
  * owns sessions + the agent loop, and streams `chat/event` notifications.
@@ -331,7 +349,13 @@ export class SundayDaemon {
               : { turnId, sessionId, event },
           ),
       },
-      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv() },
+      {
+        router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv(),
+        // F6: tool calls/results feed the session event log (best-effort).
+        onSessionEvent: (sessionId, type, payload) => {
+          void this.sessions.logEvent(sessionId, type, payload).catch(() => undefined);
+        },
+      },
     );
     this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
@@ -361,6 +385,14 @@ export class SundayDaemon {
 
   async start(): Promise<void> {
     await this.sessions.init();
+    // F6: upgrade hook — snapshot settings before a new daemon version runs.
+    try {
+      const version = await readPackageVersion();
+      const snap = await maybeSnapshotOnUpgrade(version);
+      if (snap) console.error(`[sundayd] settings snapshotted before upgrade: ${snap.id}`);
+    } catch (e) {
+      console.error(`[sundayd] upgrade snapshot check failed: ${(e as Error).message}`);
+    }
     this.transport.start();
   }
 
@@ -409,7 +441,13 @@ export class SundayDaemon {
     const loop = new AgentLoop(
       { tools: opts.tools, providers: this.providers },
       { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
-      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv() },
+      {
+        router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv(),
+        // F6: tool calls/results feed the session event log (best-effort).
+        onSessionEvent: (sessionId, type, payload) => {
+          void this.sessions.logEvent(sessionId, type, payload).catch(() => undefined);
+        },
+      },
     );
     await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal, temperature: opts.temperature });
   }
@@ -506,6 +544,9 @@ export class SundayDaemon {
     this.shuttingDown = true;
     try {
       await Promise.allSettled([...this.pendingPersists]);
+      // F6: fsync any buffered session-log entries before exit.
+      await this.sessions.flushLogs().catch(() => undefined);
+      await this.sessions.closeLogs().catch(() => undefined);
       // Phase 6: stop the browser child (no-op when never started).
       await this.browserdManager?.stop().catch(() => undefined);
       // A1: stop the cloud-task poll loop.
@@ -619,6 +660,12 @@ export class SundayDaemon {
       case 'session/create': {
         const p = parseParams(method, req.params);
         const s = this.sessions.create(p);
+        // F6: the session_created entry opens the event-sourced log.
+        await this.sessions.logEvent(s.id, 'session_created', {
+          title: s.title,
+          ...(s.cwd ? { cwd: s.cwd } : {}),
+          ...(s.model ? { model: s.model } : {}),
+        });
         // Part A: skills/rules/memory system prompt (no-op when empty).
         await this.injectSystemPrompt(s);
         await this.persistSession(s);
@@ -639,6 +686,84 @@ export class SundayDaemon {
         const p = parseParams(method, req.params);
         const deleted = await this.sessions.delete(p.sessionId);
         return { ok: true as const, deleted };
+      }
+      // F6 Durable Sessions: rewind / branch / export / checkpoints / log.
+      case 'session/rewind': {
+        const p = parseParams(method, req.params);
+        const r = await this.sessions.rewind(p.sessionId, p.entryId);
+        const s = this.sessions.require(p.sessionId);
+        return {
+          session: publicSession(s),
+          rewoundTo: r.rewoundTo,
+          droppedEntries: r.droppedEntries,
+          codeRestored: r.codeRestored,
+        };
+      }
+      case 'session/branch': {
+        const p = parseParams(method, req.params);
+        const { session, parentSessionId } = await this.sessions.branch(
+          p.sessionId,
+          p.entryId,
+          p.title,
+        );
+        return { session: publicSession(session), parentSessionId };
+      }
+      case 'session/export': {
+        const p = parseParams(method, req.params);
+        const content = await this.sessions.exportTranscript(p.sessionId, p.format);
+        return { sessionId: p.sessionId, format: p.format, content };
+      }
+      case 'session/checkpoint': {
+        const p = parseParams(method, req.params);
+        const { checkpointId, entryId } = await this.sessions.createCheckpoint(
+          p.sessionId,
+          p.label,
+        );
+        return { checkpointId, entryId };
+      }
+      case 'session/log': {
+        const p = parseParams(method, req.params);
+        const entries = await this.sessions.getLogEntries(p.sessionId);
+        return {
+          sessionId: p.sessionId,
+          entries: entries.map((e) => ({
+            seq: e.seq,
+            id: e.id,
+            ts: e.ts,
+            type: e.type,
+            payload: e.payload,
+          })),
+        };
+      }
+      // F6: settings snapshots & rollback.
+      case 'settings/snapshot': {
+        const p = parseParams(method, req.params);
+        const snap = await snapshotSettings(p.reason ?? 'manual');
+        return {
+          snapshot: snap
+            ? { id: snap.id, createdAt: snap.createdAt, reason: snap.reason, bytes: snap.bytes }
+            : null,
+        };
+      }
+      case 'settings/snapshots': {
+        const snaps = await listSettingsSnapshots();
+        return {
+          snapshots: snaps.map((s) => ({
+            id: s.id,
+            createdAt: s.createdAt,
+            reason: s.reason,
+            bytes: s.bytes,
+          })),
+        };
+      }
+      case 'settings/restore': {
+        const p = parseParams(method, req.params);
+        const backup = await restoreSettingsSnapshot(p.id);
+        await this.sessions.logEvent('__settings__', 'settings_snapshot', {
+          restoredSnapshot: p.id,
+          backupId: backup.id,
+        }).catch(() => undefined);
+        return { ok: true as const, backupId: backup.id };
       }
       case 'tools/list':
         return { tools: this.tools.definitions() };

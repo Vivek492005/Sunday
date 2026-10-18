@@ -54,6 +54,7 @@ import {
 import { readUsedToday } from './entitlements/usage.js';
 import { dailyRequestLimit } from './entitlements/types.js';
 import { registerSyncCommands } from './sync.js';
+import { registerSettingsRestoreCommand } from './settingsRestore.js';
 import {
   ContextCockpit,
   registerContextCommands,
@@ -805,6 +806,11 @@ export async function activate(
   for (const d of registerBudgetCommands(context, { tracker: budgetTracker, log })) {
     context.subscriptions.push(d);
   }
+  // F6 Durable Sessions: "Sunday: Restore Previous Settings" — rolls back to
+  // a daemon settings snapshot (auto-taken before every upgrade).
+  context.subscriptions.push(
+    registerSettingsRestoreCommand(context, { getRpc: () => manager.getRpc(), log }),
+  );
   // F4 Context Cockpit: palette commands (meter / compact / pin). The chat
   // slash commands (/compact, /pin, /forget) are intercepted in chatView.ts
   // via a per-session ContextCockpit; this palette-level cockpit shares the

@@ -300,6 +300,11 @@
         "command": "sunday.context.pin",
         "title": "Sunday: Pin a Fact…",
         "category": "Sunday"
+      },
+      {
+        "command": "sunday.settings.restore",
+        "title": "Sunday: Restore Previous Settings",
+        "category": "Sunday"
       }
     ],
     "keybindings": [
@@ -823,6 +828,10 @@
         },
         {
           "command": "sunday.context.pin",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.settings.restore",
           "group": "sunday"
         }
       ]
