@@ -9,6 +9,11 @@ import { wrapUntrustedToolOutput } from './untrusted.js';
 import { markTainted, newTaintState, taintEscalationReason, type TaintState } from './taint.js';
 import { credentialGateReason } from './credential-gate.js';
 import type { StoredSession } from './sessions.js';
+// F8 User Hooks: deterministic lifecycle hooks (block/modify/run/annotate).
+// The manager is pure + testable; the loop fires events around tool dispatch.
+import { HookManager, lifecycleEventsForTool, type HookContext, type HookDispatchResult } from './hooks.js';
+import { isWorkspaceTrusted } from './trust.js';
+import type { HookEvent } from '@sunday/hooks';
 // F2 Loop Breaker: the guard itself is pure (no vscode) and lives in the
 // sunday-agent package; sundayd's AgentLoop is the real tool-call loop, so
 // the breaker is enforced here.
@@ -51,6 +56,30 @@ export interface AgentLoopOptions {
    * defaults.
    */
   loopGuard?: Partial<LoopGuardPolicy>;
+  /**
+   * F6 Durable Sessions: optional sink for session-log events. Called with
+   * (sessionId, entryType, payload) for tool calls/results so the daemon can
+   * persist them to the event-sourced log. Undefined = no logging (tests,
+   * fire-and-forget loops). Never throws — the loop must not depend on it.
+   */
+  onSessionEvent?: (
+    sessionId: string,
+    type: 'tool_call' | 'tool_result' | 'approval',
+    payload: Record<string, unknown>,
+  ) => void;
+  /**
+   * F8 User Hooks: deterministic lifecycle hooks. `enabled: false` disables
+   * all hook execution. `workspaceRoot` defaults to the session cwd.
+   * `trusted` defaults to `isWorkspaceTrusted(workspaceRoot)` — an
+   * untrusted workspace runs ZERO hooks (fail closed). Undefined = hooks
+   * enabled with defaults.
+   */
+  hooks?: {
+    enabled?: boolean;
+    workspaceRoot?: string;
+    trusted?: boolean;
+    homeDir?: string;
+  };
 }
 
 export interface TurnEvents {
@@ -92,6 +121,8 @@ export class AgentLoop {
   private readonly sandbox: SandboxConfig | undefined;
   private readonly agentMode: AgentMode | undefined;
   private readonly loopGuardPolicy: Partial<LoopGuardPolicy> | undefined;
+  private readonly hooksOpts: AgentLoopOptions['hooks'];
+  private readonly onSessionEvent: AgentLoopOptions['onSessionEvent'];
 
   constructor(
     private readonly deps: AgentLoopDeps,
@@ -105,6 +136,33 @@ export class AgentLoop {
     this.sandbox = opts.sandbox;
     this.agentMode = opts.agentMode;
     this.loopGuardPolicy = opts.loopGuard;
+    this.onSessionEvent = opts.onSessionEvent;
+    this.hooksOpts = opts.hooks;
+  }
+
+  /**
+   * F8: build the per-turn HookManager. Disabled → null (zero overhead).
+   * Trust defaults to the workspace verdict — fail closed.
+   */
+  private hookManagerFor(cwd: string): HookManager | null {
+    if (this.hooksOpts?.enabled === false) return null;
+    const workspaceRoot = this.hooksOpts?.workspaceRoot ?? cwd;
+    const trusted = this.hooksOpts?.trusted ?? isWorkspaceTrusted(workspaceRoot);
+    return new HookManager({ workspaceRoot, trusted, homeDir: this.hooksOpts?.homeDir });
+  }
+
+  /** F8: fire a lifecycle event; never throws (a hook bug can't break the loop). */
+  private async fireHook(
+    hooks: HookManager | null,
+    event: HookEvent,
+    ctx: Omit<HookContext, 'event'>,
+  ): Promise<HookDispatchResult | null> {
+    if (!hooks) return null;
+    try {
+      return await hooks.dispatch({ ...ctx, event });
+    } catch {
+      return { annotations: [], commandErrors: [], ran: [], commandsRan: [] };
+    }
   }
 
   async runTurn(
@@ -124,6 +182,17 @@ export class AgentLoop {
 
     const modelRef = opts.model ?? session.model ?? this.defaultModel;
     const cwd = session.cwd ?? process.cwd();
+    // F8 User Hooks: per-turn manager (trust-checked, consent-checked).
+    const hooks = this.hookManagerFor(cwd);
+    const hookBase = { cwd, workspaceRoot: hooks?.workspaceRoot ?? cwd, sessionId: session.id, turnId };
+    // F8: session.start — annotations feed the opening context.
+    const startHooks = await this.fireHook(hooks, 'session.start', { ...hookBase });
+    if (startHooks?.annotations.length) {
+      session.messages.push({
+        role: 'user',
+        content: [{ type: 'text', text: `[hooks:session.start]\n${startHooks.annotations.join('\n')}` }],
+      });
+    }
     // S5: per-turn taint state — untrusted content (file reads, web, MCP)
     // escalates state-changing tool calls to manual approval.
     const taint = newTaintState();
@@ -176,6 +245,24 @@ export class AgentLoop {
 
         if (calls.length === 0) {
           if (text) session.messages.push({ role: 'assistant', content: [{ type: 'text', text }] });
+          // F8: task.end — e.g. test-before-done. A block is fed back as a
+          // user message so the model sees it next turn; annotations too.
+          const endHooks = await this.fireHook(hooks, 'task.end', { ...hookBase });
+          const endNotes: string[] = [];
+          if (endHooks?.blocked) {
+            endNotes.push(
+              `[hooks:task.end] BLOCKED by "${endHooks.blocked.hookName}": ${endHooks.blocked.reason}`,
+            );
+          }
+          if (endHooks?.annotations.length) {
+            endNotes.push(`[hooks:task.end]\n${endHooks.annotations.join('\n')}`);
+          }
+          if (endNotes.length) {
+            session.messages.push({
+              role: 'user',
+              content: [{ type: 'text', text: endNotes.join('\n') }],
+            });
+          }
           emit({ type: 'turn-end', finishReason: 'stop' });
           return;
         }
@@ -188,13 +275,37 @@ export class AgentLoop {
 
         for (const { call, parseError } of calls) {
           throwIfAborted(opts.signal);
+          // F6: record the tool call in the session event log (best-effort).
+          try {
+            this.onSessionEvent?.(session.id, 'tool_call', {
+              callId: call.id,
+              name: call.name,
+              args: call.arguments,
+            });
+          } catch {
+            // logging must never break the turn
+          }
           // F2 Loop Breaker: pre-execution check (repeated args, ping-pong).
           const pre = guard?.preCall(call.name, call.arguments);
           let tripped: LoopGuardTrigger | undefined = pre?.trigger;
           if (!tripped) {
-            const result = await this.executeCall(call, parseError, cwd, opts.signal, taint);
+            const result = await this.executeCall(call, parseError, cwd, opts.signal, taint, {
+              hooks,
+              hookBase,
+            });
             emit({ type: 'tool-result', result });
             session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });
+            // F6: record the tool result in the session event log.
+            try {
+              this.onSessionEvent?.(session.id, 'tool_result', {
+                callId: call.id,
+                name: call.name,
+                ok: !result.isError,
+                summary: contentText(result.content).slice(0, 2000),
+              });
+            } catch {
+              // logging must never break the turn
+            }
             // F2: post-execution check (repeated failures, spend divergence).
             // Attribute this call the token delta since the previous call.
             const callInput = Math.max(0, turnInputTokens - accountedInputTokens);
@@ -234,6 +345,14 @@ export class AgentLoop {
         }
         // Loop: the model sees the tool results on the next iteration.
       }
+      // F8: task.end on max-steps as well (best-effort, never fatal).
+      const maxEndHooks = await this.fireHook(hooks, 'task.end', { ...hookBase });
+      if (maxEndHooks?.annotations.length) {
+        session.messages.push({
+          role: 'user',
+          content: [{ type: 'text', text: `[hooks:task.end]\n${maxEndHooks.annotations.join('\n')}` }],
+        });
+      }
       emit({ type: 'turn-end', finishReason: 'max-steps' });
     } catch (e) {
       if (isAbort(e, opts.signal)) {
@@ -254,7 +373,44 @@ export class AgentLoop {
     cwd: string,
     signal: AbortSignal | undefined,
     taint: TaintState,
+    hookCtx?: { hooks: HookManager | null; hookBase: Omit<HookContext, 'event'> },
   ): Promise<{ toolCallId: string; content: ContentPart[]; isError: boolean }> {
+    // F8 User Hooks: pre_tool (+ pre_edit/pre_commit) run before anything
+    // else. Args are deep-cloned so modify_input actions can't corrupt the
+    // original call; a block returns WITHOUT executing the tool (zero
+    // executions — the acceptance gate). Annotations are collected and
+    // appended to the tool result for the model.
+    const mutableArgs: Record<string, unknown> = structuredClone(call.arguments ?? {});
+    const hookAnnotations: string[] = [];
+    if (hookCtx?.hooks) {
+      const preCtx = { ...hookCtx.hookBase, toolName: call.name, args: mutableArgs };
+      const preEvents: HookEvent[] = [
+        'pre_tool',
+        ...lifecycleEventsForTool(call.name).filter((e) => e.startsWith('pre_')),
+      ];
+      for (const event of preEvents) {
+        const pre = await this.fireHook(hookCtx.hooks, event, preCtx);
+        if (!pre) continue;
+        if (pre.blocked) {
+          return {
+            toolCallId: call.id,
+            content: [
+              {
+                type: 'text',
+                text: `Hook blocked tool call '${call.name}' ("${pre.blocked.hookName}"): ${pre.blocked.reason}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (pre.annotations.length) hookAnnotations.push(...pre.annotations);
+        // F8 (spec §4): hook run_command output is untrusted — taint the
+        // turn so later state-changing calls escalate to manual approval.
+        if (pre.commandsRan.length > 0) {
+          markTainted(taint, 'hook_output');
+        }
+      }
+    }
     if (parseError) {
       return {
         toolCallId: call.id,
@@ -262,7 +418,14 @@ export class AgentLoop {
         isError: true,
       };
     }
-    const decision = this.policy.evaluate(call.name);
+    // F7 Permission Intelligence: arg-aware policy decision (risk tiers,
+    // profiles, scoped allowlists, batch plans). Falls back to the legacy
+    // tool-name-only evaluate() when no intel is attached.
+    const decision = this.policy.evaluateCall(
+      call.name,
+      mutableArgs,
+      cwd,
+    );
     if (!decision.allow) {
       return {
         toolCallId: call.id,
@@ -295,7 +458,7 @@ export class AgentLoop {
     // approval (SEC-10). The gate runs here (not in the tool) because the
     // policy decision belongs to the loop, not the filesystem tool.
     if (call.name === 'read_file' && !parseError) {
-      const readPath = (call.arguments as { path?: unknown } | null)?.path;
+      const readPath = (mutableArgs as { path?: unknown } | null)?.path;
       if (typeof readPath === 'string') {
         const gateReason = credentialGateReason(readPath);
         if (gateReason) {
@@ -307,13 +470,34 @@ export class AgentLoop {
         }
       }
     }
-    const r = await this.deps.tools.call(call.name, call.arguments, {
+    // F8: dispatch with the (possibly hook-modified) args.
+    const r = await this.deps.tools.call(call.name, mutableArgs, {
       cwd,
       signal,
       // Hardening: sandbox config rides on the context; run_terminal is the
       // only tool that reads it (single decision point in terminal.ts).
       sandbox: this.sandbox,
     });
+    // F8: post_tool (+ post_edit) — annotations appended to the result so
+    // the model sees them; a post block can't un-execute, so it's surfaced
+    // as an error note (pre_* is the enforcement point).
+    let postNote = '';
+    if (hookCtx?.hooks) {
+      const postCtx = { ...hookCtx.hookBase, toolName: call.name, args: mutableArgs };
+      const postEvents: HookEvent[] = [
+        'post_tool',
+        ...lifecycleEventsForTool(call.name).filter((e) => e.startsWith('post_')),
+      ];
+      for (const event of postEvents) {
+        const post = await this.fireHook(hookCtx.hooks, event, postCtx);
+        if (!post) continue;
+        if (post.annotations.length) hookAnnotations.push(...post.annotations);
+        if (post.blocked) {
+          postNote += `\n[hooks:${event}] "${post.blocked.hookName}" flagged after execution: ${post.blocked.reason}`;
+        }
+        if (post.commandsRan.length > 0) markTainted(taint, 'hook_output');
+      }
+    }
     // S5: file reads ingest untrusted content (the agent didn't write these
     // files) — mark the turn tainted so later state-changing calls escalate.
     if (call.name === 'read_file') markTainted(taint, 'file_read_untrusted');
@@ -321,9 +505,15 @@ export class AgentLoop {
     // can reach the provider, and wrap it in explicit delimiters so the
     // model cannot mistake it for instructions.
     const safeOutput = wrapUntrustedToolOutput(call.name, redactSecrets(r.output));
+    const content: ContentPart[] = [{ type: 'text', text: safeOutput }];
+    if (hookAnnotations.length) {
+      content.push({ type: 'text', text: `[hooks]\n${hookAnnotations.join('\n')}${postNote}` });
+    } else if (postNote) {
+      content.push({ type: 'text', text: `[hooks]${postNote}` });
+    }
     return {
       toolCallId: call.id,
-      content: [{ type: 'text', text: safeOutput }],
+      content,
       isError: r.isError ?? false,
     };
   }

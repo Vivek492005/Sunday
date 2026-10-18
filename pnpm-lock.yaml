@@ -125,6 +125,22 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)
 
+  packages/hooks:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)
+
   packages/hosted-gateway:
     dependencies:
       '@sunday/gateway':
@@ -328,6 +344,9 @@ importers:
       '@sunday/tools':
         specifier: workspace:*
         version: link:../tools
+      shell-quote:
+        specifier: 1.12.0
+        version: 1.12.0
       sunday-agent:
         specifier: workspace:*
         version: link:../ext-agent
@@ -338,6 +357,9 @@ importers:
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.5
+      '@types/shell-quote':
+        specifier: ^1.7.5
+        version: 1.7.5
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
@@ -347,6 +369,9 @@ importers:
 
   packages/tools:
     dependencies:
+      '@sunday/context':
+        specifier: workspace:*
+        version: link:../context
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -1200,6 +1225,9 @@ packages:
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
+
+  '@types/shell-quote@1.7.5':
+    resolution: {integrity: sha512-+UE8GAGRPbJVQDdxi16dgadcBfQ+KG2vgZhV1+3A1XmHbmwcdwhCUwIdy+d3pAGrbvgRoVSjeI9vOWyq376Yzw==}
 
   '@types/verror@1.10.11':
     resolution: {integrity: sha512-RlDm9K7+o5stv0Co8i8ZRGxDbrTxhJtgjqjFyVh/tXQyl/rYtTKlnTvZ88oSTeYREWurwx20Js4kTuKCsFkUtg==}
@@ -3952,6 +3980,8 @@ snapshots:
   '@types/responselike@1.0.3':
     dependencies:
       '@types/node': 22.20.5
+
+  '@types/shell-quote@1.7.5': {}
 
   '@types/verror@1.10.11':
     optional: true
