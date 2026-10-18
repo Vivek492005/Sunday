@@ -1,22 +1,25 @@
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import {
   BROWSER_METHODS,
+  DEFAULT_VIEWPORTS,
   ErrorCode,
   type AxNode,
   type BrowserMethodName,
   type ConsoleEntry,
   type VerifyCheck,
   type VerifyCheckResult,
+  type ViewportSpec,
 } from '@sunday/protocol';
 import { DriverError, type Driver, type OpenResult } from './driver.js';
 import { PlaywrightDriver } from './playwright-driver.js';
 import { BrowserPolicy, BrowserPolicyError, type BrowserPolicyOptions } from './policy.js';
 import { BrowserRpcError, BrowserTransport } from './transport.js';
+import { visualDiff } from './visual-diff.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
@@ -280,6 +283,20 @@ export class BrowserdServer {
         const p = parseBrowser(name, params);
         return this.verifyUi(p.url, p.checks, p.readyTimeoutMs, p.approve);
       }
+      case 'browser/visual-diff': {
+        const p = parseBrowser(name, params);
+        return this.visualDiff(p.beforePng, p.afterPng, p.threshold);
+      }
+      case 'browser/accessibility-scan': {
+        parseBrowser(name, params);
+        const page = this.requirePage();
+        const scan = await page.a11yScan();
+        return { url: this.currentUrl, violations: scan.violations, passes: scan.passes };
+      }
+      case 'browser/viewport-matrix': {
+        const p = parseBrowser(name, params);
+        return this.viewportMatrix(p.url, p.viewports, p.fullPage, p.approve);
+      }
       case 'browser/screencast/start': {
         parseBrowser(name, params);
         await this.startScreencast();
@@ -390,6 +407,101 @@ export class BrowserdServer {
     await this.ensureDriver().startRecording({ video, trace, dir });
     this.recordingDir = dir;
     return dir;
+  }
+
+  /**
+   * F11: evidence-artifact dir for visual diffs / viewport captures.
+   * Owner-only (0700) like recordings — screenshots may capture page content.
+   */
+  private async ensureMediaDir(): Promise<string> {
+    const dir = join(this.mediaBaseDir, this.sessionId, 'media');
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    return dir;
+  }
+
+  /**
+   * F11: pixel-compare two screenshots. Pure image computation — no page
+   * needed. The highlighted diff PNG is saved under the session media dir as
+   * an evidence artifact (feeds F9's Evidence Pack `visualProof`).
+   */
+  private async visualDiff(
+    beforePngB64: string,
+    afterPngB64: string,
+    threshold: number | undefined,
+  ): Promise<{
+    width: number;
+    height: number;
+    diffPixels: number;
+    totalPixels: number;
+    diffRatio: number;
+    diffPng: string;
+    diffPath: string;
+  }> {
+    let before: Buffer;
+    let after: Buffer;
+    try {
+      before = Buffer.from(beforePngB64, 'base64');
+    } catch {
+      throw new BrowserRpcError(ErrorCode.InvalidParams, 'visual_diff: beforePng is not valid base64');
+    }
+    try {
+      after = Buffer.from(afterPngB64, 'base64');
+    } catch {
+      throw new BrowserRpcError(ErrorCode.InvalidParams, 'visual_diff: afterPng is not valid base64');
+    }
+    const diff = visualDiff(before, after, threshold ?? 0.1);
+    const dir = await this.ensureMediaDir();
+    const diffPath = join(dir, `visual-diff-${Date.now()}.png`);
+    await writeFile(diffPath, diff.diffPng, { mode: 0o600 });
+    return {
+      width: diff.width,
+      height: diff.height,
+      diffPixels: diff.diffPixels,
+      totalPixels: diff.totalPixels,
+      diffRatio: diff.diffRatio,
+      diffPng: diff.diffPng.toString('base64'),
+      diffPath,
+    };
+  }
+
+  /**
+   * F11: capture a URL across a viewport matrix (default mobile/tablet/
+   * desktop). Navigation is policy-gated exactly like browser/open
+   * (needsApproval flow included); captures are saved as evidence artifacts.
+   */
+  private async viewportMatrix(
+    url: string,
+    viewports: ViewportSpec[] | undefined,
+    fullPage: boolean | undefined,
+    approve: boolean | undefined,
+  ): Promise<{
+    url: string;
+    needsApproval?: boolean;
+    origin?: string;
+    shots: Array<{ name: string; width: number; height: number; bytes: number; path: string; png: string }>;
+  }> {
+    const decision = this.policy.checkNavigation(url, this.approvedOrigins);
+    if (decision.kind === 'needsApproval') {
+      if (!approve) {
+        return { url, needsApproval: true, origin: decision.origin, shots: [] };
+      }
+      this.approvedOrigins.add(decision.origin);
+    }
+    const specs = viewports ?? DEFAULT_VIEWPORTS;
+    const dir = await this.ensureMediaDir();
+    const driver = this.ensureDriver();
+    const shots: Array<{ name: string; width: number; height: number; bytes: number; path: string; png: string }> = [];
+    for (const vp of specs) {
+      await driver.setViewport(vp.width, vp.height);
+      const r: OpenResult = await driver.open(url);
+      this.currentUrl = r.url;
+      const png = await driver.screenshot({ fullPage: fullPage ?? false });
+      const safeName = vp.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+      const path = join(dir, `viewport-${safeName}-${vp.width}x${vp.height}-${Date.now()}.png`);
+      await writeFile(path, png, { mode: 0o600 });
+      shots.push({ name: vp.name, width: vp.width, height: vp.height, bytes: png.byteLength, path, png: png.toString('base64') });
+    }
+    return { url, shots };
   }
 
   /**

@@ -33,6 +33,23 @@ export interface SnapshotResult {
   nodes: AxNode[];
 }
 
+/** One axe-core rule violation surfaced by Driver.a11yScan (F11). */
+export interface A11yViolation {
+  id: string;
+  impact: 'minor' | 'moderate' | 'serious' | 'critical' | null;
+  description: string;
+  helpUrl: string;
+  /** How many DOM nodes the rule flagged. */
+  nodes: number;
+}
+
+/** Result of an axe-core accessibility scan of the current page. */
+export interface A11yScanResult {
+  violations: A11yViolation[];
+  /** Rules that passed (informational). */
+  passes: number;
+}
+
 /**
  * Driver — the browser backend behind browserd (§18.2).
  *
@@ -56,6 +73,14 @@ export interface Driver {
   eval(fn: string, arg?: unknown): Promise<unknown>;
   /** PNG screenshot bytes. */
   screenshot(opts?: { fullPage?: boolean }): Promise<Buffer>;
+  /**
+   * axe-core accessibility scan of the current page (F11). Implementations
+   * inject axe into the page themselves — this is NOT the restricted eval
+   * path, so it works with eval disabled.
+   */
+  a11yScan(): Promise<A11yScanResult>;
+  /** Resize the page viewport (F11 viewport-matrix captures). */
+  setViewport(width: number, height: number): Promise<void>;
   consoleEntries(limit?: number): Promise<ConsoleEntry[]>;
   networkEntries(limit?: number): Promise<NetworkEntry[]>;
   /**

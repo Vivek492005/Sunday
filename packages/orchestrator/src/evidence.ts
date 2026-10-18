@@ -664,6 +664,22 @@ export async function collectEvidencePack(opts: CollectEvidenceOptions): Promise
   return evidencePackSchema.parse(pack);
 }
 
+/**
+ * F11: attach browser visual proof (before/after diff PNGs, viewport-matrix
+ * captures, walkthrough artifacts) to a finished Evidence Pack. Returns a new
+ * validated pack — the input is not mutated.
+ */
+export function withVisualProof(
+  pack: EvidencePack,
+  paths: string[],
+  kind: VisualProof['kind'] = 'screenshot',
+): EvidencePack {
+  return evidencePackSchema.parse({
+    ...pack,
+    visualProof: { kind, paths },
+  });
+}
+
 /** One-line markdown summary of a pack, for PR descriptions / chat. */
 export function summarizeEvidencePack(pack: EvidencePack): string {
   const lines: string[] = [

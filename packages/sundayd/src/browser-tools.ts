@@ -118,7 +118,7 @@ function defineTool(manager: BrowserdManager, spec: BrowserToolSpec): Tool {
   };
 }
 
-/** All 13 browser tools (§18.2 + §18.3 macro). */
+/** All 16 browser tools (§18.2 + §18.3 macro + F11 visual loop). */
 export function createBrowserTools(manager: BrowserdManager): Tool[] {
   const specs: BrowserToolSpec[] = [
     {
@@ -337,6 +337,102 @@ export function createBrowserTools(manager: BrowserdManager): Tool[] {
         };
       },
     },
+    {
+      name: 'browser_visual_diff',
+      method: 'browser/visual-diff',
+      description:
+        'F11: pixel-compare two screenshots (base64 PNGs — e.g. before/after a UI fix). Returns the changed-pixel count and ratio plus a highlighted diff PNG saved as an evidence artifact (feeds the F9 Evidence Pack visualProof). Both shots must share dimensions — re-capture at one viewport.',
+      parameters: {
+        type: 'object',
+        required: ['beforePng', 'afterPng'],
+        properties: {
+          beforePng: { type: 'string', description: 'Base64 PNG: the "before" screenshot.' },
+          afterPng: { type: 'string', description: 'Base64 PNG: the "after" screenshot.' },
+          threshold: {
+            type: 'number',
+            description: 'Color-difference threshold 0..1 (default 0.1). Lower = more sensitive.',
+            minimum: 0,
+            maximum: 1,
+          },
+        },
+      },
+      format: (r: any) => ({
+        output: `visual_diff: ${r.diffPixels}/${r.totalPixels} pixels differ (${(r.diffRatio * 100).toFixed(2)}%) at ${r.width}x${r.height}. Diff artifact: ${r.diffPath}`,
+        metadata: {
+          diffPixels: r.diffPixels,
+          totalPixels: r.totalPixels,
+          diffRatio: r.diffRatio,
+          diffPng: r.diffPng,
+          diffPath: r.diffPath,
+        },
+      }),
+    },
+    {
+      name: 'browser_accessibility_scan',
+      method: 'browser/accessibility-scan',
+      description:
+        'F11: run an axe-core accessibility scan on the current page. Returns violations (rule id, impact, description, affected node count) and the pass count. Use it in the frontend closed loop: fix UI → rescan until zero serious/critical violations.',
+      parameters: { type: 'object', properties: {} },
+      format: (r: any) => {
+        const violations = (r.violations ?? []) as Array<{
+          id: string;
+          impact: string | null;
+          description: string;
+          nodes: number;
+        }>;
+        const lines = [
+          `a11y_scan ${r.url ?? '(no page)'}: ${violations.length} violation(s), ${r.passes} rule(s) passed`,
+          ...violations.map(
+            (v) => `  [${v.impact ?? 'unknown'}] ${v.id} ×${v.nodes} — ${v.description}`,
+          ),
+        ];
+        return { output: lines.join('\n'), metadata: { violations: r.violations, passes: r.passes } };
+      },
+    },
+    {
+      name: 'browser_viewport_matrix',
+      method: 'browser/viewport-matrix',
+      description:
+        'F11: capture a URL across the mobile/tablet/desktop viewport matrix (defaults: 390x844, 820x1180, 1440x900; custom list of up to 8 allowed). Each screenshot is saved as an evidence artifact. Same origin-approval flow as browser_open — re-run with approve:true for new origins.',
+      parameters: {
+        type: 'object',
+        required: ['url'],
+        properties: {
+          url: { type: 'string', description: 'URL to capture (http/https; file:// is blocked).' },
+          viewports: {
+            type: 'array',
+            description: 'Custom viewports (default: mobile/tablet/desktop).',
+            minItems: 1,
+            maxItems: 8,
+            items: {
+              type: 'object',
+              required: ['name', 'width', 'height'],
+              properties: {
+                name: { type: 'string' },
+                width: { type: 'integer', minimum: 1, maximum: 7680 },
+                height: { type: 'integer', minimum: 1, maximum: 4320 },
+              },
+            },
+          },
+          fullPage: { type: 'boolean', description: 'Capture the full scrollable page (default false).' },
+          approve: { type: 'boolean', description: 'Approve a previously reported new origin.' },
+        },
+      },
+      format: (r: any) => {
+        if (r.needsApproval) {
+          return {
+            output: `viewport_matrix needs approval: new origin ${r.origin}. Re-run with approve:true.`,
+            metadata: { needsApproval: true, origin: r.origin },
+          };
+        }
+        const shots = (r.shots ?? []) as Array<{ name: string; width: number; height: number; path: string }>;
+        const lines = [
+          `viewport_matrix ${r.url}: ${shots.length} capture(s)`,
+          ...shots.map((s) => `  ${s.name} ${s.width}x${s.height} → ${s.path}`),
+        ];
+        return { output: lines.join('\n'), metadata: { shots: r.shots } };
+      },
+    },
   ];
   return specs.map((s) => defineTool(manager, s));
 }
@@ -355,6 +451,9 @@ export const BROWSER_TOOL_NAMES = [
   'browser_network',
   'browser_close',
   'browser_verify_ui',
+  'browser_visual_diff',
+  'browser_accessibility_scan',
+  'browser_viewport_matrix',
 ] as const;
 
 /**

@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   DriverError,
+  type A11yScanResult,
+  type A11yViolation,
   type ConsoleEntry,
   type Driver,
   type NetworkEntry,
@@ -55,6 +57,8 @@ export interface FakePage {
   nodes: FakeNode[];
   consoleEntries?: ConsoleEntry[];
   networkEntries?: NetworkEntry[];
+  /** Test instrumentation — seeded axe violations returned by a11yScan (F11). */
+  a11yViolations?: A11yViolation[];
 }
 
 function toAx(nodes: FakeNode[]): AxNode[] {
@@ -215,6 +219,17 @@ export class FakeDriver implements Driver {
   async screenshot(_opts?: { fullPage?: boolean }): Promise<Buffer> {
     this.assertOpen();
     return Buffer.from(TINY_PNG_BASE64, 'base64');
+  }
+
+  /** F11: return seeded violations (tests) — the fake has no axe engine. */
+  async a11yScan(): Promise<A11yScanResult> {
+    this.assertOpen();
+    return { violations: this.current?.a11yViolations ?? [], passes: 0 };
+  }
+
+  /** F11: no-op in the fake (viewport has no rendering effect). */
+  async setViewport(_width: number, _height: number): Promise<void> {
+    this.assertOpen();
   }
 
   async consoleEntries(limit?: number): Promise<ConsoleEntry[]> {

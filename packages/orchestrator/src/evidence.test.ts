@@ -11,6 +11,7 @@ import {
   scoreHunk,
   scoreToTier,
   summarizeEvidencePack,
+  withVisualProof,
 } from './evidence.js';
 
 const SAMPLE_DIFF = `diff --git a/src/auth/session.ts b/src/auth/session.ts
@@ -236,5 +237,24 @@ describe('collectEvidencePack', () => {
     });
     expect(pack.hunks).toHaveLength(0);
     expect(pack.unknowns.length).toBeGreaterThan(0);
+  });
+
+  it('F11: withVisualProof attaches browser diff artifacts without mutating', async () => {
+    const pack = await collectEvidencePack({
+      taskId: 'task-6',
+      goal: 'fix misaligned pay button',
+      diffText: SAMPLE_DIFF,
+      workspaceRoot: '/tmp',
+      skipExecution: true,
+    });
+    expect(pack.visualProof).toMatchObject({ kind: 'none', paths: [] });
+    const paths = ['/tmp/media/visual-diff-1.png', '/tmp/media/viewport-desktop-1440x900.png'];
+    const proofed = withVisualProof(pack, paths);
+    expect(proofed.visualProof).toMatchObject({ kind: 'screenshot', paths });
+    expect(() => evidencePackSchema.parse(proofed)).not.toThrow();
+    // input untouched
+    expect(pack.visualProof).toMatchObject({ kind: 'none', paths: [] });
+    const walkthrough = withVisualProof(pack, ['/tmp/media/walkthrough.webm'], 'walkthrough');
+    expect(walkthrough.visualProof.kind).toBe('walkthrough');
   });
 });

@@ -6,3 +6,4 @@ export * from './playwright-driver.js';
 export * from './policy.js';
 export * from './transport.js';
 export * from './server.js';
+export * from './visual-diff.js';

@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   DriverError,
+  type A11yScanResult,
   type ConsoleEntry,
   type Driver,
   type NetworkEntry,
@@ -302,6 +305,53 @@ export class PlaywrightDriver implements Driver {
   async screenshot(opts?: { fullPage?: boolean }): Promise<Buffer> {
     const page = await this.ensurePage();
     return page.screenshot({ fullPage: opts?.fullPage ?? false, type: 'png' });
+  }
+
+  /**
+   * F11: axe-core accessibility scan. axe is injected into the page by the
+   * driver itself (CDP-level evaluate) — this does NOT go through the
+   * restricted browser/eval path, so it works with eval disabled.
+   */
+  async a11yScan(): Promise<A11yScanResult> {
+    const page = await this.ensurePage();
+    let axeSource: string;
+    try {
+      const require = createRequire(import.meta.url);
+      axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+    } catch (e) {
+      throw new DriverError(`a11y_scan: could not load axe-core: ${(e as Error).message}`);
+    }
+    let raw: any;
+    try {
+      raw = await page.evaluate(
+        `(src) => {
+          const s = document.createElement('script');
+          s.textContent = src;
+          document.documentElement.appendChild(s);
+          if (typeof axe === 'undefined') throw new Error('axe failed to initialize');
+          return axe.run(document, { resultTypes: ['violations'] }).then((r) => ({
+            violations: r.violations.map((v) => ({
+              id: v.id,
+              impact: v.impact ?? null,
+              description: v.description,
+              helpUrl: v.helpUrl,
+              nodes: v.nodes.length,
+            })),
+            passes: r.passes.length,
+          }));
+        }`,
+        axeSource,
+      );
+    } catch (e) {
+      throw new DriverError(`a11y_scan failed: ${(e as Error).message}`);
+    }
+    return { violations: raw.violations ?? [], passes: raw.passes ?? 0 };
+  }
+
+  /** F11: resize the page viewport (viewport-matrix captures). */
+  async setViewport(width: number, height: number): Promise<void> {
+    const page = await this.ensurePage();
+    await page.setViewportSize({ width, height });
   }
 
   async consoleEntries(limit?: number): Promise<ConsoleEntry[]> {

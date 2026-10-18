@@ -34,7 +34,7 @@ function registered(stub?: StubManager): { registry: ToolRegistry; stub: StubMan
 const CTX = { cwd: '/tmp/ws' };
 
 describe('browser tools', () => {
-  it('registers exactly the 13 browser_* tools, all dangerous', () => {
+  it('registers exactly the 16 browser_* tools, all dangerous', () => {
     const { registry, stub } = registered();
     expect(registry.names().sort()).toEqual([...BROWSER_TOOL_NAMES].sort());
     for (const t of createBrowserTools(new StubManager() as unknown as BrowserdManager)) {
@@ -122,6 +122,58 @@ describe('browser tools', () => {
     expect(c.output).toContain('[error] boom (a.js:1)');
     const n = await registry.call('browser_network', {}, CTX);
     expect(n.output).toContain('GET 200 http://localhost:3000/');
+  });
+
+  it('F11 tools delegate with kebab-case methods and format reports', async () => {
+    const { registry, stub } = registered();
+    stub.handler = (method) => {
+      if (method === 'browser/visual-diff') {
+        return {
+          width: 200,
+          height: 100,
+          diffPixels: 1920,
+          totalPixels: 20000,
+          diffRatio: 0.096,
+          diffPng: 'abc',
+          diffPath: '/tmp/media/visual-diff-1.png',
+        };
+      }
+      if (method === 'browser/accessibility-scan') {
+        return {
+          url: 'http://localhost:3000/',
+          violations: [
+            { id: 'color-contrast', impact: 'serious', description: 'contrast too low', helpUrl: 'https://x', nodes: 3 },
+          ],
+          passes: 40,
+        };
+      }
+      return {
+        url: 'http://localhost:3000/',
+        shots: [
+          { name: 'mobile', width: 390, height: 844, bytes: 10, path: '/tmp/media/vp-mobile.png', png: 'abc' },
+          { name: 'desktop', width: 1440, height: 900, bytes: 20, path: '/tmp/media/vp-desktop.png', png: 'def' },
+        ],
+      };
+    };
+    const d = await registry.call(
+      'browser_visual_diff',
+      { beforePng: 'aaa', afterPng: 'bbb' },
+      CTX,
+    );
+    expect(d.output).toContain('visual_diff: 1920/20000 pixels differ (9.60%)');
+    expect(d.output).toContain('/tmp/media/visual-diff-1.png');
+    expect(d.metadata).toMatchObject({ diffPixels: 1920, diffRatio: 0.096 });
+    expect(stub.calls[0]).toMatchObject({ method: 'browser/visual-diff' });
+
+    const a = await registry.call('browser_accessibility_scan', {}, CTX);
+    expect(a.output).toContain('a11y_scan http://localhost:3000/: 1 violation(s), 40 rule(s) passed');
+    expect(a.output).toContain('[serious] color-contrast ×3');
+    expect(stub.calls[1]).toMatchObject({ method: 'browser/accessibility-scan' });
+
+    const v = await registry.call('browser_viewport_matrix', { url: 'http://localhost:3000/' }, CTX);
+    expect(v.output).toContain('viewport_matrix http://localhost:3000/: 2 capture(s)');
+    expect(v.output).toContain('mobile 390x844 → /tmp/media/vp-mobile.png');
+    expect(stub.calls[2]).toMatchObject({ method: 'browser/viewport-matrix' });
   });
 
   it('action tools delegate with the right method names', async () => {

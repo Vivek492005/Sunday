@@ -54,6 +54,32 @@ export const verifyCheckSchema = z.discriminatedUnion('kind', [
 ]);
 export type VerifyCheck = z.infer<typeof verifyCheckSchema>;
 
+/** One axe-core violation surfaced by browser/accessibility-scan (F11). */
+export const a11yViolationSchema = z.object({
+  id: z.string().min(1),
+  impact: z.enum(['minor', 'moderate', 'serious', 'critical']).nullable(),
+  description: z.string(),
+  helpUrl: z.string(),
+  /** How many DOM nodes the rule flagged. */
+  nodes: z.number().int().nonnegative(),
+});
+export type A11yViolation = z.infer<typeof a11yViolationSchema>;
+
+/** One named viewport in the browser/viewport-matrix macro (F11). */
+export const viewportSpecSchema = z.object({
+  name: z.string().min(1).max(40),
+  width: z.number().int().positive().max(7680),
+  height: z.number().int().positive().max(4320),
+});
+export type ViewportSpec = z.infer<typeof viewportSpecSchema>;
+
+/** F11 default viewport matrix: mobile / tablet / desktop. */
+export const DEFAULT_VIEWPORTS: ViewportSpec[] = [
+  { name: 'mobile', width: 390, height: 844 },
+  { name: 'tablet', width: 820, height: 1180 },
+  { name: 'desktop', width: 1440, height: 900 },
+];
+
 export const verifyCheckResultSchema = z.object({
   kind: z.string().min(1),
   passed: z.boolean(),
@@ -226,6 +252,66 @@ export const BROWSER_METHODS = {
   'browser/control': {
     params: z.object({}),
     result: z.object({ control: z.enum(['agent', 'user']) }),
+  },
+  /** F11: pixel-compare two screenshots (base64 PNGs, e.g. before/after a UI
+   *  fix). Pure image computation — no page needed. The highlighted diff PNG
+   *  is saved as an evidence artifact and its path returned. */
+  'browser/visual-diff': {
+    params: z.object({
+      /** Base64-encoded PNG ("before"). */
+      beforePng: z.string().min(1),
+      /** Base64-encoded PNG ("after"). */
+      afterPng: z.string().min(1),
+      /** pixelmatch color threshold 0..1 (default 0.1). */
+      threshold: z.number().min(0).max(1).optional(),
+    }),
+    result: z.object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      diffPixels: z.number().int().nonnegative(),
+      totalPixels: z.number().int().nonnegative(),
+      diffRatio: z.number().min(0).max(1),
+      /** Highlighted diff PNG, base64-encoded. */
+      diffPng: z.string().min(1),
+      /** Evidence artifact path the diff PNG was saved to. */
+      diffPath: z.string().min(1),
+    }),
+  },
+  /** F11: axe-core accessibility scan of the current page. Observation-only. */
+  'browser/accessibility-scan': {
+    params: z.object({}),
+    result: z.object({
+      url: z.string().nullable(),
+      violations: z.array(a11yViolationSchema),
+      passes: z.number().int().nonnegative(),
+    }),
+  },
+  /** F11: capture a URL at mobile/tablet/desktop viewports (§18.3-style
+   *  composed macro). Screenshots are saved as evidence artifacts. */
+  'browser/viewport-matrix': {
+    params: z.object({
+      url: z.string().min(1),
+      viewports: z.array(viewportSpecSchema).min(1).max(8).optional(),
+      fullPage: z.boolean().optional(),
+      approve: z.boolean().optional(),
+    }),
+    result: z.object({
+      url: z.string(),
+      needsApproval: z.boolean().optional(),
+      origin: z.string().optional(),
+      shots: z.array(
+        z.object({
+          name: z.string(),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          bytes: z.number().int().nonnegative(),
+          /** Evidence artifact path. */
+          path: z.string().min(1),
+          /** PNG bytes, base64-encoded. */
+          png: z.string().min(1),
+        }),
+      ),
+    }),
   },
 } as const;
 export type BrowserMethodName = keyof typeof BROWSER_METHODS;
