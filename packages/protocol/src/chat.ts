@@ -31,6 +31,22 @@ const turnErrorEvent = z.object({
   code: z.number().int(),
   message: z.string(),
 });
+// F2 Loop Breaker: structured pause event the UI renders with the
+// "change strategy / stronger model / ask me" options. Additive — old
+// clients ignore it via their default branch.
+const loopGuardPausedEvent = z.object({
+  type: z.literal('loop-guard-paused'),
+  kind: z.enum([
+    'repeated-tool-args',
+    'repeated-failure',
+    'apply-revert-pingpong',
+    'spend-no-progress',
+  ]),
+  count: z.number().int().nonnegative(),
+  message: z.string().min(1),
+  action: z.enum(['pause', 'escalate', 'abort']),
+  suggestedActions: z.array(z.string()),
+});
 
 export const chatEventSchema = z.discriminatedUnion('type', [
   textDeltaEvent,
@@ -39,6 +55,7 @@ export const chatEventSchema = z.discriminatedUnion('type', [
   usageEvent,
   turnEndEvent,
   turnErrorEvent,
+  loopGuardPausedEvent,
 ]);
 export type ChatEvent = z.infer<typeof chatEventSchema>;
 

@@ -477,7 +477,7 @@ describe('chat turns', () => {
     h.close();
   });
 
-  it('caps runaway tool loops at max-steps', async () => {
+  it('F2 loop breaker trips before max-steps on a runaway loop', async () => {
     const looping: ChatChunk[][] = Array.from({ length: 10 }, () => [
       {
         type: 'tool-call',
@@ -485,14 +485,42 @@ describe('chat turns', () => {
       },
       { type: 'done', finishReason: 'tool_calls' },
     ]);
-    const h = await makeHarness(new MockProvider(looping), { maxIterations: 3 });
+    const h = await makeHarness(new MockProvider(looping), { maxIterations: 10 });
     const sid = await createSession(h, { cwd: h.dir });
     const id = h.call('chat/send', { sessionId: sid, message: 'loop' });
     await waitFor(() => !!response(h, id));
     const turnId = response(h, id)!.result.turnId as string;
+    await waitFor(() => events(h, turnId).some((e) => e.type === 'loop-guard-paused'));
+    const paused = events(h, turnId).find((e) => e.type === 'loop-guard-paused');
+    expect(paused.kind).toBe('repeated-tool-args');
+    expect(paused.suggestedActions).toContain('change-strategy');
+    // Pause ends the turn gracefully instead of burning to max-steps.
     await waitFor(() => events(h, turnId).some((e) => e.type === 'turn-end'));
-    expect(events(h, turnId).find((e) => e.type === 'turn-end').finishReason).toBe('max-steps');
+    expect(events(h, turnId).find((e) => e.type === 'turn-end').finishReason).toBe('stop');
     h.close();
+  });
+
+  it('caps runaway tool loops at max-steps when the loop breaker is disabled', async () => {
+    process.env.SUNDAY_LOOPGUARD_ENABLED = '0';
+    try {
+      const looping: ChatChunk[][] = Array.from({ length: 10 }, () => [
+        {
+          type: 'tool-call',
+          call: { id: 'c-loop', name: 'list_dir', arguments: { path: '.' } },
+        },
+        { type: 'done', finishReason: 'tool_calls' },
+      ]);
+      const h = await makeHarness(new MockProvider(looping), { maxIterations: 3 });
+      const sid = await createSession(h, { cwd: h.dir });
+      const id = h.call('chat/send', { sessionId: sid, message: 'loop' });
+      await waitFor(() => !!response(h, id));
+      const turnId = response(h, id)!.result.turnId as string;
+      await waitFor(() => events(h, turnId).some((e) => e.type === 'turn-end'));
+      expect(events(h, turnId).find((e) => e.type === 'turn-end').finishReason).toBe('max-steps');
+      h.close();
+    } finally {
+      delete process.env.SUNDAY_LOOPGUARD_ENABLED;
+    }
   });
 });
 

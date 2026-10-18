@@ -9,6 +9,14 @@ import { wrapUntrustedToolOutput } from './untrusted.js';
 import { markTainted, newTaintState, taintEscalationReason, type TaintState } from './taint.js';
 import { credentialGateReason } from './credential-gate.js';
 import type { StoredSession } from './sessions.js';
+// F2 Loop Breaker: the guard itself is pure (no vscode) and lives in the
+// sunday-agent package; sundayd's AgentLoop is the real tool-call loop, so
+// the breaker is enforced here.
+import {
+  LoopGuard,
+  type LoopGuardPolicy,
+  type LoopGuardTrigger,
+} from 'sunday-agent/dist/loopGuard/index.js';
 
 export const DEFAULT_MODEL = 'sunday:meta-llama/llama-3.3-70b-instruct';
 export const DEFAULT_MAX_ITERATIONS = 25;
@@ -35,6 +43,14 @@ export interface AgentLoopOptions {
    * mode-specific message. Undefined = auto (no gating).
    */
   agentMode?: AgentMode;
+  /**
+   * F2 Loop Breaker: runaway-loop detection policy. When set (and not
+   * explicitly disabled), every tool call is checked pre/post execution;
+   * on trip the loop emits `loop-guard-paused` and stops the turn
+   * (pause/escalate) or errors it (abort). Undefined = guard enabled with
+   * defaults.
+   */
+  loopGuard?: Partial<LoopGuardPolicy>;
 }
 
 export interface TurnEvents {
@@ -75,6 +91,7 @@ export class AgentLoop {
   private readonly maxIterations: number;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly agentMode: AgentMode | undefined;
+  private readonly loopGuardPolicy: Partial<LoopGuardPolicy> | undefined;
 
   constructor(
     private readonly deps: AgentLoopDeps,
@@ -87,6 +104,7 @@ export class AgentLoop {
     this.maxIterations = opts.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.sandbox = opts.sandbox;
     this.agentMode = opts.agentMode;
+    this.loopGuardPolicy = opts.loopGuard;
   }
 
   async runTurn(
@@ -109,6 +127,15 @@ export class AgentLoop {
     // S5: per-turn taint state — untrusted content (file reads, web, MCP)
     // escalates state-changing tool calls to manual approval.
     const taint = newTaintState();
+    // F2 Loop Breaker: one guard per turn; re-armed at turn start.
+    const guard =
+      this.loopGuardPolicy?.enabled === false ? undefined : new LoopGuard(this.loopGuardPolicy);
+    guard?.reset();
+    // F2: per-turn token accounting feeds the spend-divergence detector.
+    let turnInputTokens = 0;
+    let turnOutputTokens = 0;
+    let accountedInputTokens = 0;
+    let accountedOutputTokens = 0;
 
     try {
       for (let i = 0; i < this.maxIterations; i++) {
@@ -140,6 +167,8 @@ export class AgentLoop {
             calls.push({ call, parseError: chunk.call.argumentsParseError });
             emit({ type: 'tool-call', call });
           } else if (chunk.type === 'usage') {
+            turnInputTokens += chunk.usage.inputTokens;
+            turnOutputTokens += chunk.usage.outputTokens;
             emit({ type: 'usage', usage: chunk.usage });
           }
           // 'done' needs no action — the loop below decides what happens next.
@@ -159,9 +188,49 @@ export class AgentLoop {
 
         for (const { call, parseError } of calls) {
           throwIfAborted(opts.signal);
-          const result = await this.executeCall(call, parseError, cwd, opts.signal, taint);
-          emit({ type: 'tool-result', result });
-          session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });
+          // F2 Loop Breaker: pre-execution check (repeated args, ping-pong).
+          const pre = guard?.preCall(call.name, call.arguments);
+          let tripped: LoopGuardTrigger | undefined = pre?.trigger;
+          if (!tripped) {
+            const result = await this.executeCall(call, parseError, cwd, opts.signal, taint);
+            emit({ type: 'tool-result', result });
+            session.messages.push({ role: 'tool', toolCallId: call.id, content: result.content });
+            // F2: post-execution check (repeated failures, spend divergence).
+            // Attribute this call the token delta since the previous call.
+            const callInput = Math.max(0, turnInputTokens - accountedInputTokens);
+            const callOutput = Math.max(0, turnOutputTokens - accountedOutputTokens);
+            accountedInputTokens = turnInputTokens;
+            accountedOutputTokens = turnOutputTokens;
+            tripped =
+              pre && guard
+                ? guard.postResult(pre.token, {
+                    tool: call.name,
+                    isError: result.isError,
+                    resultText: contentText(result.content),
+                    inputTokens: callInput,
+                    outputTokens: callOutput,
+                  })
+                : undefined;
+          }
+          if (tripped && guard) {
+            emit({
+              type: 'loop-guard-paused',
+              kind: tripped.kind,
+              count: tripped.count,
+              message: tripped.message,
+              action: guard.policy.action,
+              suggestedActions: tripped.suggestedActions,
+            });
+            if (guard.policy.action === 'abort') {
+              emit({ type: 'turn-error', code: ErrorCode.TurnCancelled, message: tripped.message });
+            } else {
+              // pause: the agent stops and the UI offers change-strategy /
+              // stronger-model / ask-user. escalate: F3 will attach the
+              // single stronger-model retry (currently also pauses).
+              emit({ type: 'turn-end', finishReason: 'stop' });
+            }
+            return;
+          }
         }
         // Loop: the model sees the tool results on the next iteration.
       }
@@ -262,6 +331,38 @@ export class AgentLoop {
 
 export function newTurnId(): string {
   return randomUUID();
+}
+
+/**
+ * F2 Loop Breaker: read the guard policy from the environment (the sidecar
+ * has no access to VS Code settings; the extension forwards
+ * `sunday.loopGuard.*` here in a later pass). Defaults come from
+ * DEFAULT_LOOP_GUARD_POLICY.
+ */
+export function loopGuardPolicyFromEnv(): Partial<LoopGuardPolicy> {
+  const num = (v: string | undefined): number | undefined => {
+    if (v === undefined || v === '') return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const policy: Partial<LoopGuardPolicy> = {};
+  if (process.env.SUNDAY_LOOPGUARD_ENABLED === '0' || process.env.SUNDAY_LOOPGUARD_ENABLED === 'false') {
+    policy.enabled = false;
+  }
+  const threshold = num(process.env.SUNDAY_LOOPGUARD_THRESHOLD);
+  if (threshold !== undefined) policy.threshold = Math.max(2, Math.floor(threshold));
+  const action = process.env.SUNDAY_LOOPGUARD_ACTION;
+  if (action === 'pause' || action === 'escalate' || action === 'abort') policy.action = action;
+  const windowSize = num(process.env.SUNDAY_LOOPGUARD_WINDOW);
+  if (windowSize !== undefined) policy.windowSize = Math.max(4, Math.floor(windowSize));
+  return policy;
+}
+
+/** Flatten tool-result content parts to plain text for error signatures. */
+function contentText(content: ContentPart[]): string {
+  return content
+    .map((p) => (p.type === 'text' ? p.text : `[${p.type}]`))
+    .join('\n');
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

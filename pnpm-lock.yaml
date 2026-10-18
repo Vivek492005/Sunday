@@ -35,6 +35,13 @@ importers:
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)
 
   packages/context:
+    dependencies:
+      tree-sitter-wasms:
+        specifier: ^0.1.13
+        version: 0.1.13
+      web-tree-sitter:
+        specifier: ^0.25.10
+        version: 0.25.10
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -321,6 +328,9 @@ importers:
       '@sunday/tools':
         specifier: workspace:*
         version: link:../tools
+      sunday-agent:
+        specifier: workspace:*
+        version: link:../ext-agent
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -3021,6 +3031,9 @@ packages:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
 
+  tree-sitter-wasms@0.1.13:
+    resolution: {integrity: sha512-wT+cR6DwaIz80/vho3AvSF0N4txuNx/5bcRKoXouOfClpxh/qqrF4URNLQXbbt8MaAxeksZcZd1j8gcGjc+QxQ==}
+
   truncate-utf8-bytes@1.0.2:
     resolution: {integrity: sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ==}
 
@@ -3178,6 +3191,14 @@ packages:
 
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
+
+  web-tree-sitter@0.25.10:
+    resolution: {integrity: sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA==}
+    peerDependencies:
+      '@types/emscripten': ^1.40.0
+    peerDependenciesMeta:
+      '@types/emscripten':
+        optional: true
 
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
@@ -6058,6 +6079,8 @@ snapshots:
 
   tree-kill@1.2.2: {}
 
+  tree-sitter-wasms@0.1.13: {}
+
   truncate-utf8-bytes@1.0.2:
     dependencies:
       utf8-byte-length: 1.0.5
@@ -6211,6 +6234,8 @@ snapshots:
   wcwidth@1.0.1:
     dependencies:
       defaults: 1.0.4
+
+  web-tree-sitter@0.25.10: {}
 
   which@2.0.2:
     dependencies:

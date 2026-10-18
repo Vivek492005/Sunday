@@ -45,22 +45,22 @@
       },
       {
         "command": "sunday.mcp.startServer",
-        "title": "Start Server\u2026",
+        "title": "Start Server…",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.stopServer",
-        "title": "Stop Server\u2026",
+        "title": "Stop Server…",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.restartServer",
-        "title": "Restart Server\u2026",
+        "title": "Restart Server…",
         "category": "Sunday MCP"
       },
       {
         "command": "sunday.mcp.storeSecret",
-        "title": "Store Secret\u2026",
+        "title": "Store Secret…",
         "category": "Sunday MCP"
       },
       {
@@ -71,7 +71,7 @@
       {
         "category": "Sunday",
         "command": "sunday.inlineEdit",
-        "title": "Inline Edit\u2026"
+        "title": "Inline Edit…"
       },
       {
         "category": "Sunday",
@@ -86,7 +86,7 @@
       {
         "category": "Sunday",
         "command": "sunday.orchestration.run",
-        "title": "Run Orchestration\u2026"
+        "title": "Run Orchestration…"
       },
       {
         "category": "Sunday",
@@ -140,13 +140,13 @@
       },
       {
         "command": "sunday.github.cloneRepo",
-        "title": "Clone GitHub Repository\u2026",
+        "title": "Clone GitHub Repository…",
         "category": "Sunday"
       },
       {
         "category": "Sunday",
         "command": "sunday.cloudTask.submit",
-        "title": "Submit Cloud Task\u2026"
+        "title": "Submit Cloud Task…"
       },
       {
         "category": "Sunday",
@@ -156,7 +156,7 @@
       {
         "category": "Sunday",
         "command": "sunday.bestOfN.run",
-        "title": "Best-of-N: Run Parallel Attempts\u2026"
+        "title": "Best-of-N: Run Parallel Attempts…"
       },
       {
         "category": "Sunday",
@@ -166,7 +166,7 @@
       {
         "category": "Sunday",
         "command": "sunday.schedule.create",
-        "title": "Create Schedule\u2026"
+        "title": "Create Schedule…"
       },
       {
         "category": "Sunday",
@@ -176,7 +176,7 @@
       {
         "category": "Sunday",
         "command": "sunday.schedule.delete",
-        "title": "Delete Schedule\u2026"
+        "title": "Delete Schedule…"
       },
       {
         "category": "Sunday",
@@ -186,7 +186,7 @@
       {
         "category": "Sunday",
         "command": "sunday.admin.setPlan",
-        "title": "Sunday Admin: Set User Plan\u2026"
+        "title": "Sunday Admin: Set User Plan…"
       },
       {
         "category": "Sunday",
@@ -207,27 +207,27 @@
       {
         "category": "Sunday",
         "command": "sunday.initProject",
-        "title": "New Project from Template\u2026"
+        "title": "New Project from Template…"
       },
       {
         "category": "Sunday",
         "command": "sunday.mode.set",
-        "title": "Set Agent Mode\u2026"
+        "title": "Set Agent Mode…"
       },
       {
         "category": "Sunday",
         "command": "sunday.memory.applyFrom",
-        "title": "Apply Memories from Another Project\u2026"
+        "title": "Apply Memories from Another Project…"
       },
       {
         "category": "Sunday",
         "command": "sunday.designToCode",
-        "title": "Generate Component from Design Image\u2026"
+        "title": "Generate Component from Design Image…"
       },
       {
         "category": "Sunday",
         "command": "sunday.onboardRepo",
-        "title": "Onboard This Repository\u2026"
+        "title": "Onboard This Repository…"
       },
       {
         "category": "Sunday",
@@ -310,7 +310,7 @@
         },
         "sunday.sidecar.path": {
           "default": "",
-          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled \u2192 workspace \u2192 PATH).",
+          "description": "Absolute path to the sundayd entrypoint (e.g. packages/sundayd/dist/cli.js). Empty = auto-discover (bundled → workspace → PATH).",
           "type": "string"
         },
         "sunday.designToCode.model": {
@@ -370,7 +370,7 @@
         },
         "sunday.orchestration.parallel": {
           "default": false,
-          "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 \u2014 stays off until the parallel benchmark passes.",
+          "description": "Run orchestration units in parallel worktrees when true. Default false (sequential) per ADR-17 — stays off until the parallel benchmark passes.",
           "type": "boolean"
         },
         "sunday.orchestration.maxParallel": {
@@ -442,7 +442,7 @@
         "sunday.admin.key": {
           "type": "string",
           "default": "",
-          "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only \u2014 NOT for production. Never commit a real key here; prefer workspace settings over user settings."
+          "description": "Admin key for the Sunday gateway plan toggle (sunday.admin.setPlan), sent as the x-admin-key header. Testing plan gating before billing exists only — NOT for production. Never commit a real key here; prefer workspace settings over user settings."
         },
         "sunday.engagement.streaksEnabled": {
           "type": "boolean",
@@ -463,6 +463,33 @@
           ],
           "default": "auto",
           "description": "Engagement UI mode. 'auto' (default): passive until you use an AI agent feature this session, then active. 'passive': never show quest/achievement/XP prompts - streak tracking stays silent. 'active': full engagement UI. Passive mode: never interrupt a user who is just editing files."
+        },
+        "sunday.loopGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "F2 Loop Breaker: detect runaway agent loops (repeated tool calls, repeated failures, apply/revert ping-pong, spend-without-progress) and trip the circuit breaker."
+        },
+        "sunday.loopGuard.threshold": {
+          "type": "number",
+          "default": 3,
+          "minimum": 2,
+          "description": "F2 Loop Breaker: repeats needed to trip the breaker."
+        },
+        "sunday.loopGuard.action": {
+          "type": "string",
+          "enum": [
+            "pause",
+            "escalate",
+            "abort"
+          ],
+          "default": "pause",
+          "description": "F2 Loop Breaker: pause (offer change-strategy / stronger-model / ask-user), escalate (F3: single stronger-model retry), or abort the turn."
+        },
+        "sunday.loopGuard.windowSize": {
+          "type": "number",
+          "default": 12,
+          "minimum": 4,
+          "description": "F2 Loop Breaker: sliding-window size (tool-call records kept)."
         }
       },
       "title": "Sunday"
@@ -791,7 +818,7 @@
       {
         "id": "sunday.agent",
         "name": "Sunday",
-        "description": "Sunday AI coding agent \u2014 ask anything about your code",
+        "description": "Sunday AI coding agent — ask anything about your code",
         "commands": [
           {
             "name": "model",
@@ -804,11 +831,11 @@
       {
         "id": "sunday.getStarted",
         "title": "Get Started with Sunday",
-        "description": "Sunday ki saari khaasiyat \u2014 sign-in, theme, AI agent, streaks \u2014 2 minute me seekho.",
+        "description": "Sunday ki saari khaasiyat — sign-in, theme, AI agent, streaks — 2 minute me seekho.",
         "steps": [
           {
             "id": "welcome",
-            "title": "Welcome to Sunday \u2600\ufe0f",
+            "title": "Welcome to Sunday ☀️",
             "description": "Sunday = VS Code ki saari power + AI agents. Pehle sign in karo taaki free AI tier (200 requests/day) activate ho jaye.\n[Sign in to Sunday](command:sunday.account.showMenu)",
             "media": {
               "markdown": "resources/guide/welcome.md"
@@ -816,7 +843,7 @@
           },
           {
             "id": "theme",
-            "title": "Theme badlo \ud83c\udfa8",
+            "title": "Theme badlo 🎨",
             "description": "Sunday Dark (default) ya Sunday Light chuno. Shortcut: Ctrl+K phir Ctrl+T.\n[Theme Chuno](command:workbench.action.selectTheme)",
             "media": {
               "markdown": "resources/guide/theme.md"
@@ -824,7 +851,7 @@
           },
           {
             "id": "agent",
-            "title": "AI Agent kholo \ud83e\udd16",
+            "title": "AI Agent kholo 🤖",
             "description": "Editor ke top bar me Open IDE Agent button hai. Ya chat me @sunday likho.\n[Open IDE Agent](command:sunday.agent.open)",
             "media": {
               "markdown": "resources/guide/agent.md"
@@ -832,7 +859,7 @@
           },
           {
             "id": "streak",
-            "title": "Streak banao \ud83d\udd25",
+            "title": "Streak banao 🔥",
             "description": "Roz code karo, streak badhao, rewards jeeto (7/14/30 din pe extra AI requests).\n[Mera Streak](command:sunday.streak.show)",
             "media": {
               "markdown": "resources/guide/streak.md"
@@ -840,7 +867,7 @@
           },
           {
             "id": "guide",
-            "title": "Poora User Guide \ud83d\udcd6",
+            "title": "Poora User Guide 📖",
             "description": "Saare features, models aur shortcuts ek jagah. Shortcut: Ctrl+Alt+G.\n[User Guide Kholo](command:sunday.guide.open)",
             "media": {
               "markdown": "resources/guide/guide.md"

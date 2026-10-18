@@ -35,7 +35,7 @@ import {
   workspaceTrust,
 } from './trust.js';
 import { workspaceSecrets } from './workspace-secrets.js';
-import { AgentLoop, DEFAULT_MODEL, newTurnId } from './loop.js';
+import { AgentLoop, DEFAULT_MODEL, loopGuardPolicyFromEnv, newTurnId } from './loop.js';
 import { AGENT_MODE_ENV, parseAgentMode, type AgentMode } from '@sunday/tools';
 import { BrowserdManager } from './browserd.js';
 import { registerBrowserTools } from './browser-tools.js';
@@ -331,7 +331,7 @@ export class SundayDaemon {
               : { turnId, sessionId, event },
           ),
       },
-      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode },
+      { router: this.router, policy, defaultModel: opts.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv() },
     );
     this.transport = opts.transport ?? new StdioTransport((req) => this.dispatch(req), input, output, {
       onStdinClose: opts.onStdinClose ?? (() => void this.gracefulExit()),
@@ -409,7 +409,7 @@ export class SundayDaemon {
     const loop = new AgentLoop(
       { tools: opts.tools, providers: this.providers },
       { event: (_sessionId, _turnId, event) => opts.onEvent(event) },
-      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode },
+      { router: this.router, policy: this.policyGate, defaultModel: this.defaultModel, maxIterations: opts.maxIterations, sandbox: this.sandbox, agentMode: this.agentMode, loopGuard: loopGuardPolicyFromEnv() },
     );
     await loop.runTurn(newTurnId(), session, opts.prompt, { model: opts.model, signal: opts.signal, temperature: opts.temperature });
   }

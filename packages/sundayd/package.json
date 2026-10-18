@@ -11,6 +11,7 @@
     "@sunday/protocol": "workspace:*",
     "@sunday/skills": "workspace:*",
     "@sunday/tools": "workspace:*",
+    "sunday-agent": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
