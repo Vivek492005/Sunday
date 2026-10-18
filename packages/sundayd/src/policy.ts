@@ -3,6 +3,7 @@
  *  as a tool error so it can adapt, and the daemon surface exposes
  *  ErrorCode.PolicyDenied for client-initiated calls. */
 import { READ_ONLY_TOOLS, WRITE_TOOLS, type ToolRegistry } from '@sunday/tools';
+import type { PermissionIntel, PolicyContext } from './permission-intel.js';
 
 // Re-exported here so `@sunday/sundayd` keeps its existing public surface;
 // the canonical definitions live in @sunday/tools (tool mutability is a
@@ -22,7 +23,16 @@ export interface PolicyOptions {
   approvals?: string[];
 }
 
-export type PolicyDecision = { allow: true } | { allow: false; reason: string };
+export type PolicyDecision =
+  | { allow: true }
+  | {
+      allow: false;
+      reason: string;
+      /** Present when the denial is an approval request (F7): the UI can
+       *  render an approval card offering these blanket-allow scopes.
+       *  Empty scopes = one-time approval only (destructive classes). */
+      ask?: { canonical: string; tier: string; scopes: unknown[] };
+    };
 
 /**
  * Mark every tool whose definition carries `dangerous: true` on the gate.
@@ -52,12 +62,34 @@ export class PolicyGate {
   private readonly dangerous = new Set<string>();
   /** Per-session approvals for dangerous tools. */
   private readonly approved: Set<string>;
+  /** F7 Permission Intelligence — when attached, arg-aware classification
+   *  (risk tiers, profiles, scoped allowlists, batch plans) decides calls
+   *  the intel understands; everything else falls back to evaluate(). */
+  private intel: PermissionIntel | undefined;
+  private intelPlanId: string | undefined;
 
   constructor(opts: PolicyOptions = {}) {
     this.mode = opts.mode ?? 'allow-all';
     this.allow = new Set(opts.allow ?? []);
     this.deny = new Set(opts.deny ?? []);
     this.approved = new Set(opts.approvals ?? []);
+  }
+
+  /** Attach F7 Permission Intelligence (risk tiers, profiles, allowlists). */
+  attachIntel(intel: PermissionIntel, planId?: string): void {
+    this.intel = intel;
+    this.intelPlanId = planId;
+  }
+
+  /** Detach Permission Intelligence (revert to tool-name-only decisions). */
+  detachIntel(): void {
+    this.intel = undefined;
+    this.intelPlanId = undefined;
+  }
+
+  /** Whether Permission Intelligence is attached. */
+  hasIntel(): boolean {
+    return this.intel !== undefined;
   }
 
   /** Flag a tool as requiring explicit user approval (risk class M). */
@@ -98,6 +130,45 @@ export class PolicyGate {
   /** Sorted approved tool names (for the policy/list surface). */
   approvedTools(): string[] {
     return [...this.approved].sort();
+  }
+
+  /**
+   * Arg-aware evaluation (F7). When Permission Intelligence is attached and
+   * classifies the call, its decision wins — except the base `deny` list,
+   * which always wins. Unclassified calls fall back to evaluate(toolName),
+   * so behavior is unchanged when no intel is attached.
+   */
+  evaluateCall(
+    toolName: string,
+    args: Record<string, unknown> = {},
+    cwd: string = process.cwd(),
+    ctx: Partial<PolicyContext> = {},
+  ): PolicyDecision {
+    // Deny always wins over allow — checked before everything.
+    if (this.deny.has(toolName)) {
+      return { allow: false, reason: `tool '${toolName}' is denied by policy` };
+    }
+    if (this.intel) {
+      const r = this.intel.decide(toolName, args, {
+        cwd,
+        sessionId: 'default',
+        principal: 'agent',
+        ...ctx,
+      }, this.intelPlanId);
+      if (r.action) {
+        if (r.decision === 'allow') return { allow: true };
+        if (r.decision === 'deny') return { allow: false, reason: r.reason };
+        // 'ask' is surfaced as a denial carrying approval-card info: the
+        // loop feeds it back to the model as a tool error so it can adapt,
+        // and the client can render the approval UI from `ask`.
+        return {
+          allow: false,
+          reason: `${r.reason} — ask the user to approve it (one-time or a scoped always-allow), then call it again`,
+          ask: { canonical: r.action.canonical, tier: r.action.tier, scopes: r.askScopes ?? [] },
+        };
+      }
+    }
+    return this.evaluate(toolName);
   }
 
   evaluate(toolName: string): PolicyDecision {
