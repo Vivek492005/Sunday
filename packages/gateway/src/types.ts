@@ -1,5 +1,6 @@
 import type { ContentPart, ToolCall, ToolDefinition, Usage } from '@sunday/protocol';
 import type { SchedulerPriority } from './multi-scheduler.js';
+import type { TaskClass } from './policies.js';
 
 /** Gateway types (§10). The gateway speaks to hosted providers through
  *  OpenAI-compatible adapters and streams normalized chunks to sundayd. */
@@ -29,6 +30,12 @@ export interface ChatRequest {
    * before — single-agent flows are untouched.
    */
   agent?: AgentRequestContext;
+  /**
+   * F3 task class for honest routing. When the Router was built with
+   * RoutePolicies and one matches this class, the policy's primary/fallback
+   * models are used instead of `model`. Defaults to 'default'.
+   */
+  taskClass?: TaskClass;
 }
 
 /**
