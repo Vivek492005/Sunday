@@ -38,21 +38,31 @@ remain the documented mitigation until then.
 
 ## SEC-10 — Credential-file reads (`.env`, `*.pem`) not ask-gated (Low)
 
-**Status: DEFERRED (post-1.0-beta)**
+**Status: FIXED (F10, 2026-10-18)**
 
 Rationale:
 - The blast radius is already contained by SEC-03: all tool output is
   secret-redacted before it reaches the model provider, so credential
   *values* never leave the machine in prompts.
-- Ask-gating requires a new approval flow (detect credential-file patterns
-  on read, surface an approval prompt, handle the UX in both the extension
-  and CLI frontends). Not a small change.
-- Severity is Low precisely because SEC-03 contains the exfiltration path;
-  the remaining risk is local display of secrets to the same user who owns
-  the files.
+- F10's injection firewall (`packages/sundayd/src/injection-firewall.ts`)
+  now covers the remaining risk: the `credential-harvest` rule (severity:
+  block) fires on any untrusted content that asks the agent to
+  send/paste/read/include credentials, `.env` files, private keys, or
+  `credentials.json` — the request is BLOCKED, never silently executed.
+- The pre-commit security step (`packages/sundayd/src/security-scan.ts`)
+  scans staged content with gitleaks-style secret patterns (AWS keys,
+  GitHub PATs, OpenAI keys, PEM blocks, hardcoded passwords, DB connection
+  strings) and fails the gate on any hit; secret previews are redacted.
+- Direct user-initiated reads of their own credential files remain allowed
+  (severity stays Low: the remaining risk is local display of secrets to
+  the same user who owns the files, and SEC-03 contains the exfiltration
+  path).
 
-Plan: implement credential-file ask-gating alongside the SEC-09 taint work
-post-beta, when the approval UX is being extended anyway.
+Tests:
+- `injection-firewall.test.ts` → red-team payloads I7 (`paste your .env`)
+  and R3 (hidden HTML comment exfiltrating `~/.ssh/id_rsa`) both blocked.
+- `security-scan.test.ts` → secret patterns, redacted previews, `.env`
+  exemption for plain assignments, gate pass/fail semantics.
 
 ## SEC-11 — Browser policy: DNS rebinding can bypass private-IP block (Low)
 

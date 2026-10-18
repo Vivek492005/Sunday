@@ -7,6 +7,12 @@ import { redactSecrets } from '@sunday/skills';
 import { PolicyGate } from './policy.js';
 import { wrapUntrustedToolOutput } from './untrusted.js';
 import { markTainted, newTaintState, taintEscalationReason, type TaintState } from './taint.js';
+import {
+  firewallCheck,
+  wrapUntrusted,
+  sinkForTool,
+  type UntrustedSource,
+} from './injection-firewall.js';
 import { credentialGateReason } from './credential-gate.js';
 import type { StoredSession } from './sessions.js';
 // F8 User Hooks: deterministic lifecycle hooks (block/modify/run/annotate).
@@ -104,6 +110,28 @@ interface PendingCall {
   call: ToolCall;
   /** Set when the model emitted non-JSON arguments. */
   parseError?: string;
+}
+
+/**
+ * F10: map taint.ts source strings to firewall UntrustedSource values.
+ * Unknown sources default to the most conservative bucket.
+ */
+function taintSourceForFirewall(sources: string[]): UntrustedSource {
+  const KNOWN: ReadonlySet<string> = new Set([
+    'web_fetch',
+    'web_search',
+    'mcp_tool_result',
+    'file_read_untrusted',
+    'browser_content',
+    'readme',
+    'issue_text',
+    'chat_message_untrusted',
+    'clipboard',
+  ]);
+  for (const s of sources) {
+    if (KNOWN.has(s)) return s as UntrustedSource;
+  }
+  return 'mcp_tool_result';
 }
 
 /**
@@ -453,6 +481,39 @@ export class AgentLoop {
         content: [{ type: 'text', text: `Taint escalation: ${taintReason}` }],
         isError: true,
       };
+    }
+    // F10: injection firewall — generalizes taint.ts with pattern detection.
+    // When the turn is tainted, scan the proposed tool call (name + args)
+    // for injection markers and enforce the taint-to-sink policy: untrusted
+    // content reaching terminal/network/write-outside-workspace is NEVER
+    // silently executed. Blocked calls are denied; ask-worthy calls are
+    // escalated to the user, fed back as a tool error so the model adapts.
+    if (taint.taintedThisTurn) {
+      const source = taintSourceForFirewall(taint.taintSources);
+      const verdict = firewallCheck(
+        wrapUntrusted(
+          `${call.name} ${JSON.stringify(mutableArgs)}`,
+          source,
+          `agent-loop:${call.name}`
+        ),
+        sinkForTool(call.name)
+      );
+      if (verdict.decision !== 'allow') {
+        const verb = verdict.decision === 'block' ? 'Blocked' : 'Escalated for approval';
+        return {
+          toolCallId: call.id,
+          content: [
+            {
+              type: 'text',
+              text:
+                `F10 injection firewall ${verb}: '${call.name}' with tainted ` +
+                `context (sources: ${taint.taintSources.join(', ')}). ` +
+                verdict.reasons.join(' '),
+            },
+          ],
+          isError: true,
+        };
+      }
     }
     // S5: credential gate — reading .env/*.pem/id_rsa etc. requires manual
     // approval (SEC-10). The gate runs here (not in the tool) because the
