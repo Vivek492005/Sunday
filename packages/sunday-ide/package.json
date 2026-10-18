@@ -11,7 +11,9 @@
     "@sunday/protocol": "workspace:*",
     "@sunday/context": "workspace:*",
     "@sunday/hooks": "workspace:*",
-    "@sunday/orchestrator": "workspace:*"
+    "@sunday/orchestrator": "workspace:*",
+    "@sunday/gateway": "workspace:*",
+    "@sunday/org": "workspace:*"
   },
   "description": "Sunday IDE — Sunday's own custom IDE shell (Electron + React + Monaco). Zero VS Code workbench UI; Monaco is used only as the text-editing engine.",
   "devDependencies": {

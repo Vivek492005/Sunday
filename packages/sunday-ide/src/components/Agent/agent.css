@@ -496,3 +496,36 @@
   color: var(--sunday-fg);
   white-space: pre;
 }
+
+/* F14: local-only privacy toggle + Ollama status dot */
+.sunday-agent-localonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--sunday-fg-dim, #a89f8d);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sunday-agent-localonly input[type='checkbox'] {
+  accent-color: var(--sunday-accent, #f5b942);
+  cursor: pointer;
+}
+.sunday-agent-local-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.sunday-agent-local-dot[data-state='online'] {
+  background: #4caf50;
+  box-shadow: 0 0 4px #4caf50;
+}
+.sunday-agent-local-dot[data-state='offline'] {
+  background: #f44336;
+  box-shadow: 0 0 4px #f44336;
+}
+.sunday-agent-local-dot[data-state='unknown'] {
+  background: #9e9e9e;
+}

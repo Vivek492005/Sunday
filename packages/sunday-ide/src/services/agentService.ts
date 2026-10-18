@@ -21,6 +21,11 @@ import type {
   HookInfo,
   EvidenceSummary,
   LoopGuardStatus,
+  LocalChatStatus,
+  LocalModel,
+  LocalProbeResult,
+  OrgPolicySummary,
+  OrgAuditEvent,
 } from '../../electron/preload';
 
 declare global {
@@ -126,6 +131,32 @@ export const agentService = {
   evidence(diffText: string, goal: string): Promise<EvidenceSummary> {
     return bridge().evidence.get(diffText, goal);
   },
+  // F14 — local-first chat (Ollama)
+  localStatus(): Promise<LocalChatStatus> {
+    return bridge().local.status();
+  },
+  localModels(): Promise<LocalModel[]> {
+    return bridge().local.models();
+  },
+  localProbe(): Promise<LocalProbeResult> {
+    return bridge().local.probe();
+  },
+  localPrivacy(): Promise<boolean> {
+    return bridge().local.privacy();
+  },
+  setLocalPrivacy(on: boolean): Promise<boolean> {
+    return bridge().local.setPrivacy(on);
+  },
+  // F15 — team governance
+  orgLoad(workspaceDir?: string): Promise<OrgPolicySummary> {
+    return bridge().org.load(workspaceDir);
+  },
+  orgLocked(key: string, workspaceDir?: string): Promise<boolean> {
+    return bridge().org.locked(key, workspaceDir);
+  },
+  orgAudit(limit?: number): Promise<OrgAuditEvent[]> {
+    return bridge().org.audit(limit);
+  },
 };
 
 export type {
@@ -142,4 +173,9 @@ export type {
   HookInfo,
   EvidenceSummary,
   LoopGuardStatus,
+  LocalChatStatus,
+  LocalModel,
+  LocalProbeResult,
+  OrgPolicySummary,
+  OrgAuditEvent,
 };

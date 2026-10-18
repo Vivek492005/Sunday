@@ -543,6 +543,50 @@ ipcMain.handle('sunday:evidence:get', async (_e, diffText: string, goal: string)
   evidenceForDiff(diffText ?? '', goal ?? ''),
 );
 
+// ---------------------------------------------------------------- F14/F15 IPC
+//
+// INTEGRATION WAVE: F14 Local-first Chat (Ollama) + F15 Team Governance
+// (org policy bundles). Implemented in ./localOrgBackend.ts. NO STUBS —
+// every handler calls real backend code.
+import {
+  getLocalChatStatus,
+  listLocalModels,
+  probeLocalChat,
+  getLocalOnlyMode,
+  setLocalOnlyMode,
+  loadOrgPolicySummary,
+  isOrgSettingLocked,
+  getOrgAuditEvents,
+} from './localOrgBackend.js';
+
+// F14: real Ollama status (live /api/tags health check).
+ipcMain.handle('sunday:local:status', async () => getLocalChatStatus());
+
+// F14: real model discovery (live when Ollama is up, static fallback when down).
+ipcMain.handle('sunday:local:models', async () => listLocalModels());
+
+// F14: real capability probe (3 model calls; can take ~30-90s — UI shows progress).
+ipcMain.handle('sunday:local:probe', async () => probeLocalChat());
+
+// F14: local-only privacy toggle (IDE-persisted; UI offers only local models when on).
+ipcMain.handle('sunday:local:privacy', async () => getLocalOnlyMode());
+ipcMain.handle('sunday:local:set-privacy', async (_e, on: boolean) => setLocalOnlyMode(!!on));
+
+// F15: load + signature-verify the active org bundle; honest error reporting.
+ipcMain.handle('sunday:org:load', async (_e, workspaceDir?: string) =>
+  loadOrgPolicySummary(workspaceDir),
+);
+
+// F15: is this setting key org-locked? Real pattern matching.
+ipcMain.handle('sunday:org:locked', async (_e, key: string, workspaceDir?: string) =>
+  isOrgSettingLocked(key, workspaceDir),
+);
+
+// F15: recent audit events, newest first. Real JSONL audit trail.
+ipcMain.handle('sunday:org:audit', async (_e, limit?: number) =>
+  getOrgAuditEvents(typeof limit === 'number' ? limit : 20),
+);
+
 // ---------------------------------------------------------------- settings IPC
 //
 // Persisted at ~/.sunday-ide/settings.json. Wave 3: Editor, Terminal,

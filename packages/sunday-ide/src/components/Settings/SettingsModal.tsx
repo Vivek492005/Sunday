@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useIde } from '../../state/ideStore';
 import { settingsService, DEFAULT_SETTINGS, type SundaySettings } from '../../services/settingsService';
+import { agentService, type OrgPolicySummary } from '../../services/agentService';
 import { CloseIcon, SearchIcon } from '../icons';
 import './settings.css';
 
@@ -54,15 +55,23 @@ export function SettingsModal() {
   const [settings, setSettings] = useState<SundaySettings>({ ...DEFAULT_SETTINGS });
   const [query, setQuery] = useState('');
   const [loaded, setLoaded] = useState(false);
+  /* F15: org policy summary for the Organization section. */
+  const [org, setOrg] = useState<OrgPolicySummary | null>(null);
 
   useEffect(() => {
     if (!state.settingsOpen) return;
     setLoaded(false);
     setQuery('');
+    setOrg(null);
     void settingsService.get().then((s) => {
       setSettings(s);
       setLoaded(true);
     });
+    // F15: real org bundle load (null = unmanaged IDE, not an error).
+    void agentService
+      .orgLoad()
+      .then((summary) => setOrg(summary))
+      .catch(() => setOrg(null));
   }, [state.settingsOpen]);
 
   // close on Escape
@@ -189,6 +198,79 @@ export function SettingsModal() {
               </div>
             );
           })}
+          {/* F15: Organization — org-locked policies are read-only, with lock indicators. */}
+          {loaded && (query.trim() === '' || 'organization'.includes(query.trim().toLowerCase())) && (
+            <div className="sunday-settings-section">
+              <div className="sunday-settings-section-title">ORGANIZATION</div>
+              {org == null && (
+                <div className="sunday-settings-hint">Checking for an organization policy…</div>
+              )}
+              {org != null && !org.found && (
+                <div className="sunday-settings-hint">
+                  This IDE is not managed by an organization. Place a signed{' '}
+                  <code>sunday-org.json</code> in your workspace or <code>~/.sunday/</code> to
+                  enable team governance.
+                </div>
+              )}
+              {org != null && org.found && org.error && (
+                <div className="sunday-settings-hint sunday-settings-error">
+                  Organization bundle found but invalid: {org.error}
+                </div>
+              )}
+              {org != null && org.found && !org.error && (
+                <>
+                  <div className="sunday-setting-row">
+                    <div className="sunday-setting-meta">
+                      <div className="sunday-setting-label">
+                        {org.orgName ?? org.orgId ?? 'Organization'}
+                      </div>
+                      <div className="sunday-setting-hint">
+                        {org.verifiedKeyId
+                          ? `Signature verified (key ${org.verifiedKeyId})`
+                          : 'Unsigned bundle (dev mode)'}
+                      </div>
+                    </div>
+                  </div>
+                  {org.locked.length === 0 && (
+                    <div className="sunday-settings-hint">No settings are locked by your org.</div>
+                  )}
+                  {org.locked.map((key) => (
+                    <div key={key} className="sunday-setting-row sunday-setting-locked">
+                      <div className="sunday-setting-meta">
+                        <div className="sunday-setting-label">
+                          <span aria-hidden="true">🔒</span> {key}
+                        </div>
+                        <div className="sunday-setting-hint">Managed by your org — read-only</div>
+                      </div>
+                      <div className="sunday-setting-control">
+                        <span className="sunday-org-lock-badge">org-locked</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="sunday-setting-row">
+                    <div className="sunday-setting-meta">
+                      <div className="sunday-setting-label">Policy profile</div>
+                      <div className="sunday-setting-hint">F7 permission profile in effect</div>
+                    </div>
+                    <div className="sunday-setting-control">
+                      <span className="sunday-org-value">{org.policyProfile}</span>
+                    </div>
+                  </div>
+                  {org.allowedModels != null && (
+                    <div className="sunday-setting-row">
+                      <div className="sunday-setting-meta">
+                        <div className="sunday-setting-label">Allowed models</div>
+                        <div className="sunday-setting-hint">Agent model picker is restricted to these</div>
+                      </div>
+                      <div className="sunday-setting-control">
+                        <span className="sunday-org-value">{org.allowedModels.join(', ')}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

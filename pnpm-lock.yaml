@@ -221,6 +221,25 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)
 
+  packages/org:
+    dependencies:
+      '@sunday/hooks':
+        specifier: workspace:*
+        version: link:../hooks
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)
+
   packages/protocol:
     dependencies:
       zod:
@@ -280,12 +299,18 @@ importers:
       '@sunday/context':
         specifier: workspace:*
         version: link:../context
+      '@sunday/gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@sunday/hooks':
         specifier: workspace:*
         version: link:../hooks
       '@sunday/orchestrator':
         specifier: workspace:*
         version: link:../orchestrator
+      '@sunday/org':
+        specifier: workspace:*
+        version: link:../org
       '@sunday/protocol':
         specifier: workspace:*
         version: link:../protocol

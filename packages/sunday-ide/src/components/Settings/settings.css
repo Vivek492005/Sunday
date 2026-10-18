@@ -158,3 +158,29 @@
   padding: 18px 4px;
   text-align: center;
 }
+
+/* F15: org-locked indicators */
+.sunday-setting-locked {
+  opacity: 0.85;
+}
+.sunday-settings-error {
+  color: #e57373;
+}
+.sunday-org-lock-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sunday-accent, #f5b942);
+  border: 1px solid var(--sunday-accent, #f5b942);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.sunday-org-value {
+  font-size: 12px;
+  color: var(--sunday-fg, #ece5d8);
+  text-align: right;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

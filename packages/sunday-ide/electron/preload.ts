@@ -136,6 +136,18 @@ export interface SundayAPI {
   evidence: {
     get(diffText: string, goal: string): Promise<EvidenceSummary>;
   };
+  local: {
+    status(): Promise<LocalChatStatus>;
+    models(): Promise<LocalModel[]>;
+    probe(): Promise<LocalProbeResult>;
+    privacy(): Promise<boolean>;
+    setPrivacy(on: boolean): Promise<boolean>;
+  };
+  org: {
+    load(workspaceDir?: string): Promise<OrgPolicySummary>;
+    locked(key: string, workspaceDir?: string): Promise<boolean>;
+    audit(limit?: number): Promise<OrgAuditEvent[]>;
+  };
 }
 
 export interface SearchResult {
@@ -282,6 +294,63 @@ export interface EvidenceSummary {
   topRisks: { path: string; tier: string; reason: string }[];
 }
 
+/** F14: Local-first Chat (Ollama) shapes — mirror @sunday/gateway local-chat. */
+export interface LocalChatStatus {
+  enabled: boolean;
+  available: boolean;
+  agentCapable: boolean | null;
+  probedAt?: string;
+  model: string;
+  host: string;
+}
+
+export interface LocalModel {
+  /** "ollama:<bare-id>" ref the router understands. */
+  id: string;
+  label: string;
+  contextWindow: number;
+  supportsTools: boolean;
+}
+
+export interface LocalProbeCheck {
+  pass: boolean;
+  detail: string;
+}
+
+export interface LocalProbeResult {
+  model: string;
+  agentCapable: boolean;
+  checks: {
+    toolCall: LocalProbeCheck;
+    json: LocalProbeCheck;
+    editApply: LocalProbeCheck;
+  };
+  probedAt: string;
+}
+
+/** F15: Team Governance shapes — mirror @sunday/org. */
+export interface OrgPolicySummary {
+  found: boolean;
+  path?: string;
+  orgId?: string;
+  orgName?: string;
+  verifiedKeyId: string | null;
+  locked: string[];
+  policyProfile: string;
+  allowedModels: string[] | null;
+  allowedProviders: string[] | null;
+  budgets: Record<string, unknown>;
+  error?: string;
+}
+
+export interface OrgAuditEvent {
+  id: string;
+  ts: string;
+  type: string;
+  actor: string;
+  summary: string;
+}
+
 const api: SundayAPI = {
   window: {
     minimize: () => ipcRenderer.invoke('sunday:window:minimize'),
@@ -401,6 +470,18 @@ const api: SundayAPI = {
   },
   evidence: {
     get: (diffText, goal) => ipcRenderer.invoke('sunday:evidence:get', diffText, goal),
+  },
+  local: {
+    status: () => ipcRenderer.invoke('sunday:local:status'),
+    models: () => ipcRenderer.invoke('sunday:local:models'),
+    probe: () => ipcRenderer.invoke('sunday:local:probe'),
+    privacy: () => ipcRenderer.invoke('sunday:local:privacy'),
+    setPrivacy: (on: boolean) => ipcRenderer.invoke('sunday:local:set-privacy', on),
+  },
+  org: {
+    load: (workspaceDir?: string) => ipcRenderer.invoke('sunday:org:load', workspaceDir),
+    locked: (key: string, workspaceDir?: string) => ipcRenderer.invoke('sunday:org:locked', key, workspaceDir),
+    audit: (limit?: number) => ipcRenderer.invoke('sunday:org:audit', limit),
   },
 };
 

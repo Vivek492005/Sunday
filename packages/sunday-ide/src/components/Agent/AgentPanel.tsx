@@ -24,6 +24,8 @@ import type {
   AgentMode,
   AgentUsage,
   ContextUsage,
+  LocalChatStatus,
+  LocalModel,
 } from '../../services/agentService';
 import { Markdown } from './markdown';
 import './agent.css';
@@ -46,6 +48,58 @@ export function AgentPanel() {
   const [usage, setUsage] = useState<AgentUsage | null>(null);
   const [budgetPaused, setBudgetPaused] = useState(false);
   const [ctxUsage, setCtxUsage] = useState<ContextUsage | null>(null);
+  /* ---------------- F14: local-first chat (Ollama) ---------------- */
+  const [localStatus, setLocalStatus] = useState<LocalChatStatus | null>(null);
+  const [localModels, setLocalModels] = useState<LocalModel[]>([]);
+  const [localOnly, setLocalOnly] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [status, models, privacy] = await Promise.all([
+          agentService.localStatus(),
+          agentService.localModels(),
+          agentService.localPrivacy(),
+        ]);
+        if (cancelled) return;
+        setLocalStatus(status);
+        setLocalModels(models);
+        setLocalOnly(privacy);
+        // Persisted local-only: switch to a local model if the current one is cloud.
+        if (privacy && models.length > 0) {
+          setModel((prev) => (prev.startsWith('ollama:') ? prev : models[0].id));
+        }
+      } catch {
+        if (!cancelled) {
+          setLocalStatus(null);
+          setLocalModels([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLocalOnlyToggle = useCallback(async () => {
+    const next = !localOnly;
+    setLocalOnly(next);
+    try {
+      await agentService.setLocalPrivacy(next);
+    } catch {
+      // persistence failed — revert the toggle
+      setLocalOnly(!next);
+    }
+    // When enabling local-only with no local models, fall back to first local model id if any.
+    if (next && localModels.length > 0 && !model.startsWith('ollama:')) {
+      setModel(localModels[0].id);
+    }
+  }, [localOnly, localModels, model]);
+
+  // Visible models: local-only mode offers ONLY Ollama models (privacy enforced at UI).
+  const visibleCloudModels = localOnly ? [] : AGENT_MODELS;
+  const showLocalSection = localModels.length > 0;
 
   const listRef = useRef<HTMLDivElement>(null);
   const lastUserMessage = useRef<string>('');
@@ -180,12 +234,59 @@ export function AgentPanel() {
           title="Model"
           aria-label="Model"
         >
-          {AGENT_MODELS.map((m) => (
+          {visibleCloudModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>
           ))}
+          {showLocalSection && (
+            <optgroup
+              label={
+                localStatus?.available
+                  ? 'Local (Ollama)'
+                  : 'Local (Ollama — offline)'
+              }
+            >
+              {localModels.map((m) => (
+                <option key={m.id} value={m.id} disabled={!localStatus?.available}>
+                  {m.label}
+                  {localStatus?.agentCapable === true ? ' · agent-ready' : ''}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
+        {/* F14: local-only privacy toggle + Ollama status dot */}
+        <label
+          className="sunday-agent-localonly"
+          title="Local-only mode: cloud models are hidden, requests stay on your machine via Ollama"
+        >
+          <input
+            type="checkbox"
+            checked={localOnly}
+            onChange={() => void handleLocalOnlyToggle()}
+            aria-label="Local-only mode"
+          />
+          <span
+            className="sunday-agent-local-dot"
+            data-state={
+              localStatus == null
+                ? 'unknown'
+                : localStatus.available
+                  ? 'online'
+                  : 'offline'
+            }
+            title={
+              localStatus == null
+                ? 'Ollama status unknown'
+                : localStatus.available
+                  ? `Ollama online at ${localStatus.host}`
+                  : `Ollama offline — start it with \`ollama serve\` (${localStatus.host})`
+            }
+            aria-hidden="true"
+          />
+          Local-only
+        </label>
         <button
           type="button"
           className="sunday-agent-clear"
