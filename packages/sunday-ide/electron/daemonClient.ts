@@ -27,6 +27,10 @@ const pending = new Map<number | string, PendingRpc>();
 let rpcBuffer = '';
 
 function daemonBin(): string {
+  // 1. Packaged app: dist-electron/sundayd.cjs (bundled by build-electron.mjs).
+  const bundled = path.resolve(__dirname, 'sundayd.cjs');
+  if (fs.existsSync(bundled)) return bundled;
+  // 2. Dev: packages/sundayd/dist/cli.js
   // packages/sunday-ide/electron -> packages/sundayd/dist/cli.js
   return path.resolve(__dirname, '..', '..', 'sundayd', 'dist', 'cli.js');
 }

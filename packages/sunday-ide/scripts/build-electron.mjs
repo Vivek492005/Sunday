@@ -32,3 +32,27 @@ await build({
 });
 
 console.log('electron build ok');
+
+// Bundle the sundayd daemon into a single file so the packaged app
+// ships it (the installer only includes dist/ + dist-electron/).
+// daemonClient.ts resolves this bundled copy first, then the dev path.
+await build({
+  entryPoints: [path.join(root, '..', 'sundayd', 'src', 'cli.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node18',
+  outfile: path.join(root, 'dist-electron', 'sundayd.cjs'),
+  // Native / external modules the daemon shells out to or loads dynamically.
+  external: ['electron', '@lydell/node-pty', '@lydell/node-pty-*'],
+  // CJS has no import.meta.url — shim it so createRequire(import.meta.url) works.
+  banner: {
+    js: `var __sundayPtfu = require('node:url').pathToFileURL;\nvar __sundayImportMetaUrl = __sundayPtfu(__filename).href;`,
+  },
+  define: {
+    'import.meta.url': '__sundayImportMetaUrl',
+  },
+  logLevel: 'info',
+});
+
+console.log('sundayd bundle ok');
