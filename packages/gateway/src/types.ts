@@ -36,6 +36,12 @@ export interface ChatRequest {
    * models are used instead of `model`. Defaults to 'default'.
    */
   taskClass?: TaskClass;
+  /**
+   * F14 privacy tier. 'local-only' pins the request to the local Ollama
+   * provider — the router throws LocalOnlyUnavailableError rather than
+   * ever sending the request to a cloud provider. Defaults to 'any'.
+   */
+  privacy?: 'local-only' | 'any';
 }
 
 /**
@@ -83,6 +89,13 @@ export interface ChatProvider {
   readonly label: string;
   chat(request: ChatRequest): AsyncIterable<ChatChunk>;
   listModels(): Promise<ModelEntry[]>;
+  /**
+   * F14 — optional liveness check. Providers that can answer cheaply
+   * (e.g. Ollama's local /api/tags) implement this so the router can skip
+   * an unavailable primary and fall through to fallbacks instead of
+   * failing the request. Absent = assumed available.
+   */
+  isAvailable?(): Promise<boolean>;
 }
 
 /** Fill-in-the-middle completion request (ghost text / autocomplete). */

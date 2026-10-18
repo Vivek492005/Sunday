@@ -186,6 +186,22 @@ export class GroqProvider extends OpenAICompatibleProvider {
  */
 export const OLLAMA_DEFAULT_MODEL = 'ollama:qwen2.5-coder:1.5b';
 
+/**
+ * F14 — known context windows for common local models (DATA, not code).
+ * Unknown discovered models fall back to OLLAMA_DEFAULT_CONTEXT_WINDOW.
+ */
+const KNOWN_LOCAL_CONTEXT_WINDOWS: Record<string, number> = {
+  'qwen2.5-coder:1.5b': 32768,
+  'qwen2.5-coder:7b': 32768,
+  'qwen2.5-coder:14b': 32768,
+  'llama3.1:8b': 131072,
+  'llama3.2:3b': 131072,
+  'codellama:7b': 16384,
+  'deepseek-coder-v2:16b': 32768,
+};
+
+const OLLAMA_DEFAULT_CONTEXT_WINDOW = 32768;
+
 const OLLAMA_MODELS: ModelEntry[] = [
   {
     id: 'qwen2.5-coder:1.5b',
@@ -227,7 +243,51 @@ export class OllamaProvider extends OpenAICompatibleProvider {
   }
 
   async listModels(): Promise<ModelEntry[]> {
+    // F14: prefer live discovery from the local daemon; fall back to the
+    // baked-in list when Ollama is down so callers degrade gracefully.
+    try {
+      const discovered = await this.discoverModels();
+      if (discovered.length > 0) return discovered;
+    } catch {
+      // fall through to static list
+    }
     return OLLAMA_MODELS;
+  }
+
+  /**
+   * F14 — Model discovery: GET <host>/api/tags and map each installed
+   * model to a ModelEntry. Throws on transport errors / bad payloads —
+   * listModels() catches and falls back to the static list.
+   *
+   * Heuristics (documented, conservative): small local models are marked
+   * supportsTools=false — real tool-call ability is determined by the
+   * F14 capability probe, not by advertisement. FIM support is guessed
+   * from the model name ('coder' family); wrong guesses only affect which
+   * completion endpoint is tried first, never correctness.
+   */
+  async discoverModels(): Promise<ModelEntry[]> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    (timer as unknown as { unref?: () => void }).unref?.();
+    try {
+      const res = await fetch(`${this.ollamaHost()}/api/tags`, {
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(`ollama /api/tags: HTTP ${res.status}`);
+      const body = (await res.json()) as { models?: Array<{ name?: unknown }> };
+      const names = (body.models ?? [])
+        .map((m) => m?.name)
+        .filter((n): n is string => typeof n === 'string' && n.length > 0);
+      return names.map((name) => ({
+        id: name,
+        label: `${name} (Ollama, local)`,
+        contextWindow: KNOWN_LOCAL_CONTEXT_WINDOWS[name] ?? OLLAMA_DEFAULT_CONTEXT_WINDOW,
+        supportsTools: false,
+        supportsFim: /coder|code/i.test(name),
+      }));
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**

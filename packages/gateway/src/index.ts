@@ -8,6 +8,7 @@ export * from './registry.js';
 export * from './router.js';
 export * from './policies.js';
 export * from './models.js';
+export * from './local-chat.js';
 export * from './routing-log.js';
 export * from './scheduler.js';
 export * from './multi-scheduler.js';

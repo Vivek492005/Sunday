@@ -103,6 +103,16 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     family: 'deepseek',
     costTier: 'low',
   },
+  // F14 — local models run on the user's machine: free, private, small.
+  // Quality tier is 'tiny' — the F14 capability probe (not this table)
+  // decides whether a given local model may run the full agent loop.
+  'qwen2.5-coder:1.5b': {
+    id: 'qwen2.5-coder:1.5b',
+    contextLength: 32_768,
+    qualityTier: 'tiny',
+    family: 'qwen',
+    costTier: 'free',
+  },
 };
 
 export function getCapability(bareModelId: string): ModelCapability | undefined {
@@ -222,6 +232,28 @@ export const DEFAULT_ROUTE_POLICIES: RoutePolicy[] = [
       'groq:llama-3.3-70b-versatile',
     ],
     downgrade: 'ask',
+  },
+  // F14 — local-first chat modes: the user's own Ollama server serves Ask /
+  // Explain / Inline-edit first; the router skips an unavailable Ollama and
+  // relays to cloud fallbacks (downgrade 'auto', still logged + visible).
+  // privacy='local-only' requests never reach these fallbacks (router lock).
+  {
+    taskClass: 'ask',
+    primary: 'ollama:qwen2.5-coder:1.5b',
+    fallbacks: ['sunday:meta-llama/llama-3.3-70b-instruct'],
+    downgrade: 'auto',
+  },
+  {
+    taskClass: 'explain',
+    primary: 'ollama:qwen2.5-coder:1.5b',
+    fallbacks: ['sunday:meta-llama/llama-3.3-70b-instruct'],
+    downgrade: 'auto',
+  },
+  {
+    taskClass: 'inline-edit',
+    primary: 'ollama:qwen2.5-coder:1.5b',
+    fallbacks: ['groq:llama-3.3-70b-versatile'],
+    downgrade: 'auto',
   },
 ];
 

@@ -52,7 +52,12 @@ export type TaskClass =
   | 'apply'
   | 'autocomplete'
   | 'verify'
-  | 'default';
+  | 'default'
+  // F14 — local-first chat modes: Ask + Explain + Inline edit prefer the
+  // user's own Ollama server first, with graceful cloud fallback.
+  | 'ask'
+  | 'explain'
+  | 'inline-edit';
 
 /** What the router may do when the primary model hits a limit/error. */
 export type DowngradeMode =

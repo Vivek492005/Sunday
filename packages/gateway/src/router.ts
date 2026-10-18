@@ -19,6 +19,7 @@ import {
   type TaskClass,
 } from './policies.js';
 import { policyForTaskClass, qualityNote } from './models.js';
+import { LocalOnlyUnavailableError } from './local-chat.js';
 import {
   RoutingLog,
   RoutingPausedError,
@@ -303,7 +304,7 @@ export class Router {
     const t0 = Date.now();
     const taskClass: TaskClass = req.taskClass ?? 'default';
     const routePolicy = policyForTaskClass(this.options.routePolicies, taskClass);
-    const downgradeMode: DowngradeMode = routePolicy?.downgrade ?? 'auto';
+    let downgradeMode: DowngradeMode = routePolicy?.downgrade ?? 'auto';
 
     // Resolve candidates. F3 policies carry per-candidate models (fallbacks
     // may be *different models*); the legacy path keeps one bare model
@@ -345,13 +346,84 @@ export class Router {
       taskClass,
       requestedModel: req.model,
       primary: primaryRef,
-      reason: `downgrade=${downgradeMode}`,
+      reason: `downgrade=${downgradeMode}${req.privacy === 'local-only' ? ', privacy=local-only' : ''}`,
     });
 
+    // F14 — privacy enforcement: 'local-only' pins the request to the
+    // ollama provider. No cloud fallback exists by construction: the
+    // candidate list contains only ollama, and the downgrade gate is
+    // locked to 'never' so a failure surfaces instead of relaying.
+    // (attempt bookkeeping is declared just below; the privacy branch
+    // throws before any attempt is recorded.)
     const attempts: AttemptRecord[] = [];
     let relayReason: RelayAttempt['reason'] | undefined;
     let lastError: unknown;
     let failedRef: string | undefined;
+    if (req.privacy === 'local-only') {
+      const hasOllama = this.registry.ids().includes('ollama');
+      candidates = hasOllama
+        ? candidates.filter((c) => c.providerId === 'ollama')
+        : [];
+      if (candidates.length === 0) {
+        const err = new LocalOnlyUnavailableError(
+          `local-only request cannot be served: no ollama provider in the routing candidates for '${primaryRef}' (task class '${taskClass}'). ` +
+            `Start Ollama with \`ollama serve\` or drop privacy='local-only'.`,
+        );
+        this.routingLog.record({
+          kind: 'route-error',
+          taskClass,
+          requestedModel: req.model,
+          primary: primaryRef,
+          error: err.message,
+          reason: 'privacy=local-only',
+          latencyMs: Date.now() - t0,
+        });
+        throw err;
+      }
+      primaryRef = candidates[0].ref;
+      downgradeMode = 'never';
+    }
+
+    // F14 — unavailable-primary skip: a provider that advertises a cheap
+    // liveness check (Ollama's local /api/tags) and reports unavailable is
+    // skipped before any attempt, so local-first task classes degrade to
+    // their cloud fallbacks instead of failing the request. Only applies
+    // when leaving the primary is allowed (downgrade !== 'never').
+    if (downgradeMode !== 'never' && candidates.length > 1) {
+      const primaryProvider = this.registry.get(candidates[0].providerId);
+      if (typeof primaryProvider.isAvailable === 'function') {
+        let available = true;
+        try {
+          available = await primaryProvider.isAvailable();
+        } catch {
+          available = false;
+        }
+        if (!available) {
+          attempts.push({
+            providerId: candidates[0].providerId,
+            ok: false,
+            error: 'provider unavailable (local daemon not running), skipping to fallback',
+          });
+          this.routingLog.record({
+            kind: 'attempt',
+            taskClass,
+            requestedModel: req.model,
+            primary: primaryRef,
+            chosen: candidates[0].ref,
+            providerId: candidates[0].providerId,
+            ok: false,
+            error: 'provider unavailable (local daemon not running), skipping to fallback',
+          });
+          relayReason = 'server-error';
+          failedRef = primaryRef;
+          lastError = new Error(
+            `primary provider ${candidates[0].providerId} unavailable, trying fallback`,
+          );
+          candidates = candidates.slice(1);
+          primaryRef = candidates[0].ref;
+        }
+      }
+    }
 
     // Parallel-agents fair scheduling: one fair-queued slot from the shared
     // pool covers the whole call (failover candidates share it). Without an
