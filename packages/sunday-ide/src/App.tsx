@@ -7,11 +7,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { IdeProvider, useIde } from './state/ideStore';
 import { fileService } from './services/fileService';
+import { settingsService, applySettings } from './services/settingsService';
 import { registerCommand } from './services/commands';
 import { TitleBar } from './components/TitleBar';
 import { ActivityBar } from './components/ActivityBar';
 import { Explorer } from './components/Sidebar/Explorer';
 import { Search } from './components/Sidebar/Search';
+import { SourceControl } from './components/Sidebar/SourceControl';
+import { Extensions } from './components/Sidebar/Extensions';
+import { Debug } from './components/Sidebar/Debug';
+import { SettingsModal } from './components/Settings/SettingsModal';
 import { AgentPanel } from './components/Agent/AgentPanel';
 import { EditorArea } from './components/Editor/EditorArea';
 import { Panel } from './components/Panel/Panel';
@@ -38,6 +43,14 @@ function Shell() {
       console.error('open folder failed', err);
     }
   }, [dispatch]);
+
+  // Wave 3: load persisted settings once and apply (theme + editor options).
+  useEffect(() => {
+    void settingsService
+      .get()
+      .then(applySettings)
+      .catch(() => undefined);
+  }, []);
 
   // Register palette commands once.
   useEffect(() => {
@@ -75,6 +88,27 @@ function Shell() {
       run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' }),
     });
     registerCommand({
+      id: 'sunday.viewSource',
+      title: 'View: Source Control',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'source' }),
+    });
+    registerCommand({
+      id: 'sunday.viewExtensions',
+      title: 'View: Extensions',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'extensions' }),
+    });
+    registerCommand({
+      id: 'sunday.viewDebug',
+      title: 'View: Run & Debug',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'debug' }),
+    });
+    registerCommand({
+      id: 'sunday.openSettings',
+      title: 'Open Settings',
+      hint: 'Ctrl+,',
+      run: () => dispatch({ type: 'SET_SETTINGS_OPEN', open: true }),
+    });
+    registerCommand({
       id: 'sunday.commandPalette',
       title: 'Show Command Palette…',
       hint: 'Ctrl+Shift+P',
@@ -100,6 +134,9 @@ function Shell() {
       } else if (key === 'p' && e.shiftKey) {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      } else if (key === ',') {
+        e.preventDefault();
+        dispatch({ type: 'SET_SETTINGS_OPEN', open: true });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -114,7 +151,10 @@ function Shell() {
         <div className={`sunday-sidebar${state.sidebarVisible ? '' : ' hidden'}`}>
           {state.railView === 'explorer' && <Explorer />}
           {state.railView === 'search' && <Search />}
+          {state.railView === 'source' && <SourceControl />}
           {state.railView === 'agent' && <AgentPanel />}
+          {state.railView === 'extensions' && <Extensions />}
+          {state.railView === 'debug' && <Debug />}
         </div>
         <EditorArea />
       </div>
@@ -125,6 +165,7 @@ function Shell() {
       )}
       <StatusBar />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <SettingsModal />
     </div>
   );
 }

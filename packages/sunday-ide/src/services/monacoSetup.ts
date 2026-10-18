@@ -55,6 +55,32 @@ export function ensureSundayTheme(): void {
       'minimap.background': '#1a1611',
     },
   });
+  // Wave 3: light variant for the Sunday Light theme.
+  monaco.editor.defineTheme('sunday-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '8a7a5c', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'b07818' },
+      { token: 'string', foreground: '4a7a3a' },
+      { token: 'number', foreground: 'b05c2a' },
+      { token: 'type', foreground: '2a7a7a' },
+    ],
+    colors: {
+      'editor.background': '#f7f2e8',
+      'editor.foreground': '#2a2318',
+      'editor.lineHighlightBackground': '#eadfc833',
+      'editorLineNumber.foreground': '#a89a7c',
+      'editorLineNumber.activeForeground': '#b07818',
+      'editorCursor.foreground': '#b07818',
+      'editor.selectionBackground': '#f5b94255',
+      'editorIndentGuide.background1': '#e0d5bc',
+      'editorWidget.background': '#fffdf7',
+      'editorWidget.border': '#d8cba8',
+      'editorGutter.background': '#f7f2e8',
+      'minimap.background': '#f7f2e8',
+    },
+  });
 }
 
 export { monaco };

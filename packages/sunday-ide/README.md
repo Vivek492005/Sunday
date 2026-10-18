@@ -63,6 +63,12 @@ PTY via `@lydell/node-pty`, multi-tab bottom panel, `Ctrl+\``), Search
 (ripgrep via IPC, `rg` with pure-Node fallback), Command palette
 (`Ctrl+Shift+P`, fuzzy filter, command registry).
 
-**Still ahead:** Source Control UI, Extensions (Open VSX), Settings UI,
-**Wave 3** (real ext-agent/gateway wiring replacing the agent stubs),
+**Wave 3 — done:** Settings (searchable modal, Editor/Terminal/Appearance
+groups, persisted to `~/.sunday-ide/settings.json`, live-apply to Monaco +
+Sunday Dark/Light themes), Source Control (git status/stage/unstage/commit,
+Monaco diff viewer), Extensions (Open VSX browse/install/uninstall/
+enable-disable; extension host is a follow-up), Run & Debug (gutter
+breakpoints, Node launch, output console, stop; full DAP is a follow-up).
+
+**Still ahead:** real ext-agent/gateway wiring replacing the agent stubs,
 packaging (electron-builder installers).

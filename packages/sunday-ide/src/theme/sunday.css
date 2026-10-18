@@ -558,6 +558,32 @@ body {
 .sunday-ctx button.danger { color: var(--sunday-danger); }
 .sunday-ctx hr { border: none; border-top: 1px solid var(--sunday-border); margin: 5px 4px; }
 
+/* ---------------- Sunday Light theme (Wave 3) ---------------- */
+
+[data-theme="sunday-light"] {
+  --sunday-bg: #f7f2e8;
+  --sunday-bg-deep: #efe8d8;
+  --sunday-rail: #e9e0cd;
+  --sunday-sidebar: #f2ecdd;
+  --sunday-tab-active: #fbf8f0;
+  --sunday-tab-inactive: #e9e0cd;
+  --sunday-titlebar: #e9e0cd;
+  --sunday-hover: #e4d9bf;
+  --sunday-active: #d9cba6;
+  --sunday-border: #d5c7a4;
+  --sunday-border-strong: #b8a67e;
+  --sunday-fg: #2a2318;
+  --sunday-fg-dim: #5c4f38;
+  --sunday-fg-faint: #8a7a5c;
+  --sunday-accent: #b07818;
+  --sunday-accent-fg: #fffdf7;
+  --sunday-accent-soft: rgba(176, 120, 24, 0.14);
+  --sunday-danger: #c0392b;
+  --sunday-ok: #2a7a3a;
+  --sunday-statusbar: #b07818;
+  --sunday-statusbar-fg: #fffdf7;
+}
+
 /* ---------------- scrollbars ---------------- */
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }

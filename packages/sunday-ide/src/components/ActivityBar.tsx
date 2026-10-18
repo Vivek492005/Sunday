@@ -10,15 +10,17 @@ import {
   BranchIcon,
   AgentSunIcon,
   PuzzleIcon,
+  DebugIcon,
   GearIcon,
 } from './icons';
 
 const RAIL_ITEMS: { id: RailView; label: string; icon: (p: { size?: number }) => React.ReactNode; live: boolean }[] = [
   { id: 'explorer', label: 'Explorer', icon: ExplorerIcon, live: true },
   { id: 'search', label: 'Search', icon: SearchIcon, live: true },
-  { id: 'source', label: 'Source Control', icon: BranchIcon, live: false },
+  { id: 'source', label: 'Source Control', icon: BranchIcon, live: true },
   { id: 'agent', label: 'Sunday Agent', icon: AgentSunIcon, live: true },
-  { id: 'extensions', label: 'Extensions', icon: PuzzleIcon, live: false },
+  { id: 'extensions', label: 'Extensions', icon: PuzzleIcon, live: true },
+  { id: 'debug', label: 'Run & Debug', icon: DebugIcon, live: true },
 ];
 
 export function ActivityBar() {
@@ -39,9 +41,12 @@ export function ActivityBar() {
         </button>
       ))}
       <div className="spacer" />
-      <button className="sunday-rail-btn" title="Settings — coming soon" disabled>
+      <button
+        className="sunday-rail-btn"
+        title="Settings (Ctrl+,)"
+        onClick={() => dispatch({ type: 'SET_SETTINGS_OPEN', open: true })}
+      >
         <GearIcon size={22} />
-        <span className="soon">SOON</span>
       </button>
     </div>
   );

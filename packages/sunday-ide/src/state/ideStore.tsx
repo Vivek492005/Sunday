@@ -13,7 +13,7 @@ export interface OpenFile {
   dirty: boolean;
 }
 
-export type RailView = 'explorer' | 'search' | 'source' | 'agent' | 'extensions';
+export type RailView = 'explorer' | 'search' | 'source' | 'agent' | 'extensions' | 'debug';
 
 interface IdeState {
   rootFolder: string | null;
@@ -24,6 +24,7 @@ interface IdeState {
   branch: string | null;
   cursor: { line: number; column: number };
   recentFolders: string[];
+  settingsOpen: boolean;
 }
 
 type Action =
@@ -37,7 +38,8 @@ type Action =
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'SET_BRANCH'; branch: string | null }
   | { type: 'SET_CURSOR'; line: number; column: number }
-  | { type: 'ADD_RECENT'; folder: string };
+  | { type: 'ADD_RECENT'; folder: string }
+  | { type: 'SET_SETTINGS_OPEN'; open: boolean };
 
 const initialState: IdeState = {
   rootFolder: null,
@@ -48,6 +50,7 @@ const initialState: IdeState = {
   branch: null,
   cursor: { line: 1, column: 1 },
   recentFolders: loadRecent(),
+  settingsOpen: false,
 };
 
 function loadRecent(): string[] {
@@ -127,6 +130,8 @@ function reducer(state: IdeState, action: Action): IdeState {
       return { ...state, branch: action.branch };
     case 'SET_CURSOR':
       return { ...state, cursor: { line: action.line, column: action.column } };
+    case 'SET_SETTINGS_OPEN':
+      return { ...state, settingsOpen: action.open };
     case 'ADD_RECENT': {
       const folders = [action.folder, ...state.recentFolders.filter((f) => f !== action.folder)].slice(0, 8);
       persistRecent(folders);

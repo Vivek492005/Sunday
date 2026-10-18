@@ -1,0 +1,145 @@
+/* Sunday Source Control — own design. */
+
+.sunday-sc-root { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+.sunday-sc-body { flex: 1; overflow: auto; padding: 4px 8px 12px; }
+
+.sunday-sc-hint {
+  color: var(--sunday-fg-faint);
+  font-size: 12.5px;
+  padding: 16px 8px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.sunday-sc-error {
+  background: rgba(224, 92, 92, 0.12);
+  border: 1px solid rgba(224, 92, 92, 0.4);
+  color: #e08a8a;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 6px 4px;
+  line-height: 1.5;
+}
+
+.sunday-sc-group { margin-top: 10px; }
+
+.sunday-sc-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  color: var(--sunday-fg-dim);
+  padding: 6px 8px;
+}
+
+.sunday-sc-link {
+  background: none;
+  border: none;
+  color: var(--sunday-accent);
+  font-size: 11.5px;
+  cursor: pointer;
+  font-family: var(--sunday-font);
+  padding: 2px 4px;
+}
+
+.sunday-sc-link:hover { text-decoration: underline; }
+
+.sunday-sc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+
+.sunday-sc-row:hover { background: var(--sunday-hover); }
+
+.sunday-sc-name {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--sunday-font);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sunday-sc-name .fname { color: var(--sunday-fg); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sunday-sc-name .fdir { color: var(--sunday-fg-faint); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sunday-sc-badge {
+  flex: 0 0 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--sunday-mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sunday-active);
+  color: var(--sunday-fg-dim);
+}
+
+.sunday-sc-badge.s-M { background: rgba(245, 185, 66, 0.18); color: var(--sunday-accent); }
+.sunday-sc-badge.s-A { background: rgba(123, 201, 138, 0.16); color: var(--sunday-ok); }
+.sunday-sc-badge.s-D { background: rgba(224, 92, 92, 0.16); color: var(--sunday-danger); }
+.sunday-sc-badge.s-R { background: rgba(124, 201, 201, 0.16); color: #7cc9c9; }
+.sunday-sc-badge.s-\? { background: var(--sunday-active); color: var(--sunday-fg-faint); }
+
+.sunday-sc-mini {
+  flex: 0 0 auto;
+  background: var(--sunday-bg);
+  border: 1px solid var(--sunday-border);
+  border-radius: 7px;
+  color: var(--sunday-fg-dim);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--sunday-font);
+  display: flex;
+  align-items: center;
+}
+
+.sunday-sc-mini:hover { border-color: var(--sunday-accent); color: var(--sunday-accent); }
+
+.sunday-sc-commit {
+  margin-top: 14px;
+  padding: 10px 4px 4px;
+  border-top: 1px solid var(--sunday-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sunday-sc-message {
+  background: var(--sunday-bg);
+  border: 1px solid var(--sunday-border-strong);
+  border-radius: 10px;
+  color: var(--sunday-fg);
+  font-size: 12.5px;
+  padding: 9px 11px;
+  font-family: var(--sunday-font);
+  resize: vertical;
+  min-height: 56px;
+  outline: none;
+}
+
+.sunday-sc-message:focus { border-color: var(--sunday-accent); }
+
+.sunday-sc-commit-btn { width: 100%; }
+.sunday-sc-commit-btn:disabled { opacity: 0.45; cursor: default; }
+.sunday-sc-commit-btn:disabled:hover { filter: none; }
+
+/* diff modal */
+.sunday-diff-modal { width: 900px; max-width: 94vw; height: 600px; max-height: 88vh; }
+.sunday-diff-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 780px; }
+.sunday-diff-host { flex: 1; min-height: 0; position: relative; padding: 0 0 8px; }

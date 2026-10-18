@@ -70,6 +70,14 @@ export const PuzzleIcon = (p: IconProps) => (
   </svg>
 );
 
+export const DebugIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <ellipse cx="12" cy="13" rx="6" ry="7.5" />
+    <path d="M12 5.5V3M9.5 6L8 4M14.5 6L16 4M7 11H3.5M7.5 15l-3 1.5M17 11h3.5M16.5 15l3 1.5M9 13.5h6" />
+    <circle cx="12" cy="11" r="0.6" fill="currentColor" />
+  </svg>
+);
+
 export const GearIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="3.2" />

@@ -7,6 +7,12 @@ import React, { useEffect, useRef } from 'react';
 import { useIde } from '../../state/ideStore';
 import { fileService } from '../../services/fileService';
 import { ensureSundayTheme, monaco } from '../../services/monacoSetup';
+import { SETTINGS_APPLIED_EVENT, type SundaySettings } from '../../services/settingsService';
+import {
+  toggleBreakpoint,
+  getBreakpoints,
+  onBreakpointsChanged,
+} from '../../services/debugService';
 import { CloseIcon } from '../icons';
 import { WelcomePage } from './WelcomePage';
 
@@ -21,6 +27,8 @@ export function EditorArea() {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const modelsRef = useRef<Map<string, ModelEntry>>(new Map());
   const saveHandlerRef = useRef<() => void>(() => undefined);
+  const activePathRef = useRef<string | null>(null);
+  const bpDecorationsRef = useRef<string[]>([]);
 
   // create the Monaco instance once
   useEffect(() => {
@@ -37,6 +45,7 @@ export function EditorArea() {
       renderLineHighlight: 'all',
       smoothScrolling: true,
       cursorBlinking: 'smooth',
+      glyphMargin: true, // Wave 3: breakpoint gutter
     });
     editorRef.current = editor;
 
@@ -61,8 +70,44 @@ export function EditorArea() {
     };
     window.addEventListener('keydown', onKey);
 
+    // Wave 3: gutter click toggles breakpoints (debug service).
+    const mouseDisp = editor.onMouseDown((ev) => {
+      if (ev.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+      const line = ev.target.position?.lineNumber;
+      const filePath = activePathRef.current;
+      if (!line || !filePath) return;
+      toggleBreakpoint(filePath, line);
+    });
+
+    // Wave 3: live-apply settings (theme + editor options).
+    const onSettings = (ev: Event) => {
+      const s = (ev as CustomEvent<SundaySettings>).detail;
+      if (!s) return;
+      editor.updateOptions({
+        fontSize: s.editorFontSize,
+        fontFamily: s.editorFontFamily,
+        tabSize: s.editorTabSize,
+        wordWrap: s.editorWordWrap ? 'on' : 'off',
+      });
+      monaco.editor.setTheme(s.theme === 'sunday-light' ? 'sunday-light' : 'sunday-dark');
+    };
+    window.addEventListener(SETTINGS_APPLIED_EVENT, onSettings);
+
+    // Wave 3: debug panel asks us to reveal a breakpoint line.
+    const onReveal = (ev: Event) => {
+      const { line } = (ev as CustomEvent<{ filePath: string; line: number }>).detail ?? {};
+      if (typeof line !== 'number') return;
+      editor.revealLineInCenter(line);
+      editor.setPosition({ lineNumber: line, column: 1 });
+      editor.focus();
+    };
+    window.addEventListener('sunday:reveal-line', onReveal);
+
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener(SETTINGS_APPLIED_EVENT, onSettings);
+      window.removeEventListener('sunday:reveal-line', onReveal);
+      mouseDisp.dispose();
       modelsRef.current.forEach((e) => e.model.dispose());
       modelsRef.current.clear();
       editor.dispose();
@@ -148,6 +193,36 @@ export function EditorArea() {
       }
     }
   }, [state.openFiles]);
+
+  // Wave 3: keep a ref of the active path for the gutter-click handler.
+  useEffect(() => {
+    activePathRef.current = state.activePath;
+  }, [state.activePath]);
+
+  // Wave 3: paint breakpoint gutter decorations for the active file.
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const paint = () => {
+      const ed = editorRef.current;
+      const filePath = activePathRef.current;
+      if (!ed || !filePath) return;
+      const lines = getBreakpoints(filePath);
+      bpDecorationsRef.current = ed.deltaDecorations(
+        bpDecorationsRef.current,
+        lines.map((line) => ({
+          range: new monaco.Range(line, 1, line, 1),
+          options: {
+            isWholeLine: false,
+            glyphMarginClassName: 'sunday-bp-glyph',
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
+        })),
+      );
+    };
+    paint();
+    return onBreakpointsChanged(paint);
+  }, [state.activePath]);
 
   const closeTab = (e: React.MouseEvent, path: string) => {
     e.stopPropagation();
