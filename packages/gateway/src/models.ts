@@ -110,6 +110,50 @@ export function getCapability(bareModelId: string): ModelCapability | undefined 
 }
 
 /**
+ * F12 × F3 — eval-driven quality-tier overrides (DATA, not code).
+ *
+ * The nightly eval CI job writes `eval-quality-tiers.json` (see
+ * packages/eval/src/routerFeed.ts); loading it here lets measured
+ * benchmark results override the static quality tiers, so eval is product
+ * input — the router routes on measured quality, not just vendor claims.
+ * Unknown model ids are ignored; the static table stays the fallback.
+ */
+export type EvalQualityTierMap = Record<string, QualityTier>;
+
+/** Pure merge: eval tiers override static tiers for known models only. */
+export function applyEvalTiers(
+  base: Record<string, ModelCapability>,
+  evalTiers: EvalQualityTierMap,
+): Record<string, ModelCapability> {
+  const out: Record<string, ModelCapability> = { ...base };
+  for (const [id, tier] of Object.entries(evalTiers)) {
+    const cap = out[id];
+    if (cap) out[id] = { ...cap, qualityTier: tier };
+  }
+  return out;
+}
+
+/**
+ * Parse an eval-quality-tiers.json payload into an EvalQualityTierMap.
+ * Returns {} on any malformed input — the static table stays authoritative.
+ */
+export function parseEvalTierFeed(payload: unknown): EvalQualityTierMap {
+  const out: EvalQualityTierMap = {};
+  if (!payload || typeof payload !== 'object') return out;
+  const entries = (payload as { entries?: unknown }).entries;
+  if (!Array.isArray(entries)) return out;
+  const valid: QualityTier[] = ['strong', 'balanced', 'fast', 'tiny'];
+  for (const e of entries) {
+    if (!e || typeof e !== 'object') continue;
+    const { model, suggestedTier } = e as { model?: unknown; suggestedTier?: unknown };
+    if (typeof model === 'string' && valid.includes(suggestedTier as QualityTier)) {
+      out[model] = suggestedTier as QualityTier;
+    }
+  }
+  return out;
+}
+
+/**
  * Human-readable quality/cost delta for a consent prompt, e.g.
  * "est. quality ↓, cost ↓". Unknown models degrade gracefully to "".
  */

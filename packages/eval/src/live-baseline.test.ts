@@ -19,6 +19,8 @@ const dummyTask: EvalTask = {
   id: 'dummy',
   title: 'dummy',
   prompt: 'hello',
+  category: 'io',
+  seed: 999,
   setup: () => {},
   script: [],
   check: () => ({ pass: true, notes: '' }),

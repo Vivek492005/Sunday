@@ -12,12 +12,55 @@ export type ScriptStep =
   | { kind: 'tool'; tool: string; args: Record<string, unknown> }
   | { kind: 'answer'; text: string };
 
+/**
+ * F12 — versioned task-pack format. Bump when task semantics change so
+ * scoreboard runs from different pack versions are never mixed silently.
+ */
+export const TASK_PACK_VERSION = 2;
+
+/**
+ * F12 — task categories. The scoreboard reports per-category pass rates;
+ * the pack must cover every REQUIRED_TASK_CATEGORIES entry.
+ */
+export type TaskCategory =
+  | 'io'
+  | 'search'
+  | 'edit'
+  | 'terminal'
+  | 'git'
+  | 'plan'
+  | 'browser'
+  | 'infra'
+  | 'bugfix'
+  | 'feature'
+  | 'refactor'
+  | 'tests'
+  | 'multi-file'
+  | 'security';
+
+/** Categories every task pack must include at least one task of (F12). */
+export const REQUIRED_TASK_CATEGORIES: readonly TaskCategory[] = [
+  'bugfix',
+  'feature',
+  'refactor',
+  'tests',
+  'multi-file',
+  'security',
+] as const;
+
 export interface EvalTask {
   /** Stable id, e.g. "read-file". */
   id: string;
   title: string;
   /** The prompt a real model would receive. */
   prompt: string;
+  /** F12: category for the scoreboard breakdown. */
+  category: TaskCategory;
+  /**
+   * F12: fixed seed — fixture setup must be deterministic for this seed,
+   * so reruns are reproducible (acceptance: ±5% pass-rate across reruns).
+   */
+  seed: number;
   /** Populate the temp workspace before the run. */
   setup: (root: string) => void | Promise<void>;
   /** Scripted model behavior for the fake adapter. */
@@ -25,6 +68,10 @@ export interface EvalTask {
   /**
    * Deterministic checker. Receives the workspace root and the full
    * transcript of tool calls; returns pass/fail with notes.
+   *
+   * Checkers are hidden from the agent under test: they run in-process in
+   * the harness, and tasks never grant the agent write access to the
+   * checker's expectations (fixtures only, assertions stay here).
    */
   check: (root: string, transcript: ExecutedCall[]) => { pass: boolean; notes: string };
 }
@@ -42,6 +89,30 @@ export interface ExecutedCall {
 export interface ModelAdapter {
   name: string;
   runTask(task: EvalTask, workspaceRoot: string): Promise<ExecutedCall[]>;
+  /**
+   * F12: optional per-task scoring metadata (cost, tokens, requests).
+   * Adapters that can't observe it omit the method; the runner treats
+   * missing metadata as unknown rather than zero.
+   */
+  scoreMetadata?(
+    task: EvalTask,
+    transcript: ExecutedCall[],
+  ): ScoreMetadata | Promise<ScoreMetadata>;
+}
+
+/**
+ * F12: per-task scoring metadata harvested by the runner.
+ * Feeds the public scoreboard (cost-per-success, loop-trigger rate).
+ */
+export interface ScoreMetadata {
+  /** Gateway requests consumed (F1 cost unit). */
+  requests?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  /** USD cost when known (live runs priced via the F1 pricing table). */
+  costUsd?: number;
+  /** F2 LoopGuard trips observed while replaying this task's transcript. */
+  loopTriggers?: number;
 }
 
 export interface TaskResult {
@@ -54,6 +125,8 @@ export interface TaskResult {
   /** Fraction of tool calls that were schema-valid and error-free. */
   toolReliability: number;
   durationMs: number;
+  /** F12: scoring metadata (cost / loop data); absent when unobservable. */
+  score?: ScoreMetadata;
 }
 
 export interface BenchmarkReport {

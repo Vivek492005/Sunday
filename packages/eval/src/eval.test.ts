@@ -15,7 +15,7 @@ import { runBenchmark } from './runner.js';
 import { TASKS } from './tasks.js';
 
 describe('eval harness (fake-scripted adapter)', () => {
-  it('all 14 benchmark tasks pass with 100% tool reliability', async () => {
+  it('all 31 benchmark tasks pass with 100% tool reliability', async () => {
     const report = await runBenchmark(new FakeModelAdapter(), {
       outDir: join(tmpdir(), 'sunday-eval-test'),
     });
@@ -24,13 +24,19 @@ describe('eval harness (fake-scripted adapter)', () => {
     if (failed.length > 0) {
       console.log('FAILED TASKS:', failed.map(t => `${t.taskId}: ${t.notes}`).join(' | '));
     }
-    expect(report.total).toBe(14);
-    expect(report.passed).toBe(14);
+    expect(report.total).toBe(31);
+    expect(report.passed).toBe(31);
     expect(report.meanToolReliability).toBe(1);
     for (const t of report.tasks) {
       expect(t.pass, `${t.taskId}: ${t.notes}`).toBe(true);
     }
-  }, 120_000);
+    // F12: every task carries scoring metadata (requests + loop data).
+    for (const t of report.tasks) {
+      expect(t.score, `${t.taskId}: missing score metadata`).toBeDefined();
+      expect(t.score?.requests).toBeGreaterThanOrEqual(0);
+      expect(t.score?.loopTriggers).toBeGreaterThanOrEqual(0);
+    }
+  }, 240_000);
 
   it('runs a subset of tasks on request', async () => {
     const report = await runBenchmark(new FakeModelAdapter(), {

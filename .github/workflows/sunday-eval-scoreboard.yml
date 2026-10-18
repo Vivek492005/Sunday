@@ -1,0 +1,56 @@
+# Sunday eval scoreboard — nightly F12 benchmark (fake-scripted adapter, no keys).
+# Runs the versioned task pack, renders docs/SCOREBOARD.md + the F3 router
+# feed, and uploads both as artifacts. A live-model variant (--live) runs
+# separately where provider keys are configured.
+
+name: sunday-eval-scoreboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  scoreboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build eval + loop-guard provider
+        run: pnpm --filter @sunday/eval --filter @sunday/ext-agent build
+
+      - name: Run task pack (3 repetitions for variance)
+        run: |
+          cd packages/eval
+          for i in 1 2 3; do
+            node dist/cli.js run --out "eval-results/nightly-$i"
+          done
+
+      - name: Render scoreboard + F3 router feed
+        run: |
+          cd packages/eval
+          node dist/cli.js scoreboard \
+            --runs eval-results \
+            --out ../../docs/SCOREBOARD.md \
+            --feed eval-results/eval-quality-tiers.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sunday-eval-scoreboard
+          path: |
+            docs/SCOREBOARD.md
+            packages/eval/eval-results/eval-quality-tiers.json
+            packages/eval/eval-results/nightly-*/report.json

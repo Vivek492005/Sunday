@@ -84,7 +84,7 @@ node packages/eval/dist/live-baseline.js [--tasks id1,id2] [--model <id>] [--out
 
 | Metric | Target | Rationale |
 |---|---|---|
-| Task pass rate | ≥ 80% | Fake-scripted ceiling is 100% (14/14); live models are stochastic, so the bar allows a few model-variance failures while catching systematic regressions. |
+| Task pass rate | ≥ 80% | Fake-scripted ceiling is 100% (31/31, task pack v2); live models are stochastic, so the bar allows a few model-variance failures while catching systematic regressions. |
 | Mean tool reliability | ≥ 95% | Tool calls are schema-validated server-side; the overwhelming majority should be valid. |
 | Max task duration | ≤ 10 min (harness timeout) | Hung turns are failures, not slow passes. |
 
@@ -94,6 +94,10 @@ release on it.
 
 ## Current baseline (hardening phase, fake-scripted)
 
-14/14 tasks passed · mean tool reliability 100.0%.
+31/31 tasks passed · mean tool reliability 100.0% (task pack v2).
+
+See [SCOREBOARD.md](SCOREBOARD.md) for the public per-model scoreboard
+(F12): pass rate, tool reliability, median time, cost-per-successful-task
+(F1), and loop-trigger rate (F2).
 
 Live-model baselines are recorded per release in the release notes.

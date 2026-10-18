@@ -1,12 +1,14 @@
-// @sunday/eval — benchmark tasks (§24.2).
+// @sunday/eval — benchmark tasks (§24.2, F12 task pack v2).
 //
-// Fourteen small, deterministic coding tasks covering the core tool surface:
-// file I/O, search, edit, terminal, git, orchestration planning, parallel
-// orchestration (disjoint refactors, overlap rejection, quota fairness), the
-// browser navigation policy, and the browser UI bug-fix loop. Each task ships
-// a fixture setup, a scripted model transcript (for the fake adapter) and a
-// checker that inspects the resulting workspace state — so the harness runs
-// with no API keys.
+// Thirty-one small, deterministic coding tasks covering the core tool
+// surface (file I/O, search, edit, terminal, git, orchestration planning,
+// parallel orchestration, browser policy/loop) plus the F12 expansion:
+// bugfix, feature-add, refactor, test-writing, multi-file, and
+// security-sensitive tasks. Each task ships a fixed seed, a fixture setup,
+// a scripted model transcript (for the fake adapter) and a hidden checker
+// that inspects the resulting workspace state — so the harness runs with
+// no API keys. Checkers run in-process and are never visible to the agent
+// under test.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,6 +34,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'read-file',
     title: 'Read a file and report its contents',
+    category: 'io',
+    seed: 1,
     prompt: 'Read hello.txt in the workspace and tell me what it says.',
     setup(root) {
       write(root, 'hello.txt', 'Sunday says hi.\n');
@@ -45,6 +49,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'list-glob',
     title: 'List a directory tree',
+    category: 'io',
+    seed: 2,
     prompt: 'List everything under src/ in the workspace.',
     setup(root) {
       write(root, 'src/a.ts', 'export const a = 1;\n');
@@ -62,6 +68,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'grep-search',
     title: 'Search file contents with a pattern',
+    category: 'search',
+    seed: 3,
     prompt: 'Find where the marker NEEDLE-42 appears in the workspace.',
     setup(root) {
       write(root, 'src/app.ts', 'const x = 1;\n// NEEDLE-42: refactor me\n');
@@ -78,6 +86,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'edit-file',
     title: 'Make a precise edit',
+    category: 'edit',
+    seed: 4,
     prompt: 'In config.json, change the port from 3000 to 8080.',
     setup(root) {
       write(root, 'config.json', '{\n  "port": 3000,\n  "host": "localhost"\n}\n');
@@ -95,6 +105,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'write-file',
     title: 'Create a new file',
+    category: 'io',
+    seed: 5,
     prompt: 'Create notes.txt containing exactly the line "remember the milk".',
     setup() {},
     script: [{ kind: 'tool', tool: 'write_file', args: { path: 'notes.txt', content: 'remember the milk\n' } }],
@@ -106,6 +118,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'read-edit-verify',
     title: 'Multi-step: read, edit, verify with search',
+    category: 'edit',
+    seed: 6,
     prompt: 'In version.txt the version is 0.0.9 — bump it to 0.1.0 and confirm the old version is gone.',
     setup(root) {
       write(root, 'version.txt', 'version: 0.0.9\n');
@@ -126,6 +140,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'terminal-run',
     title: 'Run a command and capture output',
+    category: 'terminal',
+    seed: 7,
     prompt: 'Run `node -e "console.log(40 + 2)"` and tell me the number it prints.',
     setup() {},
     script: [{ kind: 'tool', tool: 'run_terminal', args: { command: 'node -e "console.log(40 + 2)"' } }],
@@ -138,6 +154,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'git-status',
     title: 'Inspect git status in a fixture repo',
+    category: 'git',
+    seed: 8,
     prompt: 'Tell me which files are modified in this git repo.',
     setup(root) {
       execFileSync('git', ['init', '-q'], { cwd: root });
@@ -159,6 +177,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'orchestrate-plan',
     title: 'Produce a valid 2-unit orchestration plan',
+    category: 'plan',
+    seed: 9,
     prompt: 'Plan: unit A owns src/api/**, unit B owns src/web/**, B depends on A.',
     setup() {},
     // No tool calls — the fake adapter answers directly; the checker
@@ -173,6 +193,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'browser-policy',
     title: 'Browser navigation policy blocks file:// and private IPs',
+    category: 'browser',
+    seed: 10,
     prompt: 'Try to open file:///etc/passwd and http://localhost:3000 in the agent browser.',
     setup() {},
     // No tool calls — exercised directly against the policy module with the
@@ -185,6 +207,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'parallel-disjoint-refactors',
     title: 'Two independent refactors in disjoint directories merge cleanly',
+    category: 'refactor',
+    seed: 11,
     prompt:
       'In parallel: refactor A renames `oldName` to `newName` in pkg-a/; ' +
       'refactor B renames `legacy` to `modern` in pkg-b/. The directories are disjoint.',
@@ -222,6 +246,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'parallel-overlap-rejected',
     title: 'A plan with overlapping owns_paths is rejected at plan time',
+    category: 'plan',
+    seed: 12,
     prompt:
       'Plan: unit A owns src/api/**, unit B owns src/api/routes/**. ' +
       'The overlap must be rejected before any work starts.',
@@ -254,6 +280,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'parallel-quota-fairness',
     title: 'No starvation: three contending agents share quota fairly',
+    category: 'infra',
+    seed: 13,
     prompt:
       'Three orchestration units contend for a tight model quota. ' +
       'Every unit must keep making progress — no starvation.',
@@ -331,6 +359,8 @@ export const TASKS: EvalTask[] = [
   {
     id: 'browser-seeded-ui-bug',
     title: 'Fix a seeded visible UI bug via the agent browser (fake driver)',
+    category: 'bugfix',
+    seed: 14,
     prompt:
       'The page served at http://localhost:34567/ has a visible bug: the main heading reads "Welcom" ' +
       'instead of "Welcome". Serve it, open it in the agent browser, confirm the bug via snapshot and ' +
@@ -460,6 +490,524 @@ export const TASKS: EvalTask[] = [
         pass: true,
         notes: 'server served buggy page; snapshot→console→edit→verify_ui→walkthrough in order; typo fixed; walkthrough.md written',
       };
+    },
+  },
+  // ——— F12: task-pack expansion 14 → 30 ———
+  // Categories: bugfix, feature, refactor, tests, multi-file, security.
+  // Every script uses only deterministic file tools through the fake
+  // adapter; checkers assert resulting workspace state (hidden from the
+  // agent under test — they run in-process in the harness).
+  {
+    id: 'bugfix-null-guard',
+    title: 'Bugfix: add a null guard',
+    category: 'bugfix',
+    seed: 15,
+    prompt: 'greet() in src/user.ts crashes on null — add a null guard that returns "hello guest".',
+    setup(root) {
+      write(
+        root,
+        'src/user.ts',
+        'export interface User { name: string; }\nexport function greet(u: User | null): string {\n  return \'hello \' + u.name;\n}\n',
+      );
+    },
+    script: [
+      { kind: 'tool', tool: 'read_file', args: { path: 'src/user.ts' } },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/user.ts',
+          oldText: "  return 'hello ' + u.name;",
+          newText: "  if (u === null) return 'hello guest';\n  return 'hello ' + u.name;",
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/user.ts');
+      const ok = c.includes('u === null') && c.includes("'hello guest'") && c.includes("return 'hello ' + u.name;");
+      return { pass: ok, notes: ok ? 'null guard added, original path intact' : `guard missing: ${c.slice(0, 160)}` };
+    },
+  },
+  {
+    id: 'bugfix-off-by-one',
+    title: 'Bugfix: off-by-one loop bound',
+    category: 'bugfix',
+    seed: 16,
+    prompt: 'sum() in src/sum.ts reads one past the end of the array — fix the loop bound.',
+    setup(root) {
+      write(
+        root,
+        'src/sum.ts',
+        'export function sum(a: number[]): number {\n  let t = 0;\n  for (let i = 0; i <= a.length; i++) t += a[i];\n  return t;\n}\n',
+      );
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/sum.ts', oldText: 'i <= a.length', newText: 'i < a.length' },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/sum.ts');
+      const ok = c.includes('i < a.length') && !c.includes('i <= a.length');
+      return { pass: ok, notes: ok ? 'loop bound fixed' : `bound not fixed: ${c.slice(0, 160)}` };
+    },
+  },
+  {
+    id: 'bugfix-missing-await',
+    title: 'Bugfix: missing await in async loop',
+    category: 'bugfix',
+    seed: 17,
+    prompt: 'loadAll() in src/load.ts pushes promises instead of rows — add the missing await.',
+    setup(root) {
+      write(
+        root,
+        'src/load.ts',
+        'declare function fetchRow(id: string): Promise<string>;\nexport async function loadAll(ids: string[]): Promise<string[]> {\n  const out: string[] = [];\n  for (const id of ids) {\n    const row = fetchRow(id);\n    out.push(row);\n  }\n  return out;\n}\n',
+      );
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/load.ts', oldText: 'const row = fetchRow(id);', newText: 'const row = await fetchRow(id);' },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/load.ts');
+      const ok = c.includes('await fetchRow(id)');
+      return { pass: ok, notes: ok ? 'await added' : `await missing: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'bugfix-inverted-condition',
+    title: 'Bugfix: inverted membership condition',
+    category: 'bugfix',
+    seed: 30,
+    prompt: 'discount() in src/discount.ts gives members 0% and non-members 20% — the condition is inverted.',
+    setup(root) {
+      write(
+        root,
+        'src/discount.ts',
+        'export function discount(isMember: boolean): number {\n  if (!isMember) return 0.2;\n  return 0;\n}\n',
+      );
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/discount.ts',
+          oldText: 'if (!isMember) return 0.2;\n  return 0;',
+          newText: 'if (isMember) return 0.2;\n  return 0;',
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/discount.ts');
+      const ok = c.includes('if (isMember) return 0.2;');
+      return { pass: ok, notes: ok ? 'condition fixed' : `still inverted: ${c.slice(0, 160)}` };
+    },
+  },
+  {
+    id: 'feature-cli-flag',
+    title: 'Feature: add a --verbose CLI flag',
+    category: 'feature',
+    seed: 18,
+    prompt: 'cli.mjs takes a command as first arg — add a --verbose flag that prints "verbose mode on" before running.',
+    setup(root) {
+      write(root, 'cli.mjs', "const args = process.argv.slice(2);\nconst cmd = args[0] ?? 'help';\nconsole.log('running ' + cmd);\n");
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'cli.mjs',
+          oldText: "const cmd = args[0] ?? 'help';",
+          newText:
+            "const verbose = args.includes('--verbose');\nconst cmd = args.find((a) => !a.startsWith('--')) ?? 'help';\nif (verbose) console.log('verbose mode on');",
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'cli.mjs');
+      const ok = c.includes("'--verbose'") && c.includes('verbose mode on');
+      return { pass: ok, notes: ok ? 'flag wired' : `flag missing: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'feature-env-port',
+    title: 'Feature: read PORT from the environment',
+    category: 'feature',
+    seed: 19,
+    prompt: 'src/config.ts hardcodes PORT = 3000 — read it from process.env.PORT with a 3000 fallback.',
+    setup(root) {
+      write(root, 'src/config.ts', 'export const PORT = 3000;\n');
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/config.ts', oldText: 'export const PORT = 3000;', newText: 'export const PORT = Number(process.env.PORT ?? 3000);' },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/config.ts');
+      const ok = c.includes('process.env.PORT');
+      return { pass: ok, notes: ok ? 'env port wired' : `env read missing: ${c.slice(0, 160)}` };
+    },
+  },
+  {
+    id: 'feature-add-validator',
+    title: 'Feature: add an exported email validator',
+    category: 'feature',
+    seed: 20,
+    prompt: 'src/util.ts has shout() — add an exported isEmail(s) validator using a simple regex.',
+    setup(root) {
+      write(root, 'src/util.ts', 'export function shout(s: string): string {\n  return s.toUpperCase();\n}\n');
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/util.ts',
+          oldText: 'export function shout',
+          newText:
+            'export function isEmail(s: string): boolean {\n  return /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(s);\n}\nexport function shout',
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/util.ts');
+      const ok = c.includes('export function isEmail') && c.includes('export function shout');
+      return { pass: ok, notes: ok ? 'validator added, shout intact' : `validator missing: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'feature-export-api',
+    title: 'Feature: add and export getVersion()',
+    category: 'feature',
+    seed: 21,
+    prompt: 'src/api.ts exports getStatus() — add and export getVersion() returning "1.0.0".',
+    setup(root) {
+      write(root, 'src/api.ts', "export function getStatus(): string {\n  return 'ok';\n}\n");
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/api.ts',
+          oldText: "export function getStatus(): string {\n  return 'ok';\n}",
+          newText:
+            "export function getStatus(): string {\n  return 'ok';\n}\nexport function getVersion(): string {\n  return '1.0.0';\n}",
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/api.ts');
+      const ok = c.includes('export function getVersion') && c.includes("'1.0.0'") && c.includes('export function getStatus');
+      return { pass: ok, notes: ok ? 'getVersion added' : `missing: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'feature-retry-helper',
+    title: 'Feature: add a withRetry() helper',
+    category: 'feature',
+    seed: 31,
+    prompt: 'src/net.ts has get() — add an exported withRetry(fn, tries) helper that retries a failing async fn.',
+    setup(root) {
+      write(root, 'src/net.ts', "export async function get(url: string): Promise<string> {\n  return 'data:' + url;\n}\n");
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/net.ts',
+          oldText: 'export async function get',
+          newText:
+            'export async function withRetry<T>(fn: () => Promise<T>, tries: number): Promise<T> {\n  let last: unknown;\n  for (let i = 0; i < tries; i++) {\n    try {\n      return await fn();\n    } catch (e) {\n      last = e;\n    }\n  }\n  throw last;\n}\nexport async function get',
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/net.ts');
+      const ok = c.includes('export async function withRetry') && c.includes('export async function get');
+      return { pass: ok, notes: ok ? 'withRetry added' : `missing: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'refactor-remove-dead-code',
+    title: 'Refactor: remove dead code',
+    category: 'refactor',
+    seed: 22,
+    prompt: 'src/old.ts exports used() and an unused deadHelper() — remove deadHelper, keep used().',
+    setup(root) {
+      write(root, 'src/old.ts', 'export function used(): number {\n  return 1;\n}\nexport function deadHelper(): number {\n  return 999;\n}\n');
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/old.ts',
+          oldText: '\nexport function deadHelper(): number {\n  return 999;\n}',
+          newText: '',
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/old.ts');
+      const ok = !c.includes('deadHelper') && c.includes('export function used');
+      return { pass: ok, notes: ok ? 'dead code removed' : `still present: ${c.slice(0, 200)}` };
+    },
+  },
+  {
+    id: 'refactor-shared-const',
+    title: 'Refactor: extract a shared constant',
+    category: 'refactor',
+    seed: 23,
+    prompt:
+      'src/a.ts and src/b.ts each define their own copy of the constant 100 — extract it to src/limits.ts as MAX_LIMIT and import it in both files.',
+    setup(root) {
+      write(root, 'src/a.ts', 'export const LIMIT_A = 100;\nexport function fa(): number {\n  return LIMIT_A;\n}\n');
+      write(root, 'src/b.ts', 'export const LIMIT_B = 100;\nexport function fb(): number {\n  return LIMIT_B;\n}\n');
+    },
+    script: [
+      { kind: 'tool', tool: 'write_file', args: { path: 'src/limits.ts', content: 'export const MAX_LIMIT = 100;\n' } },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/a.ts',
+          oldText: 'export const LIMIT_A = 100;\nexport function fa(): number {\n  return LIMIT_A;\n}',
+          newText: "import { MAX_LIMIT } from './limits.js';\nexport function fa(): number {\n  return MAX_LIMIT;\n}",
+        },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/b.ts',
+          oldText: 'export const LIMIT_B = 100;\nexport function fb(): number {\n  return LIMIT_B;\n}',
+          newText: "import { MAX_LIMIT } from './limits.js';\nexport function fb(): number {\n  return MAX_LIMIT;\n}",
+        },
+      },
+    ],
+    check(root, _t) {
+      const a = read(root, 'src/a.ts');
+      const b = read(root, 'src/b.ts');
+      const lim = read(root, 'src/limits.ts');
+      const ok =
+        lim.includes('export const MAX_LIMIT = 100;') &&
+        a.includes("from './limits.js'") &&
+        b.includes("from './limits.js'") &&
+        !a.includes('LIMIT_A') &&
+        !b.includes('LIMIT_B');
+      return { pass: ok, notes: ok ? 'constant extracted and imported in both files' : 'extraction incomplete' };
+    },
+  },
+  {
+    id: 'tests-write-unit',
+    title: 'Tests: write unit tests for add()',
+    category: 'tests',
+    seed: 24,
+    prompt: 'src/add.ts exports add(a, b) with no tests — write src/add.test.ts covering positive, negative and zero cases.',
+    setup(root) {
+      write(root, 'src/add.ts', 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'write_file',
+        args: {
+          path: 'src/add.test.ts',
+          content:
+            "import { strict as assert } from 'node:assert';\nimport { add } from './add.js';\nassert.equal(add(2, 3), 5);\nassert.equal(add(-2, -3), -5);\nassert.equal(add(0, 0), 0);\nassert.equal(add(-1, 1), 0);\nconsole.log('add tests pass');\n",
+        },
+      },
+    ],
+    check(root, _t) {
+      let c: string;
+      try {
+        c = read(root, 'src/add.test.ts');
+      } catch {
+        return { pass: false, notes: 'src/add.test.ts was not created' };
+      }
+      const asserts = (c.match(/assert\.equal/g) ?? []).length;
+      const ok = c.includes("from './add.js'") && asserts >= 3;
+      return { pass: ok, notes: ok ? `${asserts} assertions across positive/negative/zero` : `only ${asserts} assertions` };
+    },
+  },
+  {
+    id: 'tests-add-edge-cases',
+    title: 'Tests: add edge cases to clamp tests',
+    category: 'tests',
+    seed: 25,
+    prompt:
+      'src/clamp.test.ts only tests the happy path — add edge cases: value below lo, above hi, and exactly at both bounds.',
+    setup(root) {
+      write(root, 'src/clamp.ts', 'export function clamp(v: number, lo: number, hi: number): number {\n  return Math.min(hi, Math.max(lo, v));\n}\n');
+      write(
+        root,
+        'src/clamp.test.ts',
+        "import { strict as assert } from 'node:assert';\nimport { clamp } from './clamp.js';\nassert.equal(clamp(5, 0, 10), 5);\n",
+      );
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/clamp.test.ts',
+          oldText: 'assert.equal(clamp(5, 0, 10), 5);',
+          newText:
+            'assert.equal(clamp(5, 0, 10), 5);\nassert.equal(clamp(-3, 0, 10), 0);\nassert.equal(clamp(99, 0, 10), 10);\nassert.equal(clamp(0, 0, 10), 0);\nassert.equal(clamp(10, 0, 10), 10);',
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/clamp.test.ts');
+      const ok =
+        c.includes('clamp(-3, 0, 10), 0') &&
+        c.includes('clamp(99, 0, 10), 10') &&
+        c.includes('clamp(0, 0, 10), 0') &&
+        c.includes('clamp(10, 0, 10), 10');
+      return { pass: ok, notes: ok ? 'all four edge cases added' : 'edge cases missing' };
+    },
+  },
+  {
+    id: 'multi-file-rename-symbol',
+    title: 'Multi-file: rename getUser → fetchUser',
+    category: 'multi-file',
+    seed: 26,
+    prompt: 'Rename getUser to fetchUser across src/one.ts (definition), src/two.ts and src/three.ts (imports + call sites).',
+    setup(root) {
+      write(root, 'src/one.ts', "export function getUser(id: string): string {\n  return 'u:' + id;\n}\n");
+      write(root, 'src/two.ts', "import { getUser } from './one.js';\nexport function a(id: string): string {\n  return getUser(id);\n}\n");
+      write(root, 'src/three.ts', "import { getUser } from './one.js';\nexport function b(id: string): string {\n  return getUser(id);\n}\n");
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/one.ts', oldText: 'export function getUser(id: string): string {', newText: 'export function fetchUser(id: string): string {' },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/two.ts', oldText: "import { getUser } from './one.js';", newText: "import { fetchUser } from './one.js';" },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/two.ts', oldText: 'return getUser(id);', newText: 'return fetchUser(id);' },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/three.ts', oldText: "import { getUser } from './one.js';", newText: "import { fetchUser } from './one.js';" },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/three.ts', oldText: 'return getUser(id);', newText: 'return fetchUser(id);' },
+      },
+    ],
+    check(root, _t) {
+      const files = ['src/one.ts', 'src/two.ts', 'src/three.ts'].map((f) => read(root, f));
+      const noOld = files.every((c) => !c.includes('getUser'));
+      const hasNew = files.every((c) => c.includes('fetchUser'));
+      const ok = noOld && hasNew;
+      return { pass: ok, notes: ok ? 'renamed in all 3 files' : `noOld=${noOld} hasNew=${hasNew}` };
+    },
+  },
+  {
+    id: 'multi-file-bump-version',
+    title: 'Multi-file: bump version in two files',
+    category: 'multi-file',
+    seed: 27,
+    prompt: 'Bump the version from 1.2.3 to 1.3.0 in both package.json and src/version.ts.',
+    setup(root) {
+      write(root, 'package.json', '{\n  "name": "demo",\n  "version": "1.2.3"\n}\n');
+      write(root, 'src/version.ts', "export const VERSION = '1.2.3';\n");
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'package.json', oldText: '"version": "1.2.3"', newText: '"version": "1.3.0"' },
+      },
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/version.ts', oldText: "'1.2.3'", newText: "'1.3.0'" },
+      },
+    ],
+    check(root, _t) {
+      const pkg = read(root, 'package.json');
+      const ver = read(root, 'src/version.ts');
+      const ok = pkg.includes('"version": "1.3.0"') && ver.includes("'1.3.0'") && !pkg.includes('1.2.3') && !ver.includes('1.2.3');
+      return { pass: ok, notes: ok ? 'version bumped in both files' : 'bump incomplete' };
+    },
+  },
+  {
+    id: 'security-remove-eval',
+    title: 'Security: remove eval() on untrusted input',
+    category: 'security',
+    seed: 28,
+    prompt: 'runExpr() in src/run.ts passes untrusted input to eval() — replace it with a safe JSON.parse-based implementation.',
+    setup(root) {
+      write(root, 'src/run.ts', 'export function runExpr(expr: string): unknown {\n  return eval(expr);\n}\n');
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: { path: 'src/run.ts', oldText: '  return eval(expr);', newText: '  return JSON.parse(expr);' },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/run.ts');
+      const ok = !c.includes('eval(') && c.includes('JSON.parse(expr)');
+      return { pass: ok, notes: ok ? 'eval removed, JSON.parse used' : `still unsafe: ${c.slice(0, 160)}` };
+    },
+  },
+  {
+    id: 'security-execfile',
+    title: 'Security: fix shell command injection',
+    category: 'security',
+    seed: 29,
+    prompt:
+      'listDir() in src/cmd.ts concatenates user input into a shell command — switch to execFile with an args array.',
+    setup(root) {
+      write(
+        root,
+        'src/cmd.ts',
+        "import { exec } from 'node:child_process';\nexport function listDir(userPath: string): void {\n  exec('ls ' + userPath, () => {});\n}\n",
+      );
+    },
+    script: [
+      {
+        kind: 'tool',
+        tool: 'edit_file',
+        args: {
+          path: 'src/cmd.ts',
+          oldText:
+            "import { exec } from 'node:child_process';\nexport function listDir(userPath: string): void {\n  exec('ls ' + userPath, () => {});\n}",
+          newText:
+            "import { execFile } from 'node:child_process';\nexport function listDir(userPath: string): void {\n  execFile('ls', [userPath], () => {});\n}",
+        },
+      },
+    ],
+    check(root, _t) {
+      const c = read(root, 'src/cmd.ts');
+      const ok = c.includes("execFile('ls', [userPath]") && !c.includes("'ls ' + userPath");
+      return { pass: ok, notes: ok ? 'injection fixed via execFile args' : `still injectable: ${c.slice(0, 200)}` };
     },
   },
 ];

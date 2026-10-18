@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROTOCOL_VERSION } from '@sunday/protocol';
 import { createDefaultRegistry, type Tool, type ToolContext } from '@sunday/tools';
-import type { BaselineUsage, EvalTask, ExecutedCall, ModelAdapter, ScriptStep } from './types.js';
+import type { BaselineUsage, EvalTask, ExecutedCall, ModelAdapter, ScoreMetadata, ScriptStep } from './types.js';
 
 /** Token usage harvested from `usage` chat events during one task. */
 export type { BaselineUsage };
@@ -151,6 +151,14 @@ function browserStubTools(): Tool[] {
 /** Execute scripted steps against the real tools; record every call. */
 export class FakeModelAdapter implements ModelAdapter {
   readonly name = 'fake-scripted';
+
+  /**
+   * F12: the scripted adapter consumes one gateway request per tool call
+   * (the F1 cost unit). Tokens are unobserved → costUsd stays unknown.
+   */
+  async scoreMetadata(_task: EvalTask, transcript: ExecutedCall[]): Promise<ScoreMetadata> {
+    return { requests: transcript.length };
+  }
 
   async runTask(task: EvalTask, workspaceRoot: string): Promise<ExecutedCall[]> {
     const registry = createDefaultRegistry();

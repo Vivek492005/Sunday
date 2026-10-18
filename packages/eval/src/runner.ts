@@ -8,7 +8,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TASKS } from './tasks.js';
-import type { BenchmarkReport, ModelAdapter, TaskResult } from './types.js';
+import { countLoopTriggers } from './loopCounting.js';
+import type { BenchmarkReport, ModelAdapter, ScoreMetadata, TaskResult } from './types.js';
 
 export interface RunOptions {
   /** Subset of task ids; default = all. */
@@ -33,6 +34,20 @@ export async function runBenchmark(adapter: ModelAdapter, opts: RunOptions = {})
       const transcript = await adapter.runTask(task, root);
       const { pass, notes } = task.check(root, transcript);
       const validCalls = transcript.filter((c) => c.valid).length;
+      // F12: harvest scoring metadata (cost/requests from the adapter) and
+      // replay the transcript through the real F2 LoopGuard for the
+      // loop-trigger rate. Missing data stays unknown — never fabricated.
+      let score: ScoreMetadata | undefined;
+      try {
+        const fromAdapter = await adapter.scoreMetadata?.(task, transcript);
+        const loop = await countLoopTriggers(transcript);
+        score = {
+          ...fromAdapter,
+          ...(loop.available ? { loopTriggers: loop.triggers } : {}),
+        };
+      } catch {
+        score = undefined;
+      }
       results.push({
         taskId: task.id,
         title: task.title,
@@ -42,6 +57,7 @@ export async function runBenchmark(adapter: ModelAdapter, opts: RunOptions = {})
         validCalls,
         toolReliability: transcript.length === 0 ? 1 : validCalls / transcript.length,
         durationMs: Date.now() - taskStart,
+        ...(score ? { score } : {}),
       });
     } catch (e) {
       results.push({
