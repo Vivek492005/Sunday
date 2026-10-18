@@ -285,6 +285,21 @@
         "command": "sunday.usage.burnRefresh",
         "title": "Sunday: Refresh Burn Meter",
         "category": "Sunday"
+      },
+      {
+        "command": "sunday.context.meter",
+        "title": "Sunday: Show Context Meter",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.context.compact",
+        "title": "Sunday: Compact Context…",
+        "category": "Sunday"
+      },
+      {
+        "command": "sunday.context.pin",
+        "title": "Sunday: Pin a Fact…",
+        "category": "Sunday"
       }
     ],
     "keybindings": [
@@ -796,6 +811,18 @@
         },
         {
           "command": "sunday.usage.burnRefresh",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.context.meter",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.context.compact",
+          "group": "sunday"
+        },
+        {
+          "command": "sunday.context.pin",
           "group": "sunday"
         }
       ]

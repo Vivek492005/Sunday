@@ -29,6 +29,10 @@ import {
   recordManagedRequest,
   type MementoLike,
 } from './entitlements/usage.js';
+import {
+  ContextCockpit,
+  parseSlashCommand,
+} from './context/index.js';
 
 export const CHAT_VIEW_TYPE = 'sunday.chatView';
 
@@ -86,6 +90,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private activeTurnId: string | undefined;
   private detachBridge: (() => void) | undefined;
   private readonly disposables: vscode.Disposable[] = [];
+  /**
+   * F4 Context Cockpit — one per chat session. Tracks local messages, pinned
+   * facts, and compaction ledgers; intercepts /compact, /pin, /forget before
+   * the text reaches the agent bridge.
+   */
+  private cockpit: ContextCockpit | undefined;
   /**
    * Last entitlement-gated model list sent to the webview. Used to validate
    * the model chosen in `sunday/chat/send` — selecting a greyed/excluded
@@ -204,9 +214,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * F4: intercept /compact, /pin, /forget. Returns true when the input was
+   * a context command (handled locally — nothing is sent to the bridge).
+   */
+  private async handleContextSlash(text: string): Promise<boolean> {
+    const cmd = parseSlashCommand(text);
+    if (!cmd) return false;
+    if (!this.cockpit) this.cockpit = new ContextCockpit();
+    const cockpit = this.cockpit;
+    // The command itself is part of the local history.
+    cockpit.trackUserMessage(text);
+    const replies: string[] = [];
+    cockpit.handleSlash(cmd, (md) => replies.push(md));
+    for (const md of replies) {
+      cockpit.trackAssistantMessage(md);
+      this.postLocalReply(md);
+    }
+    this.deps.log(`chat view: context slash "/${cmd.command}" handled locally`);
+    return true;
+  }
+
+  /**
+   * F4: render a local (non-model) reply in the chat webview by synthesizing
+   * a completed turn: text-delta followed by turn-end. The webview creates
+   * the assistant message from the delta, same as a real turn.
+   */
+  private postLocalReply(markdown: string): void {
+    const turnId = `local-ctx-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const sessionId = this.sessionId ?? 'local';
+    this.post({
+      type: 'sunday/chat/event',
+      turnId,
+      sessionId,
+      event: { type: 'text-delta', delta: markdown },
+    });
+    this.post({
+      type: 'sunday/chat/event',
+      turnId,
+      sessionId,
+      event: { type: 'turn-end', finishReason: 'stop' },
+    });
+  }
+
   private async handleSend(text: string, images: ImageAttachment[], model?: string): Promise<void> {
     const t = text.trim();
     if (!t && images.length === 0) return;
+    // F4 Context Cockpit: /compact, /pin, /forget never reach the model —
+    // they are handled locally and answered in the chat UI.
+    if (await this.handleContextSlash(t)) return;
     // Task 7 gate: a plan-gated model selection never reaches the model —
     // show the upgrade/info message instead. Fail open when the list was
     // never fetched (empty gated list).

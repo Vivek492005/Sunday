@@ -54,6 +54,10 @@ import {
 import { readUsedToday } from './entitlements/usage.js';
 import { dailyRequestLimit } from './entitlements/types.js';
 import { registerSyncCommands } from './sync.js';
+import {
+  ContextCockpit,
+  registerContextCommands,
+} from './context/index.js';
 import { registerMarketplaceCommands } from './skills-marketplace/panel.js';
 import { registerProactiveMode } from './proactiveMode.js';
 import { registerAgentsMd } from './agentsMd.js';
@@ -799,6 +803,21 @@ export async function activate(
   // (budgetTracker/taskLedger singletons were created above with the
   // senders.) All vscode-free logic lives in ./budgets (unit-tested).
   for (const d of registerBudgetCommands(context, { tracker: budgetTracker, log })) {
+    context.subscriptions.push(d);
+  }
+  // F4 Context Cockpit: palette commands (meter / compact / pin). The chat
+  // slash commands (/compact, /pin, /forget) are intercepted in chatView.ts
+  // via a per-session ContextCockpit; this palette-level cockpit shares the
+  // pinned store through globalState persistence (wired at first pin).
+  const contextCockpit = new ContextCockpit();
+  for (const d of registerContextCommands(context, {
+    meter: contextCockpit.meter,
+    pinned: contextCockpit.pinned,
+    log,
+    focusChat: () => {
+      void vscode.commands.executeCommand('sunday.chatView.focus');
+    },
+  })) {
     context.subscriptions.push(d);
   }
   context.subscriptions.push(
