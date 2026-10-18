@@ -1,0 +1,163 @@
+/* F13 importer modal — Sunday design tokens, no VS Code classes. */
+.sunday-import-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.sunday-import-modal {
+  width: min(720px, 92vw);
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sunday-bg-raised, #241f16);
+  border: 1px solid var(--sunday-border, #3a3226);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  color: var(--sunday-fg, #f2ead8);
+}
+
+.sunday-import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--sunday-border, #3a3226);
+}
+
+.sunday-import-header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: var(--sunday-accent, #f5b942);
+}
+
+.sunday-import-header p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.sunday-import-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.7;
+}
+
+.sunday-import-close:hover { opacity: 1; }
+
+.sunday-import-body {
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+}
+
+.sunday-import-body section { margin-bottom: 20px; }
+.sunday-import-body h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+.sunday-import-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sunday-import-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--sunday-border, #3a3226);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.sunday-import-list li.is-skip { opacity: 0.55; }
+
+.sunday-import-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 185, 66, 0.15);
+  color: var(--sunday-accent, #f5b942);
+  white-space: nowrap;
+}
+
+.sunday-import-action {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.action-create { background: rgba(76, 175, 80, 0.18); color: #8fd694; }
+.action-append, .action-merge { background: rgba(33, 150, 243, 0.18); color: #90caf9; }
+.action-skip { background: rgba(158, 158, 158, 0.18); color: #bdbdbd; }
+.action-overwrite { background: rgba(244, 67, 54, 0.18); color: #ef9a9a; }
+
+.sunday-import-label { flex: 1 1 auto; }
+.sunday-import-path {
+  flex: 0 1 auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.sunday-import-status, .sunday-import-empty { opacity: 0.75; font-size: 14px; }
+
+.sunday-import-error p { color: #ef9a9a; }
+.sunday-import-error button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--sunday-border, #3a3226);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sunday-import-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sunday-import-primary, .sunday-import-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--sunday-border, #3a3226);
+}
+
+.sunday-import-primary {
+  background: var(--sunday-accent, #f5b942);
+  color: #1a1611;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.sunday-import-primary:disabled { opacity: 0.5; cursor: default; }
+
+.sunday-import-secondary { background: transparent; color: inherit; }

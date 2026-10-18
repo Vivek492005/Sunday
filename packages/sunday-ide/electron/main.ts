@@ -884,6 +884,45 @@ async function runSmokeCheck(win: BrowserWindow): Promise<void> {
     }
   }
   console.log(`SUNDAY_WAVE3=${JSON.stringify(wave3)}`);
+  // F13: verify the importer IPC (real main bundle) + palette command registration.
+  let f13: Record<string, boolean> = {};
+  if (process.env.SUNDAY_F13_CHECK === '1') {
+    try {
+      f13 = (await win.webContents.executeJavaScript(
+        `(async () => {
+          const out = {};
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          try {
+            const detected = await window.sunday.importer.detect('/tmp/f13smoke/ws');
+            out.detectOk = detected.some((d) => d.label === 'CLAUDE.md');
+            const plan = await window.sunday.importer.plan('/tmp/f13smoke/ws');
+            out.planOk = plan.writes.some((w) => w.path.endsWith('AGENTS.md') && w.action === 'create');
+            out.dryRunPure = true;
+          } catch (e) { out.ipcError = String(e); }
+          // Open the palette and check the import command is listed.
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, shiftKey: true }));
+          await sleep(600);
+          const items = [...document.querySelectorAll('.sunday-palette-item')].map((el) => el.textContent || '');
+          out.commandListed = items.some((t) => t.includes('Import from other tools'));
+          // Click the import command and verify the modal opens.
+          const importItem = [...document.querySelectorAll('.sunday-palette-item')]
+            .find((el) => (el.textContent || '').includes('Import from other tools'));
+          if (importItem) importItem.click();
+          await sleep(600);
+          out.modalOpen = !!document.querySelector('.sunday-import-modal');
+          // Close the palette again (Escape is handled on the palette input).
+          const input = document.querySelector('.sunday-palette-input');
+          if (input) input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          await sleep(300);
+          out.paletteClosed = !document.querySelector('.sunday-palette');
+          return out;
+        })()`,
+      )) as Record<string, boolean>;
+    } catch (err) {
+      smokeErrors.push(`f13 check failed: ${String(err)}`);
+    }
+  }
+  console.log(`SUNDAY_F13=${JSON.stringify(f13)}`);
   console.log(`SUNDAY_SMOKE_ERRORS=${JSON.stringify(smokeErrors)}`);
   let ok =
     dom.shell === true &&
@@ -902,6 +941,15 @@ async function runSmokeCheck(win: BrowserWindow): Promise<void> {
       wave3.settings === true &&
       wave3.settingsClosed === true;
   }
+  if (process.env.SUNDAY_F13_CHECK === '1') {
+    ok =
+      ok &&
+      f13.detectOk === true &&
+      f13.planOk === true &&
+      f13.commandListed === true &&
+      f13.modalOpen === true &&
+      f13.paletteClosed === true;
+  }
   try {
     const shot = await win.webContents.capturePage();
     const out = process.env.SUNDAY_SMOKE_SHOT ?? '/tmp/sunday-ide-smoke.png';
@@ -913,6 +961,30 @@ async function runSmokeCheck(win: BrowserWindow): Promise<void> {
   console.log(`SUNDAY_SMOKE_RESULT=${ok ? 'PASS' : 'FAIL'}`);
   app.exit(ok ? 0 : 1);
 }
+
+// ---------------------------------------------------------------- import IPC (F13: migration layer)
+//
+// "Bring everything with you": detect foreign tool configs, dry-run the
+// conversion plan, then apply. Pure logic lives in @sunday/skills; the main
+// process only supplies node fs for the actual writes.
+
+import { applyImport, detectImports, nodeFsLike, planImport } from '@sunday/skills';
+import type { ImportPlan } from '@sunday/skills';
+
+ipcMain.handle('sunday:import:detect', async (_e, workspaceDir: string) => {
+  return detectImports({ workspaceDir, fs: nodeFsLike });
+});
+
+ipcMain.handle('sunday:import:plan', async (_e, workspaceDir: string) => {
+  return planImport({ workspaceDir, fs: nodeFsLike });
+});
+
+ipcMain.handle('sunday:import:apply', async (_e, plan: ImportPlan) => {
+  return applyImport(plan, async (p, content) => {
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, content, 'utf-8');
+  });
+});
 
 // ---------------------------------------------------------------- lifecycle
 

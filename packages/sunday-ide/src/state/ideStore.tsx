@@ -25,6 +25,7 @@ interface IdeState {
   cursor: { line: number; column: number };
   recentFolders: string[];
   settingsOpen: boolean;
+  importOpen: boolean;
 }
 
 type Action =
@@ -39,7 +40,8 @@ type Action =
   | { type: 'SET_BRANCH'; branch: string | null }
   | { type: 'SET_CURSOR'; line: number; column: number }
   | { type: 'ADD_RECENT'; folder: string }
-  | { type: 'SET_SETTINGS_OPEN'; open: boolean };
+  | { type: 'SET_SETTINGS_OPEN'; open: boolean }
+  | { type: 'SET_IMPORT_OPEN'; open: boolean };
 
 const initialState: IdeState = {
   rootFolder: null,
@@ -51,6 +53,7 @@ const initialState: IdeState = {
   cursor: { line: 1, column: 1 },
   recentFolders: loadRecent(),
   settingsOpen: false,
+  importOpen: false,
 };
 
 function loadRecent(): string[] {
@@ -132,6 +135,8 @@ function reducer(state: IdeState, action: Action): IdeState {
       return { ...state, cursor: { line: action.line, column: action.column } };
     case 'SET_SETTINGS_OPEN':
       return { ...state, settingsOpen: action.open };
+    case 'SET_IMPORT_OPEN':
+      return { ...state, importOpen: action.open };
     case 'ADD_RECENT': {
       const folders = [action.folder, ...state.recentFolders.filter((f) => f !== action.folder)].slice(0, 8);
       persistRecent(folders);

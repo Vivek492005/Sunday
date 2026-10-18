@@ -26,3 +26,19 @@ export type { MemoryDiff, MemoryOptions, MemoryScope } from './memory.js';
 
 export { MemoryStore, extractMemories, formatMemoriesForPrompt } from './second-brain.js';
 export type { LongTermMemory, MemoryStoreOptions, MemorySearchOptions, MemoryListOptions, TranscriptTurn } from './second-brain.js';
+
+export { detectImports, planImport, applyImport, nodeFsLike, memoryFsLike } from './importers/index.js';
+export type {
+  DetectedSource,
+  FsLike,
+  ImportPlan,
+  ImportReport,
+  ImportSourceKind,
+  PlannedWrite,
+  SundayKeybinding,
+  SundayMcpServer,
+  SundaySettingsPatch,
+  UnconvertibleItem,
+  WriteAction,
+  WriteFile,
+} from './importers/index.js';

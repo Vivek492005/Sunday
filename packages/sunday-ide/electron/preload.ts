@@ -10,6 +10,35 @@ export interface FsEntry {
   isDirectory: boolean;
 }
 
+/** F13 migration-layer shapes (mirrors @sunday/skills importers). */
+export interface ImportDetectedSource {
+  kind: string;
+  path: string;
+  label: string;
+  scope: 'workspace' | 'user';
+}
+export interface ImportPlannedWrite {
+  path: string;
+  action: 'create' | 'append' | 'merge' | 'overwrite' | 'skip';
+  summary: string;
+  content: string;
+  preview: string;
+  skipReason?: string;
+}
+export interface ImportPlan {
+  workspaceDir: string;
+  detected: ImportDetectedSource[];
+  writes: ImportPlannedWrite[];
+  unconvertible: { source: string; item: string; reason: string }[];
+  nothingToDo: boolean;
+}
+export interface ImportReport {
+  appliedAt: string;
+  converted: { source: string; target: string; detail: string }[];
+  skipped: { source: string; target: string; reason: string }[];
+  needsAttention: { source: string; item: string; reason: string }[];
+}
+
 export interface SundayAPI {
   window: {
     minimize(): Promise<void>;
@@ -46,6 +75,11 @@ export interface SundayAPI {
     get(): Promise<SundaySettings>;
     set(patch: Partial<SundaySettings>): Promise<SundaySettings>;
   };
+  importer: {
+    detect(workspaceDir: string): Promise<ImportDetectedSource[]>;
+    plan(workspaceDir: string): Promise<ImportPlan>;
+    apply(plan: ImportPlan): Promise<ImportReport>;
+  };
   extensions: {
     search(query: string): Promise<OpenVsxExtension[]>;
     list(): Promise<InstalledExtension[]>;
@@ -69,11 +103,38 @@ export interface SundayAPI {
   };
   search: {
     text(query: string, dirPath: string): Promise<SearchResult[]>;
+    hybrid(query: string, dirPath: string): Promise<HybridSearchResult[]>;
   };
   agent: {
     send(req: AgentRequest): Promise<AgentReply>;
-    estimate(message: string): Promise<AgentEstimate>;
+    estimate(message: string, model?: string): Promise<AgentEstimate>;
     usage(): Promise<AgentUsage>;
+    budgetContinue(scope: string, n: number): Promise<AgentUsage>;
+  };
+  loopguard: {
+    status(): Promise<LoopGuardStatus>;
+  };
+  context: {
+    meter(): Promise<ContextUsage>;
+    pin(text: string): Promise<PinnedFact>;
+    unpin(id: string): Promise<boolean>;
+    pins(): Promise<PinnedFact[]>;
+    compactPreview(messages: AgentMessage[]): Promise<CompactionPreview>;
+    track(userText: string, assistantText: string): Promise<ContextUsage>;
+  };
+  session: {
+    rewind(sessionId: string, entryId: string): Promise<unknown>;
+    branch(sessionId: string, entryId?: string, title?: string): Promise<unknown>;
+    export(sessionId: string, format: 'jsonl' | 'markdown'): Promise<unknown>;
+  };
+  policy: {
+    evaluate(command: string, cwd: string): Promise<PolicyEval>;
+  };
+  hooks: {
+    list(workspaceDir?: string): Promise<HookInfo[]>;
+  };
+  evidence: {
+    get(diffText: string, goal: string): Promise<EvidenceSummary>;
   };
 }
 
@@ -82,6 +143,14 @@ export interface SearchResult {
   line: number;
   column: number;
   text: string;
+}
+
+export interface HybridSearchResult {
+  path: string;
+  line: number;
+  text: string;
+  why: string;
+  score: number;
 }
 
 export interface SundaySettings {
@@ -158,6 +227,59 @@ export interface AgentUsage {
   limit: number;
   resetAt: string;
   taskSpend: number;
+  costPerSuccessfulTask?: number;
+  pausedScopes?: string[];
+}
+
+export interface LoopGuardStatus {
+  tripped: boolean;
+  triggerKind?: string;
+  recentCalls: number;
+}
+
+export interface ContextUsage {
+  used: number;
+  limit: number;
+  percent: number;
+  breakdown: Record<string, number>;
+  pinnedCount: number;
+}
+
+export interface PinnedFact {
+  id: string;
+  text: string;
+  pinnedBy: string;
+  createdAt: number;
+}
+
+export interface CompactionPreview {
+  toSummarize: string[];
+  toDrop: string[];
+  toTrim: string[];
+  protected: string[];
+  tokensBefore: number;
+  tokensAfter: number;
+  draftSummary: string;
+}
+
+export interface PolicyEval {
+  tier: string;
+  decision: 'allow' | 'ask' | 'deny';
+  reasons: string[];
+}
+
+export interface HookInfo {
+  name: string;
+  event: string;
+  enabled: boolean;
+  source: 'repo' | 'user';
+}
+
+export interface EvidenceSummary {
+  hunks: number;
+  highRisk: number;
+  unrelated: number;
+  topRisks: { path: string; tier: string; reason: string }[];
 }
 
 const api: SundayAPI = {
@@ -203,6 +325,11 @@ const api: SundayAPI = {
     get: () => ipcRenderer.invoke('sunday:settings:get'),
     set: (patch) => ipcRenderer.invoke('sunday:settings:set', patch),
   },
+  importer: {
+    detect: (workspaceDir) => ipcRenderer.invoke('sunday:import:detect', workspaceDir),
+    plan: (workspaceDir) => ipcRenderer.invoke('sunday:import:plan', workspaceDir),
+    apply: (plan) => ipcRenderer.invoke('sunday:import:apply', plan),
+  },
   extensions: {
     search: (query) => ipcRenderer.invoke('sunday:extensions:search', query),
     list: () => ipcRenderer.invoke('sunday:extensions:list'),
@@ -242,11 +369,38 @@ const api: SundayAPI = {
   },
   search: {
     text: (query, dirPath) => ipcRenderer.invoke('sunday:search:text', query, dirPath),
+    hybrid: (query, dirPath) => ipcRenderer.invoke('sunday:search:hybrid', query, dirPath),
   },
   agent: {
     send: (req) => ipcRenderer.invoke('sunday:agent:send', req),
-    estimate: (message) => ipcRenderer.invoke('sunday:agent:estimate', message),
+    estimate: (message, model) => ipcRenderer.invoke('sunday:agent:estimate', message, model),
     usage: () => ipcRenderer.invoke('sunday:agent:usage'),
+    budgetContinue: (scope, n) => ipcRenderer.invoke('sunday:budget:continue', scope, n),
+  },
+  loopguard: {
+    status: () => ipcRenderer.invoke('sunday:loopguard:status'),
+  },
+  context: {
+    meter: () => ipcRenderer.invoke('sunday:context:meter'),
+    pin: (text) => ipcRenderer.invoke('sunday:context:pin', text),
+    unpin: (id) => ipcRenderer.invoke('sunday:context:unpin', id),
+    pins: () => ipcRenderer.invoke('sunday:context:pins'),
+    compactPreview: (messages) => ipcRenderer.invoke('sunday:context:compact-preview', messages),
+    track: (userText, assistantText) => ipcRenderer.invoke('sunday:context:track', userText, assistantText),
+  },
+  session: {
+    rewind: (sessionId, entryId) => ipcRenderer.invoke('sunday:session:rewind', sessionId, entryId),
+    branch: (sessionId, entryId, title) => ipcRenderer.invoke('sunday:session:branch', sessionId, entryId, title),
+    export: (sessionId, format) => ipcRenderer.invoke('sunday:session:export', sessionId, format),
+  },
+  policy: {
+    evaluate: (command, cwd) => ipcRenderer.invoke('sunday:policy:evaluate', command, cwd),
+  },
+  hooks: {
+    list: (workspaceDir) => ipcRenderer.invoke('sunday:hooks:list', workspaceDir),
+  },
+  evidence: {
+    get: (diffText, goal) => ipcRenderer.invoke('sunday:evidence:get', diffText, goal),
   },
 };
 

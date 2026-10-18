@@ -6,7 +6,8 @@
     "monaco-editor": "^0.52.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "@sunday/skills": "workspace:*",
   },
   "description": "Sunday IDE — Sunday's own custom IDE shell (Electron + React + Monaco). Zero VS Code workbench UI; Monaco is used only as the text-editing engine.",
   "devDependencies": {

@@ -17,6 +17,7 @@ import { SourceControl } from './components/Sidebar/SourceControl';
 import { Extensions } from './components/Sidebar/Extensions';
 import { Debug } from './components/Sidebar/Debug';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { ImportModal } from './components/Import/ImportModal';
 import { AgentPanel } from './components/Agent/AgentPanel';
 import { EditorArea } from './components/Editor/EditorArea';
 import { Panel } from './components/Panel/Panel';
@@ -109,6 +110,12 @@ function Shell() {
       run: () => dispatch({ type: 'SET_SETTINGS_OPEN', open: true }),
     });
     registerCommand({
+      id: 'sunday.importFromTools',
+      title: 'Sunday: Import from other tools',
+      hint: 'Claude · Cursor · VS Code',
+      run: () => dispatch({ type: 'SET_IMPORT_OPEN', open: true }),
+    });
+    registerCommand({
       id: 'sunday.commandPalette',
       title: 'Show Command Palette…',
       hint: 'Ctrl+Shift+P',
@@ -166,6 +173,7 @@ function Shell() {
       <StatusBar />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <SettingsModal />
+      <ImportModal />
     </div>
   );
 }
