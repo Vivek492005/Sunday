@@ -94,7 +94,11 @@ function ensureDaemon(): Promise<void> {
       reject(new Error(`sundayd not built at ${bin} — run pnpm --filter @sunday/sundayd build`));
       return;
     }
-    const proc = spawn(process.execPath, [bin], {
+    // Spawn via the Electron binary with --sundayd-daemon: main.ts detects the
+    // flag and runs the daemon bundle instead of creating IDE windows.
+    // (Never spawn the binary WITHOUT the flag — that would launch another
+    // full IDE, which spawns another, infinitely: the 100+ windows bug.)
+    const proc = spawn(process.execPath, [bin, '--sundayd-daemon'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     });

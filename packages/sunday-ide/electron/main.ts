@@ -2,12 +2,27 @@
  * Sunday IDE — Electron main process.
  * Frameless window, custom Sunday chrome. IPC: window controls, dialogs,
  * filesystem access, folder watching, git branch. No VS Code code anywhere.
+ *
+ * DAEMON MODE: if --sundayd-daemon is in argv, this process runs as the
+ * headless sundayd daemon (JSON-RPC over stdio) instead of the IDE.
+ * daemonClient.ts spawns the daemon this way in the packaged app, where
+ * process.execPath is the Electron binary (not Node.js).
  */
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, utilityProcess, type UtilityProcess } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { execFile } from 'node:child_process';
+
+// --- Daemon mode: run sundayd instead of the IDE ---
+// (Blocking promise prevents ALL IDE code below from running in daemon mode.)
+if (process.argv.includes('--sundayd-daemon')) {
+  const daemonPath = path.join(__dirname, 'sundayd.cjs');
+  await import(daemonPath);
+  process.stdin.resume();
+  process.stdin.on('end', () => process.exit(0));
+  await new Promise(() => {}); // block forever; daemon speaks over stdio
+}
 
 const isDev = process.env.SUNDAY_DEV === '1';
 
@@ -948,13 +963,11 @@ ipcMain.handle('sunday:extensions:setEnabled', async (_e, id: string, enabled: b
 // renderer. Full DAP (step over/into, variables, call stack via
 // vscode-debugprotocol + a debug adapter) is an explicit follow-up.
 
-import { spawn, type ChildProcess } from 'node:child_process';
-
-let debugProc: ChildProcess | null = null;
+let debugProc: UtilityProcess | null = null;
 
 function killDebugProc(): void {
   try {
-    debugProc?.kill('SIGKILL');
+    debugProc?.kill();
   } catch {
     // already dead
   }
@@ -967,9 +980,12 @@ ipcMain.handle(
     if (!program) return { ok: false, error: 'No program to launch' };
     killDebugProc();
     try {
-      const proc = spawn(process.execPath, [program, ...(args ?? [])], {
+      // Headless Node via utilityProcess (NOT spawn(process.execPath) — that's
+      // the Electron binary in the packaged app and would open IDE windows).
+      const proc = utilityProcess.fork(program, [...(args ?? [])], {
         cwd: cwd || undefined,
-        env: { ...process.env, FORCE_COLOR: '0' },
+        env: { ...process.env, FORCE_COLOR: '0' } as Record<string, string>,
+        stdio: 'pipe',
       });
       debugProc = proc;
       proc.stdout?.on('data', (d: Buffer) => {
