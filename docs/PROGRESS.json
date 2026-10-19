@@ -86,9 +86,9 @@
     },
     {
       "name": "Sunday IDE 2.0 (Custom Shell + F1-F15)",
-      "status": "active",
-      "percent": 95,
-      "detail": "Waves 1-3 + F1-F15 backends + full IDE integration + Sunday Ops UI done locally. Wave 4: Windows packaging + final release in progress."
+      "status": "done",
+      "percent": 100,
+      "detail": "Waves 1-3 + F1-F15 + Sunday Ops UI + daemon bundle. Windows installer built on CI, release sunday-ide-v2.0.0 live with Sunday-Setup.exe (106MB)."
     }
   ],
   "project": "Sunday IDE",
