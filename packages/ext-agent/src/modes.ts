@@ -78,7 +78,7 @@ export function registerAgentModes(
   refresh();
 
   const setCommand = vscode.commands.registerCommand('sunday.mode.set', async () => {
-    const pick = await vscode.window.showQuickPick(
+    const pick = await vscode.window.showQuickPick<{ label: string; description: string; mode: AgentMode }>(
       AGENT_MODES.map((mode) => ({
         label: agentModeLabel(mode),
         description: MODE_DESCRIPTIONS[mode],

@@ -131,6 +131,11 @@ function ensureDaemon(): Promise<void> {
 
 /** Raw JSON-RPC call to the sundayd daemon. Rejects honestly when the daemon is down. */
 export function daemonRpc(method: string, params: unknown, timeoutMs = 60000): Promise<unknown> {
+  // Test hook: simulate "daemon unavailable" without spawning anything.
+  // (The test asserts the honest-unavailable shape, not daemon behavior.)
+  if (process.env.SUNDAY_DAEMON_UNAVAILABLE === '1') {
+    return Promise.reject(new Error('daemon unavailable (SUNDAY_DAEMON_UNAVAILABLE=1)'));
+  }
   return ensureDaemon().then(
     () =>
       new Promise<unknown>((resolve, reject) => {

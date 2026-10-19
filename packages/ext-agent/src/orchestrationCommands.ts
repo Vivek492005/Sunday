@@ -112,7 +112,7 @@ export async function runOrchestration(deps: OrchestrationCommandDeps): Promise<
           ...(caps.entitlementCaps ? { entitlementCaps: caps.entitlementCaps } : {}),
         }),
     );
-    const merged = res.units.filter((u) => u.status === 'merged').length;
+    const merged = res.units.filter((u: { status: string }) => u.status === 'merged').length;
     vscode.window.showInformationMessage(
       `Sunday orchestration finished: ${merged}/${res.units.length} units merged` +
         (res.mergedSha ? ` (${res.mergedSha.slice(0, 12)}).` : '.') +

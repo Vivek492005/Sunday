@@ -40,11 +40,13 @@ jobs:
       - name: Build workspace dependencies
         # @sunday/* packages (+ sunday-agent) ship dist/ as their main/types
         # entry — they must be built before sunday-ide typechecks against them.
-        # sunday-agent first: sundayd imports sunday-agent/dist.
+        # Order: @sunday/* (minus sundayd) → sunday-agent → sundayd
+        # (sundayd imports sunday-agent/dist; sunday-agent imports @sunday/* dist).
         working-directory: .
         run: |
+          pnpm --filter "@sunday/*" --filter "!@sunday/sundayd" build
           pnpm --filter "sunday-agent" build
-          pnpm --filter "@sunday/*" build
+          pnpm --filter "@sunday/sundayd" build
 
       - name: Typecheck
         run: pnpm typecheck

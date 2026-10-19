@@ -64,7 +64,7 @@ export function validateCronInput(input: string): string | undefined {
 async function statusInfo(bridge: HostBridge): Promise<ScheduledTaskInfo[]> {
   const { schedules, running } = await bridge.schedulerStatus();
   const runningSet = new Set(running);
-  return schedules.map((s) => ({
+  return schedules.map((s: { name: string; cron: string; enabled: boolean; lastRunAt?: string; lastStatus?: string }) => ({
     name: s.name,
     cron: s.cron,
     enabled: s.enabled,

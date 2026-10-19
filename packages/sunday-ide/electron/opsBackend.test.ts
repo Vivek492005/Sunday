@@ -37,11 +37,18 @@ describe('F3 routing (opsBackend)', () => {
   });
 
   it('routing recent reports honestly when the daemon is unavailable', async () => {
-    const recent = await getRoutingRecent();
-    // No daemon running in tests → available must be false with an honest note
-    expect(recent.available).toBe(false);
-    expect(recent.entries).toEqual([]);
-    expect(recent.note).toMatch(/not exposed|policy table/i);
+    // Simulate "daemon down" — the test asserts the honest-unavailable shape,
+    // not actual daemon spawn behavior (which hangs on some CI runners).
+    process.env.SUNDAY_DAEMON_UNAVAILABLE = '1';
+    try {
+      const recent = await getRoutingRecent();
+      // No daemon running in tests → available must be false with an honest note
+      expect(recent.available).toBe(false);
+      expect(recent.entries).toEqual([]);
+      expect(recent.note).toMatch(/not exposed|policy table/i);
+    } finally {
+      delete process.env.SUNDAY_DAEMON_UNAVAILABLE;
+    }
   }, 15000);
 });
 
