@@ -65,9 +65,28 @@ export function removeNotificationHandler(method: string, h: NotificationHandler
 
 function dispatchDaemonNotification(method: string, params: unknown): void {
   if (method === 'chat/event') {
-    const p = params as { event?: { type: string; [k: string]: unknown } };
+    const p = params as {
+      event?: { type: string; [k: string]: unknown };
+      turnId?: string;
+      sessionId?: string;
+      via?: string;
+      relay?: unknown;
+    };
     const ev = p.event;
-    if (ev) for (const h of chatEventHandlers) h(ev);
+    if (ev) {
+      // Merge the envelope ids into the delivered event: handlers (e.g.
+      // agentBackend.realAgentSend) correlate by turnId, and the daemon puts
+      // turnId/sessionId on the NOTIFICATION, not inside the event itself.
+      // Without this merge every handler's turnId filter drops all events.
+      const merged = {
+        ...ev,
+        ...(p.turnId ? { turnId: p.turnId } : {}),
+        ...(p.sessionId ? { sessionId: p.sessionId } : {}),
+        ...(p.via ? { via: p.via } : {}),
+        ...(p.relay ? { relay: p.relay } : {}),
+      };
+      for (const h of chatEventHandlers) h(merged);
+    }
   }
   const generic = notificationHandlers.get(method);
   if (generic) for (const h of generic) h(params);
@@ -81,22 +100,26 @@ function onDaemonData(chunk: Buffer): void {
     rpcBuffer = rpcBuffer.slice(nl + 1);
     if (!line) continue;
     try {
-      const msg = parseMessage(line) as unknown as {
-        kind: string;
-        id?: number | string;
-        result?: unknown;
-        error?: { message?: string };
-        method?: string;
-        params?: unknown;
-      };
-      if (msg.kind === 'response' && msg.id !== undefined) {
-        const p = pending.get(msg.id);
-        if (p) {
-          pending.delete(msg.id);
-          if (msg.error) p.reject(new Error(msg.error.message ?? 'daemon RPC error'));
-          else p.resolve(msg.result);
+      // parseMessage returns a { kind, message } WRAPPER — the payload
+      // fields live on .message. (Reading them off the wrapper directly
+      // silently dropped every response and notification.)
+      const parsed = parseMessage(line);
+      if (parsed.kind === 'response') {
+        const msg = parsed.message as {
+          id?: number | string;
+          result?: unknown;
+          error?: { message?: string };
+        };
+        if (msg.id !== undefined) {
+          const p = pending.get(msg.id);
+          if (p) {
+            pending.delete(msg.id);
+            if (msg.error) p.reject(new Error(msg.error.message ?? 'daemon RPC error'));
+            else p.resolve(msg.result);
+          }
         }
-      } else if (msg.kind === 'notification') {
+      } else if (parsed.kind === 'notification') {
+        const msg = parsed.message as { method?: string; params?: unknown };
         dispatchDaemonNotification(msg.method ?? '', msg.params);
       }
     } catch {
@@ -157,16 +180,34 @@ function ensureDaemon(): Promise<void> {
       pending.clear();
     });
     // Handshake: sunday/ping proves the daemon is up and speaking JSON-RPC.
-    const timeout = setTimeout(() => reject(new Error('daemon ping timeout')), 15000);
-    daemonRpc('sunday/ping', {})
-      .then(() => {
+    // The ping is written DIRECTLY onto the pending-RPC machinery — it must
+    // NOT go through daemonRpc(): this executor runs synchronously BEFORE
+    // `daemonReady` is assigned, so daemonRpc → ensureDaemon() would see
+    // daemonReady === null, spawn again, and recurse until the spawn
+    // circuit breaker rejected every daemon call (the daemon was
+    // unreachable from the IDE because of exactly that).
+    const pingId = rpcId++;
+    const timeout = setTimeout(() => {
+      pending.delete(pingId);
+      reject(new Error('daemon ping timeout'));
+    }, 15000);
+    pending.set(pingId, {
+      resolve: () => {
         clearTimeout(timeout);
         resolve();
-      })
-      .catch((e) => {
+      },
+      reject: (e) => {
         clearTimeout(timeout);
         reject(e);
-      });
+      },
+    });
+    try {
+      proc.stdin.write(JSON.stringify(createRequest(pingId, 'sunday/ping', {})) + '\n');
+    } catch (e) {
+      clearTimeout(timeout);
+      pending.delete(pingId);
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
   });
   return daemonReady;
 }
