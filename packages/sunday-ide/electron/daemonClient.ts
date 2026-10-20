@@ -184,16 +184,26 @@ function ensureDaemon(): Promise<void> {
     proc.stderr.on('data', () => {
       // Daemon logs go to stderr; ignore in normal operation
     });
+    proc.stdin.on('error', () => {
+      // EPIPE class (audit L2): the daemon died mid-write. The exit/error
+      // handlers own cleanup; an unhandled stdin 'error' would throw.
+    });
     proc.on('error', (e) => {
-      daemonProc = null;
-      daemonReady = null;
+      // Identity guard: a stale process must not clear the state of a
+      // newer daemon that has already replaced it.
+      if (daemonProc === proc) {
+        daemonProc = null;
+        daemonReady = null;
+      }
       reject(e);
     });
     proc.on('exit', () => {
-      daemonProc = null;
-      daemonReady = null;
-      for (const [, p] of pending) p.reject(new Error('daemon exited'));
-      pending.clear();
+      if (daemonProc === proc) {
+        daemonProc = null;
+        daemonReady = null;
+        for (const [, p] of pending) p.reject(new Error('daemon exited'));
+        pending.clear();
+      }
     });
     // Handshake: sunday/ping proves the daemon is up and speaking JSON-RPC.
     // The ping is written DIRECTLY onto the pending-RPC machinery — it must
@@ -205,6 +215,22 @@ function ensureDaemon(): Promise<void> {
     const pingId = rpcId++;
     const timeout = setTimeout(() => {
       pending.delete(pingId);
+      // Hung-but-alive daemon (audit M1): the rejection used to stay
+      // cached in daemonReady forever and the zombie process was never
+      // killed, so every later RPC instantly failed until IDE restart.
+      // Clear the cached state and kill the child — the next RPC then
+      // respawns a fresh daemon (subject to the spawn circuit breaker).
+      if (daemonProc === proc) {
+        daemonProc = null;
+        daemonReady = null;
+      }
+      for (const [, p] of pending) p.reject(new Error('daemon ping timeout'));
+      pending.clear();
+      try {
+        proc.kill();
+      } catch {
+        // already dead
+      }
       reject(new Error('daemon ping timeout'));
     }, 15000);
     pending.set(pingId, {

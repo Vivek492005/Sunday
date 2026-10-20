@@ -10,9 +10,11 @@
 import { EventEmitter } from 'node:events';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-class FakeStdin {
+class FakeStdin extends EventEmitter {
   lines: string[] = [];
-  constructor(private readonly onLine: (line: string) => void) {}
+  constructor(private readonly onLine: (line: string) => void) {
+    super();
+  }
   write(chunk: string): boolean {
     this.lines.push(chunk);
     for (const line of chunk.split('\n')) {
