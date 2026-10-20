@@ -1,107 +1,113 @@
 {
-  "phases": [
-    {
-      "detail": "VSIX + Windows installer shipped, release live",
-      "name": "v0.1.0 Extension Release",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "569/569 tests, MCP + autocomplete + mentions",
-      "name": "Editor Intelligence",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "668/668 tests, orchestration + merge",
-      "name": "Parallel Agents",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "742/742 tests, browserd + panel",
-      "name": "Browser Agent UI",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "805/805 tests, security + docs + Apache-2.0",
-      "name": "Hardening",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "3/3 CI green; black-screen root cause fixed (dd29d944 had deleted defaultChatAgent; 4730690f restored it) \u2014 fixed Beta.1 release live with 5 assets; CI guard added so it can never silently regress",
-      "name": "Fork Build (Full IDE)",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "detail": "All 7 items done: P-030, daemon (3 stages), next-edit, background agents, voice, CLI, hosted gateway",
-      "name": "Phase 8 (Backlog)",
-      "percent": 100,
-      "status": "done"
-    },
-    {
-      "name": "Five Productivity Features",
-      "percent": 100,
-      "status": "done",
-      "detail": "Second Brain, Self-Improving Agent, Swarm UI, Proactive Mode, Zero-Config \u2014 129 tests"
-    },
-    {
-      "name": "Security Hardening (P0+P1)",
-      "percent": 100,
-      "status": "done",
-      "detail": "14 fixes: 8 P0 + 6 P1, 15/15 typecheck, adversarial verified"
-    },
-    {
-      "name": "Hosted Gateway Live",
-      "percent": 100,
-      "status": "done",
-      "detail": "sunday-final-ide.onrender.com live, 200 req/day free tier, Google OAuth published; admin gateway: /admin/login allowlist, role=admin JWT, bypasses switch-limit+quota (b432119c)"
-    },
-    {
-      "name": "Phase 9.a/9.b (Accounts)",
-      "percent": 100,
-      "status": "done",
-      "detail": "Session JWT, entitlements, Basic/Smart/Pro plans, Plan & Billing UI"
-    },
-    {
-      "name": "Auto-Update",
-      "percent": 100,
-      "status": "done",
-      "detail": "Help \u2192 Check for Updates, startup auto-check, /updates/check endpoint live"
-    },
-    {
-      "name": "18 Competitive Features",
-      "percent": 100,
-      "status": "done",
-      "detail": "Artifacts, Mission Control, Best-of-N, AGENTS.md, PR automation, and 13 more \u2014 1,885 tests total"
-    },
-    {
-      "name": "Beta.3 Release",
-      "percent": 100,
-      "status": "done",
-      "detail": "ide-v1.0.0-beta.3 released 2026-10-11 (commit 6941bb7b, CI run 38116884695): Sunday Dark default theme verified in built code, User Guide auto-opens + Ctrl+Alt+G, google-auth compile fix (explicit tsc), 5 assets live on GitHub (both Windows setups 208.6/208.6 MB, Linux 314.8 MB, macOS 214.3 MB, VSIX 0.55 MB); user install verdict pending."
-    },
-    {
-      "name": "Sunday IDE 2.0 (Custom Shell + F1-F15)",
-      "status": "done",
-      "percent": 100,
-      "detail": "Waves 1-3 + F1-F15 + Sunday Ops UI + daemon bundle. Windows installer built on CI, release sunday-ide-v2.0.0 live with Sunday-Setup.exe (106MB)."
-    },
-    {
-      "name": "Sunday IDE 2.0.1 (Safety + Full Functionality)",
-      "status": "done",
-      "percent": 100,
-      "detail": "100+ windows crash fix, safety hardening, extension host (verified), LSP, Monaco power, wired menus+statusbar. 74/74 tests, CI green, release live."
-    }
-  ],
-  "project": "Sunday IDE",
-  "release_gates": {
-    "detail": "Docs green; Build/Tests/Security/Privacy/Perf/A11y partial; Legal done (Apache-2.0)",
-    "green": 1,
-    "total": 11
+ "phases": [
+  {
+   "detail": "VSIX + Windows installer shipped, release live",
+   "name": "v0.1.0 Extension Release",
+   "percent": 100,
+   "status": "done"
   },
-  "updated": "2026-10-11T07:30:56+00:00"
+  {
+   "detail": "569/569 tests, MCP + autocomplete + mentions",
+   "name": "Editor Intelligence",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "detail": "668/668 tests, orchestration + merge",
+   "name": "Parallel Agents",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "detail": "742/742 tests, browserd + panel",
+   "name": "Browser Agent UI",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "detail": "805/805 tests, security + docs + Apache-2.0",
+   "name": "Hardening",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "detail": "3/3 CI green; black-screen root cause fixed (dd29d944 had deleted defaultChatAgent; 4730690f restored it) \u2014 fixed Beta.1 release live with 5 assets; CI guard added so it can never silently regress",
+   "name": "Fork Build (Full IDE)",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "detail": "All 7 items done: P-030, daemon (3 stages), next-edit, background agents, voice, CLI, hosted gateway",
+   "name": "Phase 8 (Backlog)",
+   "percent": 100,
+   "status": "done"
+  },
+  {
+   "name": "Five Productivity Features",
+   "percent": 100,
+   "status": "done",
+   "detail": "Second Brain, Self-Improving Agent, Swarm UI, Proactive Mode, Zero-Config \u2014 129 tests"
+  },
+  {
+   "name": "Security Hardening (P0+P1)",
+   "percent": 100,
+   "status": "done",
+   "detail": "14 fixes: 8 P0 + 6 P1, 15/15 typecheck, adversarial verified"
+  },
+  {
+   "name": "Hosted Gateway Live",
+   "percent": 100,
+   "status": "done",
+   "detail": "sunday-final-ide.onrender.com live, 200 req/day free tier, Google OAuth published; admin gateway: /admin/login allowlist, role=admin JWT, bypasses switch-limit+quota (b432119c)"
+  },
+  {
+   "name": "Phase 9.a/9.b (Accounts)",
+   "percent": 100,
+   "status": "done",
+   "detail": "Session JWT, entitlements, Basic/Smart/Pro plans, Plan & Billing UI"
+  },
+  {
+   "name": "Auto-Update",
+   "percent": 100,
+   "status": "done",
+   "detail": "Help \u2192 Check for Updates, startup auto-check, /updates/check endpoint live"
+  },
+  {
+   "name": "18 Competitive Features",
+   "percent": 100,
+   "status": "done",
+   "detail": "Artifacts, Mission Control, Best-of-N, AGENTS.md, PR automation, and 13 more \u2014 1,885 tests total"
+  },
+  {
+   "name": "Beta.3 Release",
+   "percent": 100,
+   "status": "done",
+   "detail": "ide-v1.0.0-beta.3 released 2026-10-11 (commit 6941bb7b, CI run 38116884695): Sunday Dark default theme verified in built code, User Guide auto-opens + Ctrl+Alt+G, google-auth compile fix (explicit tsc), 5 assets live on GitHub (both Windows setups 208.6/208.6 MB, Linux 314.8 MB, macOS 214.3 MB, VSIX 0.55 MB); user install verdict pending."
+  },
+  {
+   "name": "Sunday IDE 2.0 (Custom Shell + F1-F15)",
+   "status": "done",
+   "percent": 100,
+   "detail": "Waves 1-3 + F1-F15 + Sunday Ops UI + daemon bundle. Windows installer built on CI, release sunday-ide-v2.0.0 live with Sunday-Setup.exe (106MB)."
+  },
+  {
+   "name": "Sunday IDE 2.0.1 (Safety + Full Functionality)",
+   "status": "done",
+   "percent": 100,
+   "detail": "100+ windows crash fix, safety hardening, extension host (verified), LSP, Monaco power, wired menus+statusbar. 74/74 tests, CI green, release live."
+  },
+  {
+   "name": "Sunday IDE \u2014 Plan-Gap Integration (7 features)",
+   "percent": 100,
+   "status": "done",
+   "detail": "Auto-update, sign-in/account, Mission Control, streaks, Plan+Trace, Session Replay + Memory, Design Mode \u2014 all real + wired; 180/180 IDE tests, typecheck clean; critical daemon-RPC bug found + fixed en route (client could never complete an RPC)"
+  }
+ ],
+ "project": "Sunday IDE",
+ "release_gates": {
+  "detail": "Docs green; Build/Tests/Security/Privacy/Perf/A11y partial; Legal done (Apache-2.0)",
+  "green": 1,
+  "total": 11
+ },
+ "updated": "2026-10-11T07:30:56+00:00"
 }
