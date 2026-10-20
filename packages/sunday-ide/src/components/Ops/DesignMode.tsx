@@ -240,7 +240,7 @@ export function DesignModeSection() {
           </div>
           <div className="design-preview-wrap">
             {React.createElement('webview', {
-              ref: (el: WebviewEl | null) => {
+              ref: (el: WebviewEl | null): void => {
                 webviewRef.current = el;
                 if (el && !el.dataset.sundayNavWired) {
                   el.dataset.sundayNavWired = '1';
