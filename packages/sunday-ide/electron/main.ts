@@ -17,32 +17,47 @@ import { execFile } from 'node:child_process';
 // --- Daemon mode: run sundayd instead of the IDE ---
 // (Blocking promise prevents ALL IDE code below from running in daemon mode.)
 if (process.argv.includes('--sundayd-daemon')) {
-  const daemonPath = path.join(__dirname, 'sundayd.cjs');
-  try {
-    await import(daemonPath);
-  } catch (e) {
-    // Never hang silently — a dead daemon must fail fast so the circuit
-    // breaker in daemonClient.ts sees the exit instead of a zombie process.
-    process.stderr.write(`[sundayd-daemon] failed to load ${daemonPath}: ${e}\n`);
-    process.exit(1);
-  }
-  process.stdin.resume();
-  process.stdin.on('end', () => process.exit(0));
-  await new Promise(() => {}); // block forever; daemon speaks over stdio
+  void (async () => {
+    const daemonPath = path.join(__dirname, 'sundayd.cjs');
+    try {
+      await import(daemonPath);
+    } catch (e) {
+      // Never hang silently — a dead daemon must fail fast so the circuit
+      // breaker in daemonClient.ts sees the exit instead of a zombie process.
+      process.stderr.write(`[sundayd-daemon] failed to load ${daemonPath}: ${e}\n`);
+      process.exit(1);
+    }
+    process.stdin.resume();
+    process.stdin.on('end', () => process.exit(0));
+    await new Promise(() => {}); // block forever; daemon speaks over stdio
+  })();
+  // Fall through to a permanent block below (see bottom of this block).
 }
 
 // --- Extension-host mode: run the extension host instead of the IDE ---
 if (process.argv.includes('--sunday-extension-host')) {
-  const hostPath = path.join(__dirname, 'exthost.cjs');
-  try {
-    await import(hostPath);
-  } catch (e) {
-    process.stderr.write(`[sunday-exthost] failed to load ${hostPath}: ${e}\n`);
-    process.exit(1);
-  }
-  process.stdin.resume();
-  process.stdin.on('end', () => process.exit(0));
-  await new Promise(() => {}); // block forever; host speaks over stdio
+  void (async () => {
+    const hostPath = path.join(__dirname, 'exthost.cjs');
+    try {
+      await import(hostPath);
+    } catch (e) {
+      process.stderr.write(`[sunday-exthost] failed to load ${hostPath}: ${e}\n`);
+      process.exit(1);
+    }
+    process.stdin.resume();
+    process.stdin.on('end', () => process.exit(0));
+    await new Promise(() => {}); // block forever; host speaks over stdio
+  })();
+}
+
+// In either headless mode the async IIFE above owns the process. The
+// IDE bootstrap below still registers IPC handlers (harmless — no window or
+// renderer ever exists in headless mode), but window creation is guarded
+// by HEADLESS so no IDE window can ever appear from a daemon/host process.
+const HEADLESS_MODE =
+  process.argv.includes('--sundayd-daemon') || process.argv.includes('--sunday-extension-host');
+if (HEADLESS_MODE) {
+  setInterval(() => {}, 1 << 30); // keep event loop alive for stdio RPC
 }
 
 const isDev = process.env.SUNDAY_DEV === '1';
@@ -1361,13 +1376,15 @@ ipcMain.handle('sunday:import:apply', async (_e, plan: ImportPlan) => {
 
 // ---------------------------------------------------------------- lifecycle
 
-app.whenReady().then(() => {
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+if (!HEADLESS_MODE) {
+  app.whenReady().then(() => {
+    createWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}
