@@ -81,7 +81,7 @@ const spawnMock = vi.fn(() => fakeProc);
 
 vi.mock('node:child_process', () => ({ spawn: spawnMock }));
 
-const { daemonRpc, addChatEventHandler, addNotificationHandler } =
+const { daemonRpc, addChatEventHandler, removeChatEventHandler, addNotificationHandler, removeNotificationHandler } =
   await import('./daemonClient.js');
 
 describe('daemonClient (fake daemon)', () => {
@@ -119,5 +119,46 @@ describe('daemonClient (fake daemon)', () => {
     await daemonRpc('test/notify-then-respond', {});
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ runId: 'run-1', unitId: 'u1', phase: 'started' });
+  });
+
+  it('a throwing notification handler is isolated: logged, swallowed, others still run (audit H2)', async () => {
+    // Dispatch runs inside the daemon stdout 'data' callback — a throw
+    // escaping it is an uncaught exception in the main process. The H2
+    // chain was: missions.json save throws EPERM/ENOSPC mid-run → app
+    // death. Handlers must be individually wrapped.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const chatThrower = (): void => {
+      throw new Error('simulated save failure');
+    };
+    const genericThrower = (): void => {
+      throw new Error('simulated generic failure');
+    };
+    const chatSeen: unknown[] = [];
+    const genericSeen: unknown[] = [];
+    const chatRecorder = (ev: unknown): void => {
+      chatSeen.push(ev);
+    };
+    const genericRecorder = (p: unknown): void => {
+      genericSeen.push(p);
+    };
+    // Throwers registered FIRST: on the pre-fix code the first throw
+    // aborted the whole dispatch loop and the recorders never ran.
+    addChatEventHandler(chatThrower);
+    addChatEventHandler(chatRecorder);
+    addNotificationHandler('orchestrate/event', genericThrower);
+    addNotificationHandler('orchestrate/event', genericRecorder);
+    try {
+      const res = (await daemonRpc('test/notify-then-respond', {})) as { echoed?: string };
+      expect(res.echoed).toBe('test/notify-then-respond');
+      expect(chatSeen).toHaveLength(1);
+      expect(genericSeen).toHaveLength(1);
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      removeChatEventHandler(chatThrower);
+      removeChatEventHandler(chatRecorder);
+      removeNotificationHandler('orchestrate/event', genericThrower);
+      removeNotificationHandler('orchestrate/event', genericRecorder);
+      errSpy.mockRestore();
+    }
   });
 });

@@ -12,6 +12,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, utilityProcess, type Utilit
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 
 // --- Daemon mode: run sundayd instead of the IDE ---
@@ -58,6 +59,48 @@ const HEADLESS_MODE =
   process.argv.includes('--sundayd-daemon') || process.argv.includes('--sunday-extension-host');
 if (HEADLESS_MODE) {
   setInterval(() => {}, 1 << 30); // keep event loop alive for stdio RPC
+}
+
+// ---------------------------------------------------------------------------
+// Last-resort crash safety net (audit M5 / H2)
+// ---------------------------------------------------------------------------
+// The IDE's main process is heavily event-driven (daemon notifications, fs
+// watcher, streams, timers): one stray throw in any callback must be
+// logged and survived, not terminate the app. uncaughtException /
+// unhandledRejection are logged — full stack, to stderr AND
+// ~/.sunday-ide/logs/main.log — and the app keeps running.
+// Headless daemon / extension-host processes are deliberately EXCLUDED:
+// they keep fail-fast semantics so the parent's circuit breaker sees the
+// exit and can respawn them (a swallowed crash there = zombie child).
+const MAIN_LOG_FILE = path.join(os.homedir(), '.sunday-ide', 'logs', 'main.log');
+
+function logMainProcessError(kind: string, err: unknown): void {
+  const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  const line = `[${new Date().toISOString()}] ${kind}: ${detail}\n`;
+  try {
+    process.stderr.write(`[sunday] ${line}`);
+  } catch {
+    // stderr gone — nothing more we can do
+  }
+  try {
+    mkdirSync(path.dirname(MAIN_LOG_FILE), { recursive: true });
+    appendFileSync(MAIN_LOG_FILE, line, 'utf8');
+  } catch {
+    // Logging must never throw.
+  }
+}
+
+if (!HEADLESS_MODE) {
+  try {
+    // Keep the log bounded: roll it once when it grows past ~5MB.
+    if (statSync(MAIN_LOG_FILE).size > 5 * 1024 * 1024) {
+      renameSync(MAIN_LOG_FILE, `${MAIN_LOG_FILE}.old`);
+    }
+  } catch {
+    // no log yet — fine
+  }
+  process.on('uncaughtException', (e) => logMainProcessError('uncaughtException', e));
+  process.on('unhandledRejection', (r) => logMainProcessError('unhandledRejection', r));
 }
 
 const isDev = process.env.SUNDAY_DEV === '1';

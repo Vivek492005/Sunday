@@ -6,7 +6,7 @@
  * persistence shape, honest error handling, caps, event binding, the
  * single-in-flight rule, and status mapping.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -345,5 +345,69 @@ describe('missionService persistence robustness', () => {
     expect(registered).toHaveLength(1);
     expect(registered[0].method).toBe('orchestrate/event');
     expect(typeof registered[0].handler).toBe('function');
+  });
+});
+
+describe('missionService save failures are non-fatal (audit H2)', () => {
+  // Point the store at a path whose parent is a regular FILE: every
+  // mkdir/write/rename under it fails (ENOTDIR), simulating the Windows
+  // file-lock / ENOSPC conditions from the audit.
+  function blockedFilePath(name: string): string {
+    const blocker = path.join(tmpDir, name);
+    fs.writeFileSync(blocker, 'i am a file, not a directory', 'utf8');
+    return path.join(blocker, 'missions.json');
+  }
+
+  it('createMission resolves and state survives in memory when the store cannot be written', async () => {
+    const svc = createMissionService({
+      rpc: makeRpc(),
+      filePath: blockedFilePath('blocker-create'),
+      addNotificationHandler: () => {},
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // Pre-fix, saveStore threw here and createMission rejected.
+      const mission = await svc.createMission({ goal: 'unwritable store', workspaceRoot: '/tmp/ws' });
+      expect(mission.status).toBe('planned');
+      expect(mission.plan?.units).toHaveLength(2);
+      // The failure is surfaced, not hidden…
+      expect(svc.lastSaveError()).toBeTruthy();
+      expect(errSpy).toHaveBeenCalled();
+      // …and the state is kept (in memory) instead of being lost.
+      const listed = await svc.listMissions();
+      expect(listed.map((m) => m.id)).toContain(mission.id);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it('handleOrchestrateEvent never throws on save failure and binds the run in memory', async () => {
+    // orchestrate/run hangs forever: the mission stays queued/in-flight.
+    const rpc: DaemonRpcFn = async (method: string) => {
+      if (method === 'orchestrate/plan') return PLAN;
+      if (method === 'orchestrate/run') return new Promise(() => {});
+      throw new Error(`unexpected RPC ${method}`);
+    };
+    const svc = createMissionService({
+      rpc,
+      filePath: blockedFilePath('blocker-event'),
+      addNotificationHandler: () => {},
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const mission = await svc.createMission({ goal: 'event path', workspaceRoot: '/tmp/ws' });
+      const started = await svc.startMission(mission.id);
+      expect(started.status).toBe('queued');
+      // This is the exact H2 path: a daemon notification handler doing
+      // sync disk IO. It must not throw even when every save fails.
+      expect(() =>
+        svc.handleOrchestrateEvent({ runId: 'run-9', unitId: 'auth-fix', phase: 'started' }),
+      ).not.toThrow();
+      const bound = (await svc.listMissions()).find((m) => m.id === mission.id);
+      expect(bound?.runId).toBe('run-9');
+      expect(bound?.status).toBe('running');
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 });

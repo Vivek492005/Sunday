@@ -149,6 +149,10 @@ export interface MissionService {
   handleOrchestrateEvent(params: unknown): void;
   initMissionService(): void;
   missionsFilePath(): string;
+  /** Message of the most recent failed store save, or null when the last
+   *  save succeeded. Saves never throw (see saveStore) — this is how the
+   *  failure is surfaced instead. */
+  lastSaveError(): string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +216,28 @@ export function createMissionService(deps: MissionServiceDeps = {}): MissionServ
   // -- persistence (sync IO: the event handler is a sync callback, and
   //    sync load/save keeps concurrent mutations race-free) -------------
 
+  // Save-failure fallback (audit H2): saveStore is called synchronously
+  // from handleOrchestrateEvent, which runs inside a daemon stdout 'data'
+  // callback — a throw there (missions.json momentarily locked by an AV
+  // scan / indexer on Windows, or ENOSPC) escapes as an uncaught
+  // exception and kills the main process mid-run. So saveStore NEVER
+  // throws: on failure the newest store is kept here in memory (loadStore
+  // serves it instead of the stale disk copy), the error is logged with
+  // its stack and recorded for lastSaveError(), and the next successful
+  // save flushes everything back to disk.
+  let unsavedStore: MissionsFile | null = null;
+  let saveError: string | null = null;
+
+  function lastSaveError(): string | null {
+    return saveError;
+  }
+
   function loadStore(): MissionsFile {
+    if (unsavedStore) {
+      // A previous save failed — the disk copy is stale. Serve the
+      // in-memory store (deep copy: callers mutate what they are given).
+      return JSON.parse(JSON.stringify(unsavedStore)) as MissionsFile;
+    }
     const file = missionsFilePath();
     try {
       if (!fs.existsSync(file)) return { missions: [] };
@@ -254,12 +279,21 @@ export function createMissionService(deps: MissionServiceDeps = {}): MissionServ
   }
 
   function saveStore(store: MissionsFile): void {
-    const file = missionsFilePath();
     const pruned: MissionsFile = { missions: pruneMissions(store.missions) };
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-    fs.writeFileSync(tmp, JSON.stringify(pruned, null, 2), 'utf8');
-    fs.renameSync(tmp, file);
+    try {
+      const file = missionsFilePath();
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const tmp = `${file}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+      fs.writeFileSync(tmp, JSON.stringify(pruned, null, 2), 'utf8');
+      fs.renameSync(tmp, file);
+      unsavedStore = null;
+      saveError = null;
+    } catch (e) {
+      // Non-fatal by design — see the fallback note above loadStore.
+      unsavedStore = pruned;
+      saveError = errMessage(e);
+      console.error('[sunday] missions.json save failed — state kept in memory:', e);
+    }
   }
 
   function appendLog(mission: Mission, entry: MissionLogEntry): void {
@@ -570,6 +604,7 @@ export function createMissionService(deps: MissionServiceDeps = {}): MissionServ
     handleOrchestrateEvent,
     initMissionService,
     missionsFilePath,
+    lastSaveError,
   };
 }
 
@@ -609,4 +644,8 @@ export function handleOrchestrateEvent(params: unknown): void {
 
 export function initMissionService(): void {
   defaultService.initMissionService();
+}
+
+export function lastSaveError(): string | null {
+  return defaultService.lastSaveError();
 }

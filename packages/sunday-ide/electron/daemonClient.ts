@@ -63,6 +63,22 @@ export function removeNotificationHandler(method: string, h: NotificationHandler
   notificationHandlers.get(method)?.delete(h);
 }
 
+/**
+ * Invoke one notification handler in isolation (audit H2). Dispatch runs
+ * inside the daemon stdout 'data' callback: a handler that throws (e.g. a
+ * disk error while persisting mission state) would otherwise escape as an
+ * uncaught exception in the main process and kill the app mid-run — and
+ * abort delivery to every remaining handler. Log with the full stack and
+ * keep dispatching.
+ */
+function safeNotify(method: string, run: () => void): void {
+  try {
+    run();
+  } catch (e) {
+    console.error(`[sunday] daemon notification handler for '${method}' threw:`, e);
+  }
+}
+
 function dispatchDaemonNotification(method: string, params: unknown): void {
   if (method === 'chat/event') {
     const p = params as {
@@ -85,11 +101,11 @@ function dispatchDaemonNotification(method: string, params: unknown): void {
         ...(p.via ? { via: p.via } : {}),
         ...(p.relay ? { relay: p.relay } : {}),
       };
-      for (const h of chatEventHandlers) h(merged);
+      for (const h of chatEventHandlers) safeNotify(method, () => h(merged));
     }
   }
   const generic = notificationHandlers.get(method);
-  if (generic) for (const h of generic) h(params);
+  if (generic) for (const h of generic) safeNotify(method, () => h(params));
 }
 
 function onDaemonData(chunk: Buffer): void {
