@@ -222,6 +222,11 @@ function Shell() {
       on('sunday:show-settings', () => dispatch({ type: 'SET_SETTINGS_OPEN', open: true })),
       on('sunday:show-import', () => dispatch({ type: 'SET_IMPORT_OPEN', open: true })),
       on('sunday:show-agent', () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' })),
+      // Auto-update: the installer has been launched (detached) from the
+      // update dialog — quit so it can replace the app files.
+      on('sunday:update:installing', () => {
+        void window.sunday?.window.close().catch(() => undefined);
+      }),
       on('sunday:about', () =>
         window.alert('Sunday IDE 2.0\n100% Sunday interface — VS Code organs, Sunday skin.\nWaves 1–3 + F1–F15 built in.'),
       ),
