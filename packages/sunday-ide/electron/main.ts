@@ -1145,13 +1145,19 @@ export function parseOpenVsxSearch(json: unknown): OpenVsxExtension[] {
 ipcMain.handle('sunday:extensions:search', async (_e, query: string): Promise<OpenVsxExtension[]> => {
   const q = (query ?? '').trim() || '*';
   const url = `https://open-vsx.org/api/-/search?query=${encodeURIComponent(q)}&size=24&includeAllVersions=false`;
+  // Audit M4: the fetch had no timeout — a stalled registry could hang
+  // the search (and the install below) indefinitely.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'SundayIDE/1.0' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'SundayIDE/1.0' }, signal: controller.signal });
     if (!res.ok) return [];
     const json: unknown = await res.json();
     return parseOpenVsxSearch(json);
   } catch {
     return [];
+  } finally {
+    clearTimeout(timeout);
   }
 });
 
@@ -1181,13 +1187,68 @@ ipcMain.handle(
     const targetDir = path.join(EXTENSIONS_DIR, ext.id);
     const tmpFile = path.join(os.tmpdir(), `sunday-ext-${Date.now()}.vsix`);
     try {
-      const res = await fetch(ext.downloadUrl, { headers: { 'User-Agent': 'SundayIDE/1.0' } });
-      if (!res.ok) return { ok: false, error: `Download failed (${res.status})` };
-      const buf = Buffer.from(await res.arrayBuffer());
-      await fs.writeFile(tmpFile, buf);
+      // Audit M4: stream the VSIX to disk with a hard size cap and a
+      // timeout. The old code buffered the whole download via
+      // arrayBuffer() with no cap and no timeout — a huge or hostile
+      // registry response could blow up main-process memory or hang
+      // the install forever.
+      const MAX_VSIX_BYTES = 200 * 1024 * 1024;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+      try {
+        const res = await fetch(ext.downloadUrl, {
+          headers: { 'User-Agent': 'SundayIDE/1.0' },
+          signal: controller.signal,
+        });
+        if (!res.ok) return { ok: false, error: `Download failed (${res.status})` };
+        if (!res.body) return { ok: false, error: 'Download failed (empty response body)' };
+        const { createWriteStream } = await import('node:fs');
+        const out = createWriteStream(tmpFile);
+        let streamError: Error | null = null;
+        out.on('error', (e: Error) => {
+          streamError = e;
+        });
+        const reader = res.body.getReader();
+        let total = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAX_VSIX_BYTES) {
+            await reader.cancel().catch(() => {});
+            out.destroy();
+            return { ok: false, error: 'Extension package is too large (>200MB) — install refused' };
+          }
+          if (!out.write(Buffer.from(value))) {
+            // Wait for drain — or for the stream to die, in which case
+            // the streamError check below bails out of the loop.
+            await new Promise<void>((resolve) => {
+              out.once('drain', resolve);
+              out.once('error', () => resolve());
+            });
+          }
+          if (streamError) throw streamError;
+        }
+        await new Promise<void>((resolve) => out.end(() => resolve()));
+        if (streamError) throw streamError;
+      } finally {
+        clearTimeout(timeout);
+      }
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const AdmZip = require('adm-zip') as new (p: string) => { extractAllTo(d: string, o: boolean): void };
+      const AdmZip = require('adm-zip') as new (p: string) => {
+        extractAllTo(d: string, o: boolean): void;
+        getEntries(): { entryName: string }[];
+      };
       const zip = new AdmZip(tmpFile);
+      // Zip-slip guard (audit M4): every entry must resolve INSIDE the
+      // target dir before anything is extracted.
+      const targetRoot = path.resolve(targetDir);
+      for (const entry of zip.getEntries()) {
+        const dest = path.resolve(targetRoot, entry.entryName);
+        if (dest !== targetRoot && !dest.startsWith(targetRoot + path.sep)) {
+          return { ok: false, error: `Unsafe path in extension package: ${entry.entryName}` };
+        }
+      }
       await fs.mkdir(targetDir, { recursive: true });
       zip.extractAllTo(targetDir, true);
       const manifest: InstalledExtension = {
@@ -1646,6 +1707,10 @@ if (!HEADLESS_MODE) {
         })
         .catch(() => undefined);
     }, 30_000).unref?.();
+  }).catch((e) => {
+    // Audit L7: without this, a createWindow() failure left a
+    // windowless zombie process with an unhandled rejection.
+    logMainProcessError('app startup (whenReady) failed', e);
   });
 
   app.on('window-all-closed', () => {

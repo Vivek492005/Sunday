@@ -60,6 +60,17 @@ describe('F14: local-only privacy toggle (real persistence)', () => {
     expect(setLocalOnlyMode(false)).toBe(false);
     expect(getLocalOnlyMode()).toBe(false);
   });
+
+  it('a local.json containing the literal null reads as off, never throws (audit L8)', () => {
+    const prefsFile = path.join(os.homedir(), '.sunday-ide', 'local.json');
+    fs.mkdirSync(path.dirname(prefsFile), { recursive: true });
+    fs.writeFileSync(prefsFile, 'null', 'utf8');
+    // Pre-fix this threw TypeError (dereferencing .localOnly on null).
+    expect(getLocalOnlyMode()).toBe(false);
+    fs.writeFileSync(prefsFile, '42', 'utf8');
+    expect(getLocalOnlyMode()).toBe(false);
+    // afterEach restores the original value via setLocalOnlyMode.
+  });
 });
 
 describe('F15: org bundle load (real parsing + verification)', () => {

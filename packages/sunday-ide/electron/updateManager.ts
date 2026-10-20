@@ -580,5 +580,19 @@ export async function installUpdate(
     default:
       throw new Error(`updates are not supported on platform '${platform}'`);
   }
+  // Audit L1: a spawned child with no 'error' listener throws in main
+  // when the exe can't launch — the realistic Windows case is AV
+  // quarantining the fresh download between the stat above and this
+  // spawn. Log it instead of crashing the app at install time. (Guarded
+  // by typeof: injected spawn fakes in tests may not implement .on.)
+  const childRec = child as unknown as {
+    on?: (ev: string, fn: (e: Error) => void) => void;
+    unref?: () => void;
+  } | null;
+  if (childRec && typeof childRec.on === 'function') {
+    childRec.on('error', (e) => {
+      console.error('[sunday] update installer failed to launch:', e);
+    });
+  }
   (child as { unref?: () => void } | null)?.unref?.();
 }

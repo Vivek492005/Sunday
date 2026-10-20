@@ -121,7 +121,15 @@ const LOCAL_PREFS_FILE = path.join(sundayIdeDir(), 'local.json');
  *  enforcement lives in the gateway router; the IDE enforces it at the UI
  *  level by offering only local models when on). */
 export function getLocalOnlyMode(): boolean {
-  return readJson<{ localOnly: boolean }>(LOCAL_PREFS_FILE, { localOnly: false }).localOnly;
+  // Audit L8: readJson returns parsed JSON unchecked — a local.json
+  // containing the literal `null` (or any non-object) made `.localOnly`
+  // throw. Validate the shape; anything unexpected means "off".
+  const prefs: unknown = readJson<unknown>(LOCAL_PREFS_FILE, { localOnly: false });
+  return (
+    typeof prefs === 'object' &&
+    prefs !== null &&
+    (prefs as { localOnly?: unknown }).localOnly === true
+  );
 }
 
 export function setLocalOnlyMode(on: boolean): boolean {
