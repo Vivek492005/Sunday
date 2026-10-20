@@ -97,7 +97,7 @@ export function ensureLanguageServices(): void {
 
   const ts = monaco.languages.typescript;
   const compilerOptions: monaco.languages.typescript.CompilerOptions = {
-    target: ts.ScriptTarget.ES2022,
+    target: ts.ScriptTarget.ES2020,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     jsx: ts.JsxEmit.ReactJSX,

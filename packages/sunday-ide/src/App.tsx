@@ -196,6 +196,25 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, [dispatch, openFolder]);
 
+  // TitleBar menu event router — every menu item must do something real.
+  useEffect(() => {
+    const on = (name: string, fn: () => void) => {
+      const h = () => fn();
+      window.addEventListener(name, h);
+      return () => window.removeEventListener(name, h);
+    };
+    const offs = [
+      on('sunday:show-palette', () => setPaletteOpen(true)),
+      on('sunday:toggle-terminal', () => setPanelOpen((v) => !v)),
+      on('sunday:show-settings', () => dispatch({ type: 'SET_SETTINGS_OPEN', open: true })),
+      on('sunday:show-import', () => dispatch({ type: 'SET_IMPORT_OPEN', open: true })),
+      on('sunday:about', () =>
+        window.alert('Sunday IDE 2.0\n100% Sunday interface — VS Code organs, Sunday skin.\nWaves 1–3 + F1–F15 built in.'),
+      ),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [dispatch]);
+
   return (
     <div className="sunday-app">
       <TitleBar />

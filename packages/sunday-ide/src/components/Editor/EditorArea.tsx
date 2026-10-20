@@ -87,6 +87,23 @@ export function EditorArea() {
       dispatch({ type: 'SET_CURSOR', line: ev.position.lineNumber, column: ev.position.column });
     });
 
+    // Menu-driven find/replace (Edit menu → triggers Monaco's built-in widget).
+    const onFind = () => editor.getAction('actions.find')?.run();
+    const onReplace = () => editor.getAction('editor.action.startFindReplaceAction')?.run();
+    window.addEventListener('sunday:editor-find', onFind);
+    window.addEventListener('sunday:editor-replace', onReplace);
+    // Status bar "Ln X, Col Y" → quick go-to-line prompt.
+    const onGotoLine = () => {
+      const raw = window.prompt('Go to line:', String(editor.getPosition()?.lineNumber ?? 1));
+      const line = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(line) && line >= 1) {
+        editor.revealLineInCenter(line);
+        editor.setPosition({ lineNumber: line, column: 1 });
+        editor.focus();
+      }
+    };
+    window.addEventListener('sunday:editor-goto-line', onGotoLine);
+
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -130,6 +147,9 @@ export function EditorArea() {
 
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('sunday:editor-find', onFind);
+      window.removeEventListener('sunday:editor-replace', onReplace);
+      window.removeEventListener('sunday:editor-goto-line', onGotoLine);
       window.removeEventListener(SETTINGS_APPLIED_EVENT, onSettings);
       window.removeEventListener('sunday:reveal-line', onReveal);
       mouseDisp.dispose();

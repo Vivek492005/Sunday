@@ -52,21 +52,45 @@ export function TitleBar() {
     window.dispatchEvent(new CustomEvent('sunday:save-active'));
   };
 
+  const ev = (name: string) => () => window.dispatchEvent(new CustomEvent(name));
+
   const menus: Record<string, MenuEntry[]> = {
     File: [
+      { label: 'New File', kbd: 'Ctrl+N', action: ev('sunday:new-file') },
+      { separator: true, label: '' },
+      { label: 'Open File…', action: ev('sunday:open-file') },
       { label: 'Open Folder…', kbd: 'Ctrl+O', action: () => void openFolder() },
-      { label: 'New File', kbd: 'Ctrl+N', action: () => window.dispatchEvent(new CustomEvent('sunday:new-file')) },
       { separator: true, label: '' },
       { label: 'Save', kbd: 'Ctrl+S', action: saveActive },
+      { label: 'Save As…', action: ev('sunday:save-as') },
+      { separator: true, label: '' },
+      { label: 'Import from Claude / Cursor / VS Code…', action: ev('sunday:show-import') },
       { separator: true, label: '' },
       { label: 'Close Window', action: () => void windowControls.close() },
     ],
+    Edit: [
+      { label: 'Find', kbd: 'Ctrl+F', action: ev('sunday:editor-find') },
+      { label: 'Replace', kbd: 'Ctrl+H', action: ev('sunday:editor-replace') },
+      { separator: true, label: '' },
+      { label: 'Command Palette', kbd: 'Ctrl+Shift+P', action: ev('sunday:show-palette') },
+    ],
     View: [
       { label: 'Toggle Sidebar', kbd: 'Ctrl+B', action: () => dispatch({ type: 'TOGGLE_SIDEBAR' }) },
-      { label: 'Explorer', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'explorer' }) },
+      { separator: true, label: '' },
+      { label: 'Explorer', kbd: 'Ctrl+Shift+E', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'explorer' }) },
+      { label: 'Search', kbd: 'Ctrl+Shift+F', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'search' }) },
+      { label: 'Source Control', kbd: 'Ctrl+Shift+G', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'source' }) },
+      { label: 'Agent', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' }) },
+      { label: 'Extensions', kbd: 'Ctrl+Shift+X', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'extensions' }) },
+      { label: 'Debug', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'debug' }) },
+      { label: 'Sunday Ops', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }) },
+      { separator: true, label: '' },
+      { label: 'Toggle Terminal', kbd: 'Ctrl+`', action: ev('sunday:toggle-terminal') },
+      { label: 'Settings', kbd: 'Ctrl+,', action: ev('sunday:show-settings') },
     ],
     Help: [
-      { label: 'About Sunday', action: () => window.dispatchEvent(new CustomEvent('sunday:about')) },
+      { label: 'About Sunday', action: ev('sunday:about') },
+      { label: 'Sunday on GitHub', action: () => void window.open('https://github.com/Vivek492005/Sunday', '_blank') },
     ],
   };
 
