@@ -86,8 +86,27 @@ function onDaemonData(chunk: Buffer): void {
   }
 }
 
+let daemonSpawnAttempts: number[] = [];
+
+/**
+ * Circuit breaker: if the daemon keeps dying on startup, don't respawn in a
+ * hot loop (each spawn is a full Electron process). Max 3 attempts per 60s;
+ * after that fail fast until the window slides past.
+ */
+function daemonSpawnAllowed(): boolean {
+  const now = Date.now();
+  daemonSpawnAttempts = daemonSpawnAttempts.filter((t) => now - t < 60_000);
+  return daemonSpawnAttempts.length < 3;
+}
+
 function ensureDaemon(): Promise<void> {
   if (daemonReady) return daemonReady;
+  if (!daemonSpawnAllowed()) {
+    return Promise.reject(
+      new Error('sundayd failed to start repeatedly — giving up for now (circuit breaker). Restart Sunday to retry.'),
+    );
+  }
+  daemonSpawnAttempts.push(Date.now());
   daemonReady = new Promise<void>((resolve, reject) => {
     const bin = daemonBin();
     if (!fs.existsSync(bin)) {
@@ -145,6 +164,12 @@ export function daemonRpc(method: string, params: unknown, timeoutMs = 60000): P
       new Promise<unknown>((resolve, reject) => {
         if (!daemonProc?.stdin) {
           reject(new Error('daemon not running'));
+          return;
+        }
+        // SAFETY: cap in-flight RPCs — an unresponsive daemon must not let
+        // the pending map (and its timers) grow without bound.
+        if (pending.size >= 100) {
+          reject(new Error('too many pending daemon RPCs — daemon overloaded'));
           return;
         }
         const id = rpcId++;

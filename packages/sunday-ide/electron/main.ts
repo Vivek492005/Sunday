@@ -18,7 +18,14 @@ import { execFile } from 'node:child_process';
 // (Blocking promise prevents ALL IDE code below from running in daemon mode.)
 if (process.argv.includes('--sundayd-daemon')) {
   const daemonPath = path.join(__dirname, 'sundayd.cjs');
-  await import(daemonPath);
+  try {
+    await import(daemonPath);
+  } catch (e) {
+    // Never hang silently — a dead daemon must fail fast so the circuit
+    // breaker in daemonClient.ts sees the exit instead of a zombie process.
+    process.stderr.write(`[sundayd-daemon] failed to load ${daemonPath}: ${e}\n`);
+    process.exit(1);
+  }
   process.stdin.resume();
   process.stdin.on('end', () => process.exit(0));
   await new Promise(() => {}); // block forever; daemon speaks over stdio
@@ -141,11 +148,14 @@ ipcMain.handle('sunday:fs:readDir', async (_e, dirPath: string): Promise<FsEntry
 
 ipcMain.handle(
   'sunday:fs:readFile',
-  async (_e, filePath: string): Promise<{ content: string; isBinary: boolean }> => {
-    const buf = await fs.readFile(filePath);
+  async (_e, filePath: string): Promise<{ content: string; isBinary: boolean; truncated?: boolean }> => {
+    // SAFETY: never load a giant file fully into the renderer — 10MB cap.
+    const st = await fs.stat(filePath);
+    const MAX = 10 * 1024 * 1024;
+    const buf = st.size > MAX ? (await fs.readFile(filePath)).subarray(0, MAX) : await fs.readFile(filePath);
     const head = buf.subarray(0, 8192);
     if (head.includes(0)) return { content: '', isBinary: true };
-    return { content: buf.toString('utf-8'), isBinary: false };
+    return { content: buf.toString('utf-8'), isBinary: false, truncated: st.size > MAX };
   },
 );
 
@@ -179,8 +189,21 @@ ipcMain.handle('sunday:watch:start', async (_e, dirPath: string) => {
   stopWatcher();
   const { watch } = await import('node:fs');
   const recursive = process.platform === 'darwin' || process.platform === 'win32';
+  // SAFETY: batch + dedupe fs events (300ms window, cap 200 names) — a raw
+  // watch on a busy tree (npm install, git checkout) fires thousands of
+  // events/sec and would flood the renderer into a freeze.
+  let batch = new Set<string>();
+  let timer: NodeJS.Timeout | null = null;
+  const flush = () => {
+    timer = null;
+    if (batch.size === 0) return;
+    const names = [...batch].slice(0, 200);
+    batch = new Set();
+    mainWindow?.webContents.send('sunday:fs-changed', { dirPath, filename: names.join('\n') });
+  };
   fsWatcher = watch(dirPath, { recursive }, (_event, filename) => {
-    mainWindow?.webContents.send('sunday:fs-changed', { dirPath, filename: filename ?? '' });
+    if (filename) batch.add(filename);
+    if (!timer) timer = setTimeout(flush, 300);
   });
 });
 

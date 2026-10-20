@@ -6,7 +6,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useIde } from '../../state/ideStore';
 import { fileService } from '../../services/fileService';
-import { ensureSundayTheme, monaco } from '../../services/monacoSetup';
+import { ensureSundayTheme, ensureLanguageServices, monaco } from '../../services/monacoSetup';
 import { SETTINGS_APPLIED_EVENT, type SundaySettings } from '../../services/settingsService';
 import {
   toggleBreakpoint,
@@ -34,6 +34,7 @@ export function EditorArea() {
   useEffect(() => {
     if (!hostRef.current || editorRef.current) return;
     ensureSundayTheme();
+    ensureLanguageServices();
     const editor = monaco.editor.create(hostRef.current, {
       theme: 'sunday-dark',
       automaticLayout: true,
@@ -46,6 +47,30 @@ export function EditorArea() {
       smoothScrolling: true,
       cursorBlinking: 'smooth',
       glyphMargin: true, // Wave 3: breakpoint gutter
+      // VS Code-level editing behaviour
+      quickSuggestions: { other: true, comments: false, strings: true },
+      suggestOnTriggerCharacters: true,
+      acceptSuggestionOnEnter: 'on',
+      tabCompletion: 'on',
+      wordBasedSuggestions: 'matchingDocuments',
+      parameterHints: { enabled: true, cycle: true },
+      hover: { enabled: true },
+      links: true,
+      colorDecorators: true,
+      bracketPairColorization: { enabled: true },
+      guides: { bracketPairs: 'active', indentation: true },
+      formatOnPaste: true,
+      autoIndent: 'full',
+      folding: true,
+      foldingHighlight: true,
+      showFoldingControls: 'mouseover',
+      occurrencesHighlight: 'singleFile',
+      selectionHighlight: true,
+      codeLens: false,
+      inlayHints: { enabled: 'on' },
+      stickyScroll: { enabled: true },
+      multiCursorModifier: 'alt',
+      find: { addExtraSpaceOnTop: false },
     });
     editorRef.current = editor;
 

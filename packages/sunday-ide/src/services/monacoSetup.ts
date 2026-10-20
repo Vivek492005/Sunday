@@ -83,4 +83,58 @@ export function ensureSundayTheme(): void {
   });
 }
 
+let languageConfigured = false;
+
+/**
+ * Configure Monaco's built-in language services for VS Code-level editing:
+ * - TypeScript/JavaScript: full IntelliSense, diagnostics, JSX, module resolution
+ * - JSON: schema validation off by default (schemas added per-workspace later)
+ * Called once at startup (from App / EditorArea mount).
+ */
+export function ensureLanguageServices(): void {
+  if (languageConfigured) return;
+  languageConfigured = true;
+
+  const ts = monaco.languages.typescript;
+  const compilerOptions: monaco.languages.typescript.CompilerOptions = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    jsx: ts.JsxEmit.ReactJSX,
+    allowJs: true,
+    checkJs: false,
+    esModuleInterop: true,
+    allowSyntheticDefaultImports: true,
+    strict: false,
+    noEmit: true,
+    allowNonTsExtensions: true,
+    resolveJsonModule: true,
+    isolatedModules: true,
+    skipLibCheck: true,
+  };
+  ts.typescriptDefaults.setCompilerOptions(compilerOptions);
+  ts.javascriptDefaults.setCompilerOptions({ ...compilerOptions, checkJs: false });
+
+  // Report ALL semantic + syntactic errors (real red squiggles like VS Code),
+  // but don't demand a full program — suggestions stay enabled.
+  const diagnostics: monaco.languages.typescript.DiagnosticsOptions = {
+    noSemanticValidation: false,
+    noSyntaxValidation: false,
+    noSuggestionDiagnostics: false,
+    onlyVisible: false,
+  };
+  ts.typescriptDefaults.setDiagnosticsOptions(diagnostics);
+  ts.javascriptDefaults.setDiagnosticsOptions({ ...diagnostics, noSemanticValidation: false });
+
+  ts.typescriptDefaults.setEagerModelSync(true);
+  ts.javascriptDefaults.setEagerModelSync(true);
+
+  // JSON: allow comments + trailing commas off by default; keep validation on.
+  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+    validate: true,
+    allowComments: true,
+    trailingCommas: 'error',
+  });
+}
+
 export { monaco };
