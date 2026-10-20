@@ -26,6 +26,21 @@ function hostBin(): string {
   return path.resolve(__dirname, 'exthost.cjs');
 }
 
+/**
+ * Write a line to the host's stdin, swallowing write errors. Used from
+ * async callbacks where a throw would surface as an unhandled rejection;
+ * if the host died mid-write its exit handler owns state cleanup.
+ * (Request writes in extHostRpc stay unguarded on purpose: there a throw
+ * inside the promise executor correctly rejects that RPC.)
+ */
+function writeToHost(line: string): void {
+  try {
+    hostProc?.stdin?.write(line + '\n');
+  } catch {
+    // host gone — exit handler cleans up
+  }
+}
+
 function spawnAllowed(): boolean {
   const now = Date.now();
   spawnAttempts = spawnAttempts.filter((t) => now - t < 60_000);
@@ -65,14 +80,11 @@ function onHostData(chunk: Buffer): void {
       // neutral value; the IDE main handlers below fulfill real ones.
       void handleBridgeCall(msg.method, msg.params ?? {}).then(
         (r) => {
-          if (msg.id !== undefined && hostProc?.stdin)
-            hostProc.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: r }) + '\n');
+          if (msg.id !== undefined) writeToHost(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: r }));
         },
         (e: Error) => {
-          if (msg.id !== undefined && hostProc?.stdin)
-            hostProc.stdin.write(
-              JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { message: e.message } }) + '\n',
-            );
+          if (msg.id !== undefined)
+            writeToHost(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { message: e.message } }));
         },
       );
     }
@@ -109,13 +121,15 @@ export function ensureExtensionHost(): Promise<void> {
       new Error('extension host failed to start repeatedly — circuit breaker engaged. Restart Sunday to retry.'),
     );
   }
+  const bin = hostBin();
+  if (!fs.existsSync(bin)) {
+    // Checked BEFORE anything is cached: a missing bundle must not poison
+    // hostReady with a forever-rejected promise, and must not consume
+    // circuit-breaker budget.
+    return Promise.reject(new Error(`extension host not built at ${bin}`));
+  }
   spawnAttempts.push(Date.now());
   hostReady = new Promise<void>((resolve, reject) => {
-    const bin = hostBin();
-    if (!fs.existsSync(bin)) {
-      reject(new Error(`extension host not built at ${bin}`));
-      return;
-    }
     const proc = spawn(process.execPath, [bin, '--sunday-extension-host'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
@@ -123,27 +137,76 @@ export function ensureExtensionHost(): Promise<void> {
     hostProc = proc;
     proc.stdout.on('data', onHostData);
     proc.stderr.on('data', () => {});
+    proc.stdin.on('error', () => {
+      // EPIPE class: the child died mid-write. The exit/error handlers
+      // below own state cleanup; an unhandled stdin 'error' would throw.
+    });
     proc.on('error', (e) => {
-      hostProc = null;
-      hostReady = null;
+      if (hostProc === proc) {
+        hostProc = null;
+        hostReady = null;
+      }
       reject(e);
     });
     proc.on('exit', () => {
-      hostProc = null;
-      hostReady = null;
-      for (const [, p] of pending) p.reject(new Error('extension host exited'));
-      pending.clear();
+      const wasCurrent = hostProc === proc;
+      if (wasCurrent) {
+        hostProc = null;
+        hostReady = null;
+        for (const [, p] of pending) p.reject(new Error('extension host exited'));
+        pending.clear();
+      }
+      // No-op once settled (e.g. a normal startup) — only rejects a
+      // startup that is still waiting on its handshake.
+      reject(new Error('extension host exited during startup'));
     });
-    const timeout = setTimeout(() => reject(new Error('extension host ping timeout')), 15000);
-    extHostRpc('extHost/ping', {})
-      .then(() => {
+    // Handshake: extHost/ping proves the host is up and speaking JSON-RPC.
+    // The ping is written DIRECTLY onto the pending-RPC machinery — it must
+    // NOT go through extHostRpc(): this executor runs synchronously BEFORE
+    // `hostReady` is assigned, so extHostRpc → ensureExtensionHost() would
+    // see hostReady === null, spawn again, and recurse until the spawn
+    // circuit breaker rejected every call, leaving a rejected promise
+    // cached forever and up to 3 orphaned host processes. (Exactly the bug
+    // class fixed earlier in daemonClient.ts; this mirrors that fix.)
+    const pingId = rpcId++;
+    const failStartup = (e: Error): void => {
+      // Any handshake failure: kill the spawned host and clear the cached
+      // promise so a later call can retry with a fresh spawn instead of
+      // inheriting this failure for the rest of the session.
+      if (hostProc === proc) {
+        hostProc = null;
+        hostReady = null;
+      }
+      try {
+        proc.kill();
+      } catch {
+        // already dead
+      }
+      reject(e);
+    };
+    const timeout = setTimeout(() => {
+      pending.delete(pingId);
+      failStartup(new Error('extension host ping timeout'));
+    }, 15000);
+    pending.set(pingId, {
+      resolve: () => {
         clearTimeout(timeout);
         resolve();
-      })
-      .catch((e) => {
+      },
+      reject: (e) => {
         clearTimeout(timeout);
-        reject(e);
-      });
+        failStartup(e);
+      },
+    });
+    try {
+      proc.stdin.write(
+        JSON.stringify({ jsonrpc: '2.0', id: pingId, method: 'extHost/ping', params: {} }) + '\n',
+      );
+    } catch (e) {
+      clearTimeout(timeout);
+      pending.delete(pingId);
+      failStartup(e instanceof Error ? e : new Error(String(e)));
+    }
   });
   return hostReady;
 }
