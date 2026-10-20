@@ -14,7 +14,12 @@ import {
   onBreakpointsChanged,
 } from '../../services/debugService';
 import { configureLsp, ensureLspForLanguage, lspSyncDocument, lspConfigFor } from '../../services/lspService';
+import { streakService } from '../../services/streakService';
 import { CloseIcon } from '../icons';
+
+/** Engagement: report editing activity at most once per 10s (the
+ *  main-process tracker accrues active minutes from the gaps). */
+let lastStreakNoteMs = 0;
 import { WelcomePage } from './WelcomePage';
 
 /** Ensure the LSP server for a language is up and sync the model with it. */
@@ -84,6 +89,11 @@ export function EditorArea() {
     editorRef.current = editor;
 
     editor.onDidChangeModelContent(() => {
+      const now = Date.now();
+      if (now - lastStreakNoteMs > 10_000) {
+        lastStreakNoteMs = now;
+        void streakService.noteEdit();
+      }
       const model = editor.getModel();
       if (!model) return;
       const entry = [...modelsRef.current.entries()].find(([, e]) => e.model === model);

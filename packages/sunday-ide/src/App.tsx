@@ -19,6 +19,7 @@ import { Debug } from './components/Sidebar/Debug';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { ImportModal } from './components/Import/ImportModal';
 import { AgentPanel } from './components/Agent/AgentPanel';
+import { MissionControl } from './components/Missions/MissionControl';
 import { OpsView } from './components/Ops/OpsView';
 import { EditorArea } from './components/Editor/EditorArea';
 import { Panel } from './components/Panel/Panel';
@@ -88,6 +89,18 @@ function Shell() {
       id: 'sunday.viewAgent',
       title: 'View: Sunday Agent',
       run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' }),
+    });
+    registerCommand({
+      id: 'sunday.viewMissions',
+      title: 'View: Mission Control',
+      run: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'missions' }),
+    });
+    registerCommand({
+      id: 'sunday.checkForUpdates',
+      title: 'Sunday: Check for Updates',
+      run: () => {
+        window.dispatchEvent(new CustomEvent('sunday:update:open-dialog'));
+      },
     });
     registerCommand({
       id: 'sunday.viewSource',
@@ -226,6 +239,7 @@ function Shell() {
           {state.railView === 'search' && <Search />}
           {state.railView === 'source' && <SourceControl />}
           {state.railView === 'agent' && <AgentPanel />}
+          {state.railView === 'missions' && <MissionControl />}
           {state.railView === 'extensions' && <Extensions />}
           {state.railView === 'debug' && <Debug />}
           {state.railView === 'ops' && <OpsView />}

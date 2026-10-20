@@ -86,6 +86,15 @@ export const OpsShieldIcon = (p: IconProps) => (
   </svg>
 );
 
+/** Mission Control: a target — missions are goals Sunday runs down. */
+export const MissionTargetIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="8" />
+    <circle cx="12" cy="12" r="4.5" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const GearIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="12" cy="12" r="3.2" />

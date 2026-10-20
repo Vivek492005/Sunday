@@ -13,7 +13,7 @@ export interface OpenFile {
   dirty: boolean;
 }
 
-export type RailView = 'explorer' | 'search' | 'source' | 'agent' | 'extensions' | 'debug' | 'ops';
+export type RailView = 'explorer' | 'search' | 'source' | 'agent' | 'missions' | 'extensions' | 'debug' | 'ops';
 
 interface IdeState {
   rootFolder: string | null;

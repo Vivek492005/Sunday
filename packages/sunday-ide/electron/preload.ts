@@ -161,6 +161,34 @@ export interface SundayAPI {
     locked(key: string, workspaceDir?: string): Promise<boolean>;
     audit(limit?: number): Promise<OrgAuditEvent[]>;
   };
+  update: {
+    check(): Promise<UpdateCheckOut>;
+    download(url: string): Promise<UpdateDownloadOut>;
+    install(path: string): Promise<void>;
+  };
+  streak: {
+    get(): Promise<StreakInfoOut>;
+    noteEdit(): Promise<void>;
+  };
+  memory: {
+    list(limit?: number): Promise<MemoryRecordOut[]>;
+    search(query: string, limit?: number): Promise<MemoryRecordOut[]>;
+    save(input: SaveMemoryInput): Promise<MemoryRecordOut>;
+    remove(id: string): Promise<boolean>;
+  };
+  missions: {
+    list(): Promise<MissionOut[]>;
+    create(input: CreateMissionInput): Promise<MissionOut>;
+    start(id: string): Promise<MissionOut>;
+    refresh(id: string): Promise<MissionOut>;
+    stop(id: string): Promise<MissionOut>;
+  };
+  account: {
+    status(): Promise<AccountStatusOut>;
+    signIn(): Promise<AccountStatusOut>;
+    signOut(): Promise<void>;
+    quota(): Promise<QuotaResultOut>;
+  };
   ops: {
     routingPolicies(): Promise<RoutePolicyOut[]>;
     routingRecent(): Promise<RoutingRecentOut>;
@@ -298,6 +326,152 @@ export interface AgentTurnTraceOut {
 export interface AgentTraceOut {
   turns: AgentTurnTraceOut[];
 }
+
+/** Auto-update check result (mirrors electron/updateManager.ts). */
+export interface UpdateCheckOut {
+  available: boolean;
+  latest?: string;
+  downloadUrl?: string;
+  assetName?: string;
+  releaseNotes?: string;
+  publishedAt?: string;
+  source?: 'gateway' | 'github';
+  error?: string;
+}
+
+export interface UpdateDownloadOut {
+  path: string;
+  sizeBytes: number;
+}
+
+/** Streak/engagement info (mirrors ext-agent StreakInfo). */
+export interface StreakInfoOut {
+  current: number;
+  longest: number;
+  lastActiveDate: string;
+  freezesAvailable: number;
+  freezeMilestone: number;
+  vacationDaysUsed: number;
+  vacationYear: number;
+  vacationStart: string;
+  vacationUntil: string;
+  lastRiskNotifiedDate: string;
+  lastMilestoneNotifiedAt: number;
+  todayKey: string;
+  todayIsActive: boolean;
+  onVacation: boolean;
+  atRisk: boolean;
+  nextMilestone: { daysAway: number; bonus: number; atDays: number } | null;
+}
+
+/** One Second Brain memory record (mirrors @sunday/skills LongTermMemory). */
+export interface MemoryRecordOut {
+  id: string;
+  text: string;
+  timestamp: string;
+  project: string;
+  tags: string[];
+  source: 'auto' | 'manual';
+}
+
+export interface SaveMemoryInput {
+  text: string;
+  tags?: string[];
+}
+
+/** Mission Control shapes (mirror electron/missionService.ts). */
+export interface PlannedUnitOut {
+  id: string;
+  title: string;
+  owns_paths: string[];
+  acceptance: string[];
+  budget: number;
+}
+
+export interface MissionPlanOut {
+  units: PlannedUnitOut[];
+  totalBudget: number;
+}
+
+export type UnitRunStatusOut = 'queued' | 'running' | 'verifying' | 'done' | 'failed' | 'cancelled';
+
+export interface UnitRunStateOut {
+  id: string;
+  title: string;
+  status: UnitRunStatusOut;
+  worktreePath?: string;
+  model?: string;
+  steps?: number;
+  sha?: string;
+  error?: string;
+}
+
+export type MissionStatusOut =
+  | 'planned'
+  | 'queued'
+  | 'running'
+  | 'done'
+  | 'failed'
+  | 'stopped'
+  | 'error';
+
+export interface MissionLogEntryOut {
+  ts: string;
+  unitId?: string;
+  phase: string;
+  detail?: string;
+}
+
+export interface MissionOut {
+  id: string;
+  goal: string;
+  model?: string;
+  workspaceRoot: string;
+  createdAt: string;
+  updatedAt: string;
+  status: MissionStatusOut;
+  runId?: string;
+  plan?: MissionPlanOut;
+  units?: UnitRunStateOut[];
+  logTail: MissionLogEntryOut[];
+  error?: string;
+}
+
+export interface CreateMissionInput {
+  goal: string;
+  model?: string;
+  workspaceRoot: string;
+}
+
+/** Account shapes (mirror electron/accountManager.ts). */
+export interface AccountUserOut {
+  id: string;
+  email?: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
+export interface AccountStatusOut {
+  signedIn: boolean;
+  user?: AccountUserOut;
+  /** Plan id from GET /me/entitlements when known. */
+  plan?: string;
+  /** True when showing the last known account (gateway unreachable). */
+  stale?: boolean;
+  /** Human-readable, token-free error message. */
+  error?: string;
+}
+
+export interface QuotaOut {
+  requestsUsed: number;
+  tokensIn: number;
+  tokensOut: number;
+  baseQuota: number;
+  totalQuota: number;
+  quotaRemaining: number;
+}
+
+export type QuotaResultOut = QuotaOut | { error: string };
 
 export interface LoopGuardStatus {
   tripped: boolean;
@@ -705,6 +879,53 @@ const api: SundayAPI = {
     browserViewportMatrix: (url: string) => ipcRenderer.invoke('sunday:browser:viewport-matrix', url),
     scoreboard: () => ipcRenderer.invoke('sunday:eval:scoreboard'),
   },
+  update: {
+    check: () => ipcRenderer.invoke('sunday:update:check'),
+    download: (url: string) => ipcRenderer.invoke('sunday:update:download', url),
+    install: (path: string) => ipcRenderer.invoke('sunday:update:install', path),
+  },
+  streak: {
+    get: () => ipcRenderer.invoke('sunday:streak:get'),
+    noteEdit: () => ipcRenderer.invoke('sunday:streak:note-edit'),
+  },
+  memory: {
+    list: (limit?: number) => ipcRenderer.invoke('sunday:memory:list', limit),
+    search: (query: string, limit?: number) =>
+      ipcRenderer.invoke('sunday:memory:search', query, limit),
+    save: (input: SaveMemoryInput) => ipcRenderer.invoke('sunday:memory:save', input),
+    remove: (id: string) => ipcRenderer.invoke('sunday:memory:remove', id),
+  },
+  missions: {
+    list: () => ipcRenderer.invoke('sunday:missions:list'),
+    create: (input: CreateMissionInput) => ipcRenderer.invoke('sunday:missions:create', input),
+    start: (id: string) => ipcRenderer.invoke('sunday:missions:start', id),
+    refresh: (id: string) => ipcRenderer.invoke('sunday:missions:refresh', id),
+    stop: (id: string) => ipcRenderer.invoke('sunday:missions:stop', id),
+  },
+  account: {
+    status: () => ipcRenderer.invoke('sunday:account:status'),
+    signIn: () => ipcRenderer.invoke('sunday:account:sign-in'),
+    signOut: () => ipcRenderer.invoke('sunday:account:sign-out'),
+    quota: () => ipcRenderer.invoke('sunday:account:quota'),
+  },
 };
 
 contextBridge.exposeInMainWorld('sunday', api);
+
+// Main-process startup update check pushes 'sunday:update:available';
+// re-broadcast it as the DOM event the status-bar pill listens for.
+// (The preload shares the page's DOM at runtime; the electron tsconfig
+// has no DOM lib, so reach the globals through a structural cast.)
+ipcRenderer.on('sunday:update:available', (_e, result) => {
+  try {
+    const g = globalThis as unknown as {
+      dispatchEvent?: (event: unknown) => boolean;
+      CustomEvent?: new (type: string, init?: { detail?: unknown }) => unknown;
+    };
+    if (typeof g.dispatchEvent === 'function' && typeof g.CustomEvent === 'function') {
+      g.dispatchEvent(new g.CustomEvent('sunday:update:status', { detail: result }));
+    }
+  } catch {
+    // No DOM (shouldn't happen in the renderer preload) — ignore.
+  }
+});

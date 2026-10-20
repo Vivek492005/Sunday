@@ -7,10 +7,13 @@ import React from 'react';
 import { useIde } from '../state/ideStore';
 import { baseName } from '../services/languageMap';
 import { BranchIcon } from './icons';
+import { UpdatePill } from './Update/UpdateDialog';
+import { StreakPill, useStreakInfo } from './Streak/StreakPill';
 
 export function StatusBar() {
   const { state, dispatch } = useIde();
   const activeFile = state.openFiles.find((f) => f.path === state.activePath);
+  const streakInfo = useStreakInfo();
 
   const ev = (name: string, detail?: unknown) =>
     window.dispatchEvent(new CustomEvent(name, { detail }));
@@ -35,6 +38,8 @@ export function StatusBar() {
         </button>
       )}
       <div className="sb-right">
+        <StreakPill info={streakInfo} />
+        <UpdatePill />
         {activeFile && (
           <button
             className="sb-item sb-btn"

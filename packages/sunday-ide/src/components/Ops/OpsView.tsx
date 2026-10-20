@@ -11,13 +11,17 @@ import { useIde } from '../../state/ideStore';
 import { opsService, type SessionSummary } from '../../services/opsService';
 import { gitService } from '../../services/gitService';
 import { DesignModeSection } from './DesignMode';
+import { SessionReplay } from './SessionReplay';
+import { MemoryPanel } from './MemoryPanel';
 import './ops.css';
 
-type OpsTab = 'routing' | 'sessions' | 'permissions' | 'hooks' | 'evidence' | 'security' | 'browser' | 'scoreboard';
+type OpsTab = 'routing' | 'sessions' | 'replay' | 'memory' | 'permissions' | 'hooks' | 'evidence' | 'security' | 'browser' | 'scoreboard';
 
 const TABS: { id: OpsTab; label: string; f: string }[] = [
   { id: 'routing', label: 'Routing', f: 'F3' },
   { id: 'sessions', label: 'Sessions', f: 'F6' },
+  { id: 'replay', label: 'Replay', f: 'F6' },
+  { id: 'memory', label: 'Memory', f: 'Brain' },
   { id: 'permissions', label: 'Permissions', f: 'F7' },
   { id: 'hooks', label: 'Hooks', f: 'F8' },
   { id: 'evidence', label: 'Evidence', f: 'F9' },
@@ -979,6 +983,8 @@ export function OpsView() {
       <div className="ops-body">
         {tab === 'routing' && <RoutingPanel />}
         {tab === 'sessions' && <SessionsPanel />}
+        {tab === 'replay' && <SessionReplay />}
+        {tab === 'memory' && <MemoryPanel />}
         {tab === 'permissions' && <PermissionsPanel />}
         {tab === 'hooks' && <HooksPanel />}
         {tab === 'evidence' && <EvidencePanel />}

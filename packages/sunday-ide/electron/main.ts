@@ -8,7 +8,7 @@
  * daemonClient.ts spawns the daemon this way in the packaged app, where
  * process.execPath is the Electron binary (not Node.js).
  */
-import { app, BrowserWindow, ipcMain, dialog, utilityProcess, type UtilityProcess } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, utilityProcess, type UtilityProcess } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
@@ -116,6 +116,128 @@ async function loadDevWithRetry(win: BrowserWindow, attempts: number): Promise<v
   }
   console.error('Sunday IDE: dev server not reachable on :5173');
 }
+
+// ---------------------------------------------------------------- auto-update
+// Feed: hosted gateway /updates/check first, GitHub Releases fallback
+// (electron/updateManager.ts). Check runs on demand (palette / dialog)
+// and once ~30s after startup; results are pushed to the renderer pill.
+// Install happens ONLY from an explicit user click in the dialog — the
+// manager refuses any path it did not download itself this session.
+
+import {
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  DEFAULT_GATEWAY_URL,
+} from './updateManager.js';
+
+ipcMain.handle('sunday:update:check', async () =>
+  checkForUpdates({
+    gatewayUrl: DEFAULT_GATEWAY_URL,
+    currentVersion: app.getVersion(),
+    platform: process.platform,
+  }),
+);
+
+ipcMain.handle('sunday:update:download', async (_e, url: string) => {
+  const filePath = await downloadUpdate({}, url);
+  const stat = await fs.stat(filePath);
+  return { path: filePath, sizeBytes: stat.size };
+});
+
+ipcMain.handle('sunday:update:install', async (_e, filePath: string) => {
+  await installUpdate({}, filePath);
+});
+
+// ---------------------------------------------------------------- streaks + memory
+// Streaks run on the REAL ext-agent engagement engine (streakService wraps
+// StreakStore/ActivityStore over ~/.sunday/engagement). Memory runs on the
+// real @sunday/skills Second Brain store (~/.sunday/memory/memories.jsonl).
+
+import {
+  getStreakInfo,
+  noteEditActivity,
+  recordAgentTaskCompleted,
+  recordCommitMade,
+} from './streakService.js';
+import {
+  listMemories,
+  searchMemories,
+  saveMemory,
+  deleteMemory,
+  type SaveMemoryInput,
+} from './memoryService.js';
+
+ipcMain.handle('sunday:streak:get', async () => getStreakInfo());
+ipcMain.handle('sunday:streak:note-edit', async () => {
+  noteEditActivity();
+});
+
+// ---------------------------------------------------------------- mission control
+// Kanban over the daemon's REAL orchestrate/* RPCs (electron/missionService.ts).
+// State persists in ~/.sunday-ide/missions.json; orchestrate/event
+// notifications feed each card's live log tail.
+
+import {
+  listMissions,
+  createMission,
+  startMission,
+  refreshMission,
+  stopMission,
+  initMissionService,
+  type CreateMissionInput,
+} from './missionService.js';
+
+initMissionService();
+
+// ---------------------------------------------------------------- account
+// Google OAuth loopback -> hosted-gateway session (~/.sunday-ide/session.json,
+// 0600, tokens never logged). On sign-in the daemon is configured with the
+// session token (daemon/configure sundayApiToken) so the hosted free tier
+// works in agent chat — the same path the VS Code extension uses.
+
+import {
+  signIn as accountSignIn,
+  signOut as accountSignOut,
+  getAccountStatus,
+  getQuota as getAccountQuota,
+  configureDaemonWithSession,
+  type AccountManagerDeps,
+} from './accountManager.js';
+
+const accountDeps: AccountManagerDeps = {
+  openUrl: async (url: string) => {
+    await shell.openExternal(url);
+  },
+  daemonConfigure: async (token: string) => {
+    // daemon/configure requires a workspaceRoot; the token itself is
+    // daemon-global (SUNDAY_API_TOKEN). The user's home dir is the
+    // always-valid root here.
+    await configureDaemonWithSession(os.homedir(), token);
+  },
+};
+
+ipcMain.handle('sunday:account:status', async () => getAccountStatus(accountDeps));
+ipcMain.handle('sunday:account:sign-in', async () => accountSignIn(accountDeps));
+ipcMain.handle('sunday:account:sign-out', async () => {
+  await accountSignOut(accountDeps);
+});
+ipcMain.handle('sunday:account:quota', async () => getAccountQuota(accountDeps));
+
+ipcMain.handle('sunday:missions:list', async () => listMissions());
+ipcMain.handle('sunday:missions:create', async (_e, input: CreateMissionInput) =>
+  createMission(input),
+);
+ipcMain.handle('sunday:missions:start', async (_e, id: string) => startMission(id));
+ipcMain.handle('sunday:missions:refresh', async (_e, id: string) => refreshMission(id));
+ipcMain.handle('sunday:missions:stop', async (_e, id: string) => stopMission(id));
+
+ipcMain.handle('sunday:memory:list', async (_e, limit?: number) => listMemories(limit));
+ipcMain.handle('sunday:memory:search', async (_e, query: string, limit?: number) =>
+  searchMemories(query ?? '', limit),
+);
+ipcMain.handle('sunday:memory:save', async (_e, input: SaveMemoryInput) => saveMemory(input));
+ipcMain.handle('sunday:memory:remove', async (_e, id: string) => deleteMemory(id));
 
 // ---------------------------------------------------------------- window IPC
 
@@ -535,6 +657,8 @@ ipcMain.handle(
         model,
         cwd: req.cwd,
       });
+      // Engagement: a completed AI task is a real streak-day signal.
+      recordAgentTaskCompleted();
       return {
         content: r.content,
         budgetPaused: r.budgetPaused,
@@ -845,6 +969,7 @@ ipcMain.handle(
     const msg = (message ?? '').trim();
     if (!dirPath || !msg) return { ok: false, error: 'Commit message is empty' };
     const r = await gitRun(dirPath, ['commit', '-m', msg]);
+    if (r.ok) recordCommitMade(); // engagement: a commit is a streak-day signal
     return r.ok ? { ok: true } : { ok: false, error: r.stderr || 'git commit failed' };
   },
 );
@@ -1413,6 +1538,22 @@ if (!HEADLESS_MODE) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+    // Auto-update: one delayed startup check (~30s, so it never competes
+    // with first paint). Only a FOUND update is pushed to the renderer;
+    // failures are silent here — the dialog/palette surface them on demand.
+    setTimeout(() => {
+      void checkForUpdates({
+        gatewayUrl: DEFAULT_GATEWAY_URL,
+        currentVersion: app.getVersion(),
+        platform: process.platform,
+      })
+        .then((result) => {
+          if (result.available) {
+            mainWindow?.webContents.send('sunday:update:available', result);
+          }
+        })
+        .catch(() => undefined);
+    }, 30_000).unref?.();
   });
 
   app.on('window-all-closed', () => {

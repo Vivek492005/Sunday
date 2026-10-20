@@ -7,6 +7,7 @@ import { useIde } from '../state/ideStore';
 import { fileService, windowControls } from '../services/fileService';
 import { baseName } from '../services/languageMap';
 import { SunLogo, MinIcon, MaxIcon, RestoreIcon, XIcon } from './icons';
+import { AccountChip } from './Account/AccountChip';
 
 interface MenuEntry {
   label: string;
@@ -81,6 +82,7 @@ export function TitleBar() {
       { label: 'Search', kbd: 'Ctrl+Shift+F', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'search' }) },
       { label: 'Source Control', kbd: 'Ctrl+Shift+G', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'source' }) },
       { label: 'Agent', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' }) },
+      { label: 'Mission Control', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'missions' }) },
       { label: 'Extensions', kbd: 'Ctrl+Shift+X', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'extensions' }) },
       { label: 'Debug', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'debug' }) },
       { label: 'Sunday Ops', action: () => dispatch({ type: 'SET_RAIL_VIEW', view: 'ops' }) },
@@ -142,6 +144,8 @@ export function TitleBar() {
           </div>
         ))}
       </div>
+
+      <AccountChip />
 
       <div className="sunday-window-controls">
         <button aria-label="Minimize" onClick={() => void windowControls.minimize()}>
