@@ -1,0 +1,161 @@
+/* Auto-Update dialog + status-bar pill — Sunday design tokens, no VS Code classes. */
+
+.sunday-update-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.sunday-update-modal {
+  width: min(560px, 92vw);
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sunday-sidebar, #221c14);
+  border: 1px solid var(--sunday-border-strong, #4a3d28);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  color: var(--sunday-fg, #e8e0d0);
+  overflow: hidden;
+}
+
+.sunday-update-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--sunday-border, #33291a);
+}
+
+.sunday-update-header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: var(--sunday-accent, #f5b942);
+}
+
+.sunday-update-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sunday-fg-dim, #a89a7c);
+}
+
+.sunday-update-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.7;
+  display: flex;
+}
+
+.sunday-update-close:hover { opacity: 1; }
+
+.sunday-update-body {
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+}
+
+.sunday-update-status { font-size: 14px; color: var(--sunday-fg-dim, #a89a7c); }
+
+.sunday-update-version {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sunday-fg, #e8e0d0);
+  margin: 0 0 6px;
+}
+
+.sunday-update-meta {
+  font-size: 12px;
+  color: var(--sunday-fg-faint, #8a7a5c);
+  margin: 0 0 12px;
+  font-family: var(--sunday-mono, ui-monospace, Menlo, Consolas, monospace);
+}
+
+.sunday-update-notes {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--sunday-fg-dim, #a89a7c);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--sunday-border, #33291a);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 0 0 14px;
+}
+
+.sunday-update-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunday-border, #33291a);
+  overflow: hidden;
+  margin: 14px 0 8px;
+}
+
+.sunday-update-progress-bar {
+  width: 40%;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--sunday-accent, #f5b942);
+  animation: sunday-update-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes sunday-update-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.sunday-update-error p { color: var(--sunday-danger, #e05c5c); font-size: 13.5px; line-height: 1.5; }
+
+.sunday-update-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sunday-update-primary,
+.sunday-update-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: var(--sunday-font, sans-serif);
+  border: 1px solid var(--sunday-border-strong, #4a3d28);
+}
+
+.sunday-update-primary {
+  background: var(--sunday-accent, #f5b942);
+  color: var(--sunday-accent-fg, #1a1611);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.sunday-update-primary:hover { filter: brightness(1.08); }
+.sunday-update-primary:disabled { opacity: 0.5; cursor: default; }
+
+.sunday-update-secondary { background: transparent; color: inherit; }
+.sunday-update-secondary:hover { background: var(--sunday-hover, #2a2318); }
+
+/* Status-bar pill (sits on the yellow Sunday status bar, so it inverts). */
+.sunday-update-pill {
+  background: #1a1611;
+  color: var(--sunday-accent, #f5b942);
+  border: none;
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--sunday-font, sans-serif);
+  white-space: nowrap;
+}
+
+.sunday-update-pill:hover { filter: brightness(1.35); }
