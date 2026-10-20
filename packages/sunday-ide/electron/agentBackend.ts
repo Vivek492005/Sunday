@@ -104,16 +104,28 @@ const BUDGET_FILE = path.join(sundayIdeDir(), 'budgets.json');
 
 const ledger = new TaskLedger(200);
 // Restore persisted records (TaskLedger has no load(); re-record each).
-for (const r of readJson<TaskRecord[]>(LEDGER_FILE, [])) {
+// Audit M6: shape-guard the parsed JSON. readJson only guarantees
+// "valid JSON", never the shape — a hand-edited / half-migrated
+// ledger.json containing {} / null / 42 made this module-scope for..of
+// throw a TypeError, killing the main process before any window
+// opened. Wrong shape now degrades to an empty ledger. (Every other
+// store in the app already validates shape; this one didn't.)
+const savedLedger: unknown = readJson<unknown>(LEDGER_FILE, []);
+for (const r of Array.isArray(savedLedger) ? savedLedger : []) {
   try {
-    ledger.record(r);
+    ledger.record(r as TaskRecord);
   } catch {
     // Corrupt entry — skip, ledger stays valid
   }
 }
 
+// Same guard for budgets.json: BudgetTracker dereferences its limits
+// lazily, so a null / array / scalar file would explode on first use.
+const savedBudgets: unknown = readJson<unknown>(BUDGET_FILE, {});
 const budgetTracker = new BudgetTracker(
-  readJson<Partial<Record<BudgetScope, { soft: number; hard: number }>>>(BUDGET_FILE, {}),
+  savedBudgets !== null && typeof savedBudgets === 'object' && !Array.isArray(savedBudgets)
+    ? (savedBudgets as Partial<Record<BudgetScope, { soft: number; hard: number }>>)
+    : {},
 );
 
 function persistLedger(): void {
@@ -234,7 +246,19 @@ const contextMeter = new ContextMeter();
 const pinnedStore = new PinnedStore({
   persist: (facts) => writeJson(PINS_FILE, facts),
 });
-pinnedStore.load(readJson<PinnedFact[]>(PINS_FILE, []));
+// Audit M6 shape guard (same class as the ledger above): PinnedStore.load
+// iterates its argument and keys facts by id, so anything but an array
+// of well-formed facts threw at module scope. Filter to valid pins;
+// wrong shape degrades to no pins.
+const savedPins: unknown = readJson<unknown>(PINS_FILE, []);
+const validPins: PinnedFact[] = (Array.isArray(savedPins) ? savedPins : []).filter(
+  (f): f is PinnedFact =>
+    typeof f === 'object' &&
+    f !== null &&
+    typeof (f as PinnedFact).id === 'string' &&
+    typeof (f as PinnedFact).text === 'string',
+);
+pinnedStore.load(validPins);
 
 export interface ContextUsageOut {
   used: number;
