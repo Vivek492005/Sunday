@@ -1376,6 +1376,28 @@ ipcMain.handle('sunday:import:apply', async (_e, plan: ImportPlan) => {
 
 // ---------------------------------------------------------------- lifecycle
 
+// ---- LSP servers (any language with a server binary) ----
+import {
+  startLspServer,
+  sendLspMessage,
+  stopLspServer,
+  stopAllLspServers,
+  setLspMessageListener,
+} from './lspManager.js';
+
+setLspMessageListener((language, payload) => {
+  mainWindow?.webContents.send('sunday:lsp:message', { language, payload });
+});
+
+ipcMain.handle('sunday:lsp:start', (_e, language: string, command: string, args: string[], cwd: string) =>
+  startLspServer(language, command, args, cwd),
+);
+ipcMain.handle('sunday:lsp:send', (_e, language: string, json: string) => sendLspMessage(language, json));
+ipcMain.handle('sunday:lsp:stop', (_e, language: string) => {
+  stopLspServer(language);
+});
+app.on('before-quit', () => stopAllLspServers());
+
 if (!HEADLESS_MODE) {
   app.whenReady().then(() => {
     createWindow();

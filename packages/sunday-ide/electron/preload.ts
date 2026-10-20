@@ -63,6 +63,12 @@ export interface SundayAPI {
     stop(): Promise<void>;
     onChanged(cb: (info: { dirPath: string; filename: string }) => void): () => void;
   };
+  lsp: {
+    start(language: string, command: string, args: string[], cwd: string): Promise<{ ok: boolean; error?: string }>;
+    send(language: string, json: string): Promise<boolean>;
+    stop(language: string): Promise<void>;
+    onMessage(cb: (info: { language: string; payload: string }) => void): () => void;
+  };
   git: {
     branch(dirPath: string): Promise<string | null>;
     status(dirPath: string): Promise<GitStatusResult>;
@@ -192,6 +198,8 @@ export interface SundaySettings {
   editorTabSize: number;
   editorWordWrap: boolean;
   terminalFontSize: number;
+  /** LSP servers: { "<monacoLanguageId>": ["command", ...args] } */
+  lspServers: Record<string, string[]>;
 }
 
 export interface GitFileChange {
@@ -526,6 +534,16 @@ const api: SundayAPI = {
       ): void => cb(info);
       ipcRenderer.on('sunday:fs-changed', listener);
       return () => ipcRenderer.removeListener('sunday:fs-changed', listener);
+    },
+  },
+  lsp: {
+    start: (language, command, args, cwd) => ipcRenderer.invoke('sunday:lsp:start', language, command, args, cwd),
+    send: (language, json) => ipcRenderer.invoke('sunday:lsp:send', language, json),
+    stop: (language) => ipcRenderer.invoke('sunday:lsp:stop', language),
+    onMessage: (cb) => {
+      const listener = (_e: unknown, info: { language: string; payload: string }): void => cb(info);
+      ipcRenderer.on('sunday:lsp:message', listener);
+      return () => ipcRenderer.removeListener('sunday:lsp:message', listener);
     },
   },
   git: {

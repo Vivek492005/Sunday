@@ -28,6 +28,8 @@ export const DEFAULT_SETTINGS: SundaySettings = {
   editorTabSize: 2,
   editorWordWrap: false,
   terminalFontSize: 13,
+  // LSP servers by Monaco language id. Edit in Settings → Language Servers.
+  lspServers: {},
 };
 
 /** Merge a partial settings object over the defaults (pure, tested). */

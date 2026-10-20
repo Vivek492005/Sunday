@@ -13,8 +13,16 @@ import {
   getBreakpoints,
   onBreakpointsChanged,
 } from '../../services/debugService';
+import { configureLsp, ensureLspForLanguage, lspSyncDocument, lspConfigFor } from '../../services/lspService';
 import { CloseIcon } from '../icons';
 import { WelcomePage } from './WelcomePage';
+
+/** Ensure the LSP server for a language is up and sync the model with it. */
+async function lspEnsureAndSync(languageId: string, model: monaco.editor.ITextModel): Promise<void> {
+  if (!lspConfigFor(languageId)) return; // no server configured — Monaco built-ins handle it
+  await ensureLspForLanguage(languageId);
+  await lspSyncDocument(languageId, model);
+}
 
 interface ModelEntry {
   model: monaco.editor.ITextModel;
@@ -28,6 +36,7 @@ export function EditorArea() {
   const modelsRef = useRef<Map<string, ModelEntry>>(new Map());
   const saveHandlerRef = useRef<() => void>(() => undefined);
   const activePathRef = useRef<string | null>(null);
+  const rootFolderRef = useRef<string | null>(null);
   const bpDecorationsRef = useRef<string[]>([]);
 
   // create the Monaco instance once
@@ -132,6 +141,7 @@ export function EditorArea() {
         wordWrap: s.editorWordWrap ? 'on' : 'off',
       });
       monaco.editor.setTheme(s.theme === 'sunday-light' ? 'sunday-light' : 'sunday-dark');
+      configureLsp(s.lspServers ?? {}, rootFolderRef.current ?? '');
     };
     window.addEventListener(SETTINGS_APPLIED_EVENT, onSettings);
 
@@ -202,6 +212,7 @@ export function EditorArea() {
         monaco.editor.setModelLanguage(existing.model, openFile.language);
         editor.setModel(existing.model);
       }
+      void lspEnsureAndSync(openFile.language, existing.model);
       return;
     }
     // first open: load content from disk
@@ -223,6 +234,7 @@ export function EditorArea() {
           monaco.editor.createModel(content, openFile.language, uri);
         modelsRef.current.set(activePath, { model, savedContent: content });
         editor.setModel(model);
+        void lspEnsureAndSync(openFile.language, model);
       })
       .catch((err) => console.error('open failed', err));
   }, [state.activePath, state.openFiles]);
@@ -243,6 +255,11 @@ export function EditorArea() {
   useEffect(() => {
     activePathRef.current = state.activePath;
   }, [state.activePath]);
+
+  // Track the root folder for LSP rootUri.
+  useEffect(() => {
+    rootFolderRef.current = state.rootFolder;
+  }, [state.rootFolder]);
 
   // Wave 3: paint breakpoint gutter decorations for the active file.
   useEffect(() => {
