@@ -357,3 +357,28 @@
 .text-ok {
   color: var(--sunday-ok);
 }
+
+/* Design Mode (Browser tab, section 5) */
+.design-toolbar {
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.design-current-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 11px;
+}
+.design-preview-wrap {
+  border: 1px solid var(--sunday-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+.design-preview {
+  display: block;
+  border: 0;
+}

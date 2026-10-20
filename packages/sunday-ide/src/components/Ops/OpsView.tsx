@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useIde } from '../../state/ideStore';
 import { opsService, type SessionSummary } from '../../services/opsService';
 import { gitService } from '../../services/gitService';
+import { DesignModeSection } from './DesignMode';
 import './ops.css';
 
 type OpsTab = 'routing' | 'sessions' | 'permissions' | 'hooks' | 'evidence' | 'security' | 'browser' | 'scoreboard';
@@ -873,6 +874,7 @@ function BrowserPanel() {
           </table>
         )}
       </div>
+      <DesignModeSection />
     </div>
   );
 }

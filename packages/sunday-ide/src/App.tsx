@@ -208,6 +208,7 @@ function Shell() {
       on('sunday:toggle-terminal', () => setPanelOpen((v) => !v)),
       on('sunday:show-settings', () => dispatch({ type: 'SET_SETTINGS_OPEN', open: true })),
       on('sunday:show-import', () => dispatch({ type: 'SET_IMPORT_OPEN', open: true })),
+      on('sunday:show-agent', () => dispatch({ type: 'SET_RAIL_VIEW', view: 'agent' })),
       on('sunday:about', () =>
         window.alert('Sunday IDE 2.0\n100% Sunday interface — VS Code organs, Sunday skin.\nWaves 1–3 + F1–F15 built in.'),
       ),
