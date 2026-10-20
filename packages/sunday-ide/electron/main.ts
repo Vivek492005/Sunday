@@ -13,6 +13,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import type { FSWatcher } from 'node:fs';
 import { execFile } from 'node:child_process';
 
 // --- Daemon mode: run sundayd instead of the IDE ---
@@ -106,7 +107,7 @@ if (!HEADLESS_MODE) {
 const isDev = process.env.SUNDAY_DEV === '1';
 
 let mainWindow: BrowserWindow | null = null;
-let fsWatcher: { close(): void } | null = null;
+let fsWatcher: FSWatcher | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -442,6 +443,14 @@ ipcMain.handle('sunday:watch:start', async (_e, dirPath: string) => {
   fsWatcher = watch(dirPath, { recursive }, (_event, filename) => {
     if (filename) batch.add(filename);
     if (!timer) timer = setTimeout(flush, 300);
+  });
+  // Audit M3: an FSWatcher 'error' event with no listener throws as an
+  // uncaught exception in main. The watched root being deleted/renamed
+  // externally, or a removable/network drive disconnecting, must only
+  // cost us live watching — log it and stop the watcher gracefully.
+  fsWatcher.on('error', (e) => {
+    logMainProcessError('fs watcher error — watching disabled', e);
+    stopWatcher();
   });
 });
 
