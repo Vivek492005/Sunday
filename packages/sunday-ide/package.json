@@ -45,5 +45,5 @@
     "package:win": "electron-builder --win --config electron-builder.yml"
   },
   "type": "module",
-  "version": "2.1.0"
+  "version": "2.1.1"
 }
