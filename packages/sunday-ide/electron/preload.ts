@@ -86,6 +86,11 @@ export interface SundayAPI {
     install(ext: OpenVsxExtension): Promise<{ ok: boolean; error?: string }>;
     uninstall(id: string): Promise<{ ok: boolean; error?: string }>;
     setEnabled(id: string, enabled: boolean): Promise<void>;
+    hostScan(): Promise<unknown>;
+    hostActivate(rootPath: string | null): Promise<Record<string, string> | { error: string }>;
+    executeCommand(id: string, args?: unknown[]): Promise<unknown>;
+    onMessage(cb: (info: { kind: string; message: string }) => void): () => void;
+    onOutput(cb: (info: { method: string; name: string; value?: string }) => void): () => void;
   };
   debug: {
     launch(cwd: string, program: string, args: string[]): Promise<{ ok: boolean; error?: string }>;
@@ -546,6 +551,19 @@ const api: SundayAPI = {
     install: (ext) => ipcRenderer.invoke('sunday:extensions:install', ext),
     uninstall: (id) => ipcRenderer.invoke('sunday:extensions:uninstall', id),
     setEnabled: (id, enabled) => ipcRenderer.invoke('sunday:extensions:setEnabled', id, enabled),
+    hostScan: () => ipcRenderer.invoke('sunday:extensions:hostScan'),
+    hostActivate: (rootPath) => ipcRenderer.invoke('sunday:extensions:hostActivate', rootPath),
+    executeCommand: (id, args) => ipcRenderer.invoke('sunday:extensions:executeCommand', id, args),
+    onMessage: (cb) => {
+      const listener = (_e: unknown, info: { kind: string; message: string }): void => cb(info);
+      ipcRenderer.on('sunday:ext:message', listener);
+      return () => ipcRenderer.removeListener('sunday:ext:message', listener);
+    },
+    onOutput: (cb) => {
+      const listener = (_e: unknown, info: { method: string; name: string; value?: string }): void => cb(info);
+      ipcRenderer.on('sunday:ext:output', listener);
+      return () => ipcRenderer.removeListener('sunday:ext:output', listener);
+    },
   },
   debug: {
     launch: (cwd, program, args) => ipcRenderer.invoke('sunday:debug:launch', cwd, program, args),

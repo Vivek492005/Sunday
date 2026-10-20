@@ -56,3 +56,23 @@ await build({
 });
 
 console.log('sundayd bundle ok');
+
+// Bundle the extension host — loaded by main.ts in --sunday-extension-host mode.
+await build({
+  entryPoints: [path.join(root, 'electron', 'extHost', 'host.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node18',
+  outfile: path.join(root, 'dist-electron', 'exthost.cjs'),
+  external: ['electron'],
+  banner: {
+    js: `var __sundayPtfu = require('node:url').pathToFileURL;\nvar __sundayImportMetaUrl = __sundayPtfu(__filename).href;`,
+  },
+  define: {
+    'import.meta.url': '__sundayImportMetaUrl',
+  },
+  logLevel: 'info',
+});
+
+console.log('extension host bundle ok');

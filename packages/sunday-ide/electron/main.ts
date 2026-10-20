@@ -31,6 +31,20 @@ if (process.argv.includes('--sundayd-daemon')) {
   await new Promise(() => {}); // block forever; daemon speaks over stdio
 }
 
+// --- Extension-host mode: run the extension host instead of the IDE ---
+if (process.argv.includes('--sunday-extension-host')) {
+  const hostPath = path.join(__dirname, 'exthost.cjs');
+  try {
+    await import(hostPath);
+  } catch (e) {
+    process.stderr.write(`[sunday-exthost] failed to load ${hostPath}: ${e}\n`);
+    process.exit(1);
+  }
+  process.stdin.resume();
+  process.stdin.on('end', () => process.exit(0));
+  await new Promise(() => {}); // block forever; host speaks over stdio
+}
+
 const isDev = process.env.SUNDAY_DEV === '1';
 
 let mainWindow: BrowserWindow | null = null;
@@ -978,6 +992,58 @@ ipcMain.handle('sunday:extensions:setEnabled', async (_e, id: string, enabled: b
   } catch {
     // missing manifest — ignore
   }
+});
+
+// ---------------------------------------------------------------- extension host IPC
+//
+// Real extension host: scans + activates installed extensions, runs their
+// contributed commands. vscode window.* bridge calls land back here and are
+// forwarded to the renderer (toast/input/quickpick) via webContents events.
+
+import { extHostRpc, setExtensionHostNotifier } from './extensionHostManager.js';
+
+setExtensionHostNotifier(async (method, params) => {
+  if (!mainWindow) return null;
+  if (method === 'window.showMessage') {
+    mainWindow.webContents.send('sunday:ext:message', params);
+    return null;
+  }
+  if (method === 'window.outputAppend' || method === 'window.outputShow' || method === 'window.outputClear') {
+    mainWindow.webContents.send('sunday:ext:output', { method, ...params });
+    return null;
+  }
+  if (method === 'window.statusBar') {
+    mainWindow.webContents.send('sunday:ext:statusbar', params);
+    return null;
+  }
+  if (method === 'window.showTextDocument') {
+    mainWindow.webContents.send('sunday:ext:open', params);
+    return null;
+  }
+  return null;
+});
+
+ipcMain.handle('sunday:extensions:hostScan', async () => {
+  try {
+    return await extHostRpc('extHost/scan', {});
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+});
+
+ipcMain.handle('sunday:extensions:hostActivate', async (_e, rootPath: string | null) => {
+  try {
+    return await extHostRpc('extHost/activateAll', {
+      roots: rootPath ? [rootPath] : [],
+      config: {},
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+});
+
+ipcMain.handle('sunday:extensions:executeCommand', async (_e, id: string, args: unknown[]) => {
+  return extHostRpc('extHost/executeCommand', { id, args: args ?? [] });
 });
 
 // ---------------------------------------------------------------- debug IPC (Wave 3: minimal)
