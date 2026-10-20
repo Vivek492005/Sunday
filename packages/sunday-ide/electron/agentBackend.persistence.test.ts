@@ -5,23 +5,25 @@
  * SCOPE. readJson only guarantees valid JSON, not the shape: a file
  * containing `{}` / `null` / `42` made the module-scope iteration throw
  * a TypeError and killed the main process before any window opened.
- * These tests point HOME at a temp dir (os.homedir() reads $HOME on
- * Linux), poison the files, and import the module fresh per scenario.
+ * These tests point SUNDAY_IDE_DIR at a temp dir (agentBackend honors it
+ * over os.homedir(), whose env semantics differ per OS — $HOME on Linux,
+ * %USERPROFILE% on Windows), poison the files, and import the module
+ * fresh per scenario.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
-const realHome = process.env.HOME;
+const realIdeDir = process.env.SUNDAY_IDE_DIR;
 const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sunday-agentbackend-home-'));
 const ideDir = path.join(fakeHome, '.sunday-ide');
 fs.mkdirSync(ideDir, { recursive: true });
-process.env.HOME = fakeHome;
+process.env.SUNDAY_IDE_DIR = ideDir;
 
 afterAll(() => {
-  if (realHome === undefined) delete process.env.HOME;
-  else process.env.HOME = realHome;
+  if (realIdeDir === undefined) delete process.env.SUNDAY_IDE_DIR;
+  else process.env.SUNDAY_IDE_DIR = realIdeDir;
   fs.rmSync(fakeHome, { recursive: true, force: true });
 });
 

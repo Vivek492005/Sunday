@@ -77,7 +77,11 @@ import { parseMessage, createRequest } from '@sunday/protocol';
 // ---------------------------------------------------------------------------
 
 function sundayIdeDir(): string {
-  const dir = path.join(os.homedir(), '.sunday-ide');
+  // SUNDAY_IDE_DIR override (used by tests): os.homedir() semantics differ
+  // per OS ($HOME on Linux, %USERPROFILE% on Windows), so tests must not
+  // rely on redirecting HOME to isolate the state dir.
+  const override = process.env.SUNDAY_IDE_DIR;
+  const dir = override && override.trim() ? override : path.join(os.homedir(), '.sunday-ide');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
