@@ -376,6 +376,63 @@ export interface RealAgentReply {
   sessionId?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Activity trace — REAL per-tool-call timings from the daemon's chat/event
+// stream (tool-call / tool-result notifications carry the actual calls the
+// agent loop made; durations are measured here, in the send wrapper).
+// Bounded: last 25 turns, max 200 entries per turn. Nothing is synthesized —
+// a turn with no tool calls simply has an empty entries list.
+// ---------------------------------------------------------------------------
+
+export interface AgentTraceEntry {
+  callId: string;
+  name: string;
+  argsSummary: string;
+  startedAt: number;
+  durationMs?: number;
+  status: 'running' | 'ok' | 'error';
+  resultSummary?: string;
+}
+
+export interface AgentTurnTrace {
+  turnId: string;
+  sessionId?: string;
+  startedAt: number;
+  finishedAt?: number;
+  status: 'running' | 'done' | 'error';
+  entries: AgentTraceEntry[];
+  usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+const MAX_TRACE_TURNS = 25;
+const MAX_TRACE_ENTRIES_PER_TURN = 200;
+const turnTraces: AgentTurnTrace[] = [];
+
+/** The activity trace: newest turn first. Real daemon data only. */
+export function getAgentTrace(): { turns: AgentTurnTrace[] } {
+  return { turns: [...turnTraces].reverse() };
+}
+
+function summarizeArgs(args: unknown): string {
+  try {
+    const s = JSON.stringify(args ?? {});
+    return s.length > 160 ? `${s.slice(0, 157)}…` : s;
+  } catch {
+    return '';
+  }
+}
+
+function summarizeResultContent(content: unknown): string {
+  if (!Array.isArray(content)) return '';
+  const texts: string[] = [];
+  for (const part of content) {
+    const p = part as { type?: string; text?: string };
+    if (p && p.type === 'text' && typeof p.text === 'string') texts.push(p.text);
+  }
+  const joined = texts.join(' ').replace(/\s+/g, ' ').trim();
+  return joined.length > 200 ? `${joined.slice(0, 197)}…` : joined;
+}
+
 let ideSessionId: string | null = null;
 
 async function ensureIdeSession(cwd?: string): Promise<string> {
@@ -414,23 +471,88 @@ export async function realAgentSend(req: {
   if (!turnId) throw new Error('daemon chat/send returned no turnId');
 
   // Collect the turn: accumulate text-delta until turn-end / turn-error.
+  // In parallel, build the activity trace from the SAME real event stream:
+  // tool-call starts a timed entry, its tool-result completes it.
+  const trace: AgentTurnTrace = {
+    turnId,
+    sessionId,
+    startedAt: Date.now(),
+    status: 'running',
+    entries: [],
+  };
+  turnTraces.push(trace);
+  if (turnTraces.length > MAX_TRACE_TURNS) {
+    turnTraces.splice(0, turnTraces.length - MAX_TRACE_TURNS);
+  }
+  const pendingCalls = new Map<string, AgentTraceEntry>();
+
   const content = await new Promise<string>((resolve, reject) => {
     let text = '';
+    const finishTrace = (status: 'done' | 'error') => {
+      trace.status = status;
+      trace.finishedAt = Date.now();
+    };
     const timeout = setTimeout(() => {
       removeChatEventHandler(handler);
+      finishTrace('error');
       reject(new Error('turn timed out after 5 minutes'));
     }, 300000);
     const handler: ChatEventHandler = (ev) => {
       if ((ev.turnId ?? ev.turn_id) !== turnId) return;
       if (ev.type === 'text-delta' && typeof ev.delta === 'string') text += ev.delta;
-      else if (ev.type === 'turn-end') {
+      else if (ev.type === 'tool-call') {
+        const call = ev.call as
+          | { id?: string; name?: string; arguments?: Record<string, unknown> }
+          | undefined;
+        if (call?.id && call.name && trace.entries.length < MAX_TRACE_ENTRIES_PER_TURN) {
+          const entry: AgentTraceEntry = {
+            callId: call.id,
+            name: call.name,
+            argsSummary: summarizeArgs(call.arguments),
+            startedAt: Date.now(),
+            status: 'running',
+          };
+          trace.entries.push(entry);
+          pendingCalls.set(call.id, entry);
+        }
+      } else if (ev.type === 'tool-result') {
+        const result = ev.result as
+          | { toolCallId?: string; content?: unknown; isError?: boolean }
+          | undefined;
+        const entry = result?.toolCallId ? pendingCalls.get(result.toolCallId) : undefined;
+        if (entry) {
+          entry.durationMs = Date.now() - entry.startedAt;
+          entry.status = result?.isError ? 'error' : 'ok';
+          const summary = summarizeResultContent(result?.content);
+          if (summary) entry.resultSummary = summary;
+          pendingCalls.delete(entry.callId);
+        }
+      } else if (ev.type === 'usage') {
+        const usage = ev.usage as { inputTokens?: number; outputTokens?: number } | undefined;
+        if (usage) {
+          trace.usage = {
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+          };
+        }
+      } else if (ev.type === 'turn-end') {
         clearTimeout(timeout);
         removeChatEventHandler(handler);
+        finishTrace('done');
         resolve(text);
       } else if (ev.type === 'turn-error') {
         clearTimeout(timeout);
         removeChatEventHandler(handler);
-        reject(new Error(typeof ev.error === 'string' ? ev.error : 'turn-error'));
+        finishTrace('error');
+        reject(
+          new Error(
+            typeof ev.message === 'string'
+              ? ev.message
+              : typeof ev.error === 'string'
+                ? ev.error
+                : 'turn-error',
+          ),
+        );
       }
     };
     addChatEventHandler(handler);

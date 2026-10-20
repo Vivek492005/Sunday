@@ -28,6 +28,16 @@ import type {
   LocalModel,
 } from '../../services/agentService';
 import { Markdown } from './markdown';
+import { parsePlanFromText } from './planParse';
+import { PlanCard } from './PlanCard';
+import { TracePanel } from './TracePanel';
+import {
+  getDesignChip,
+  onDesignChipChange,
+  clearDesignChip,
+  designChipPromptPrefix,
+  type DesignChip,
+} from '../../services/designContext';
 import './agent.css';
 
 const SUGGESTIONS = [
@@ -52,6 +62,10 @@ export function AgentPanel() {
   const [localStatus, setLocalStatus] = useState<LocalChatStatus | null>(null);
   const [localModels, setLocalModels] = useState<LocalModel[]>([]);
   const [localOnly, setLocalOnly] = useState(false);
+  /* Design Mode: element chip picked in Ops → Browser preview */
+  const [designChip, setDesignChip] = useState<DesignChip | null>(() => getDesignChip());
+
+  useEffect(() => onDesignChipChange(setDesignChip), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,9 +177,14 @@ export function AgentPanel() {
       setInput('');
       setEstimate(null);
 
+      // Design Mode chip: prepended to the outgoing prompt as structured
+      // context; the displayed/stored user message stays the user's own text.
+      const chip = designChip;
+      const outgoing = chip ? designChipPromptPrefix(chip) + message : message;
+
       try {
         const reply = await agentService.send({
-          message,
+          message: outgoing,
           mode,
           model,
           history: withUser,
@@ -175,6 +194,7 @@ export function AgentPanel() {
         setMessages(next);
         saveHistory(next);
         if (reply.budgetPaused) setBudgetPaused(true);
+        if (chip) clearDesignChip(); // consumed by this send
       } catch (err) {
         const failed: AgentMessage = {
           role: 'assistant',
@@ -186,7 +206,7 @@ export function AgentPanel() {
         void refreshUsage();
       }
     },
-    [messages, mode, model, sending, refreshUsage],
+    [messages, mode, model, sending, refreshUsage, designChip],
   );
 
   const handleSendClick = () => {
@@ -366,13 +386,25 @@ export function AgentPanel() {
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <div key={i} className={`sunday-agent-msg ${m.role}`}>
-            <div className="sunday-agent-bubble">
-              {m.role === 'user' ? m.content : <Markdown source={m.content} />}
+        {messages.map((m, i) => {
+          const plan = m.role === 'assistant' ? parsePlanFromText(m.content) : null;
+          return (
+            <div key={i} className={`sunday-agent-msg ${m.role}`}>
+              <div className="sunday-agent-bubble">
+                {m.role === 'user' ? (
+                  m.content
+                ) : plan ? (
+                  <>
+                    <PlanCard steps={plan.steps} />
+                    {plan.rest && <Markdown source={plan.rest} />}
+                  </>
+                ) : (
+                  <Markdown source={m.content} />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {sending && (
           <div className="sunday-agent-msg assistant">
@@ -398,8 +430,30 @@ export function AgentPanel() {
         )}
       </div>
 
+      {/* Activity / trace (real daemon tool calls, timed) */}
+      <TracePanel />
+
       {/* input */}
       <div className="sunday-agent-input-area">
+        {designChip && (
+          <div className="sunday-design-chip" title={`Picked on ${designChip.url}`}>
+            <span className="sunday-design-chip-label">Design</span>
+            <span className="sunday-design-chip-tag">&lt;{designChip.tag}&gt;</span>
+            <span className="sunday-design-chip-sel">{designChip.selector}</span>
+            {designChip.text && (
+              <span className="sunday-design-chip-text">“{designChip.text}”</span>
+            )}
+            <button
+              type="button"
+              className="sunday-design-chip-x"
+              onClick={() => clearDesignChip()}
+              aria-label="Remove design context"
+              title="Remove design context"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {estimate && (
           <span className="sunday-agent-estimate" title={estimate.rationale}>
             ~{estimate.min}–{estimate.max} requests · {estimate.confidence} confidence

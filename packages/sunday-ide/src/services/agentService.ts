@@ -14,6 +14,9 @@ import type {
   AgentReply,
   AgentEstimate,
   AgentUsage,
+  AgentTraceOut,
+  AgentTurnTraceOut,
+  AgentTraceEntryOut,
   ContextUsage,
   PinnedFact,
   CompactionPreview,
@@ -102,6 +105,10 @@ export const agentService = {
   budgetContinue(scope: string, n: number): Promise<AgentUsage> {
     return bridge().agent.budgetContinue(scope, n);
   },
+  /** Activity trace: real per-tool-call timings from daemon chat events. */
+  trace(): Promise<AgentTraceOut> {
+    return bridge().agent.trace();
+  },
   // F2
   loopGuardStatus(): Promise<LoopGuardStatus> {
     return bridge().loopguard.status();
@@ -166,6 +173,9 @@ export type {
   AgentReply,
   AgentEstimate,
   AgentUsage,
+  AgentTraceOut,
+  AgentTurnTraceOut,
+  AgentTraceEntryOut,
   ContextUsage,
   PinnedFact,
   CompactionPreview,

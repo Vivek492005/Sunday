@@ -80,6 +80,10 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Design Mode (Ops → Browser) embeds a page preview in a <webview>.
+      // Guest pages get NO preload and NO node access (see DesignMode.tsx
+      // webpreferences attribute), so the guest is fully sandboxed.
+      webviewTag: true,
     },
   });
 
@@ -480,6 +484,7 @@ import {
   evaluatePolicy,
   listHooksOut,
   evidenceForDiff,
+  getAgentTrace,
   type BudgetScope,
 } from './agentBackend.js';
 
@@ -503,6 +508,10 @@ ipcMain.handle('sunday:agent:usage', async () => {
     pausedScopes: u.pausedScopes,
   };
 });
+
+// Activity trace: real per-tool-call timings collected by realAgentSend
+// from the daemon's chat/event stream (see agentBackend.ts).
+ipcMain.handle('sunday:agent:trace', async () => getAgentTrace());
 
 // REAL agent send: F1 budget gate → sundayd daemon (AgentLoop with
 // F2/F7/F8 inside) → collect turn. Throws real errors when unavailable.

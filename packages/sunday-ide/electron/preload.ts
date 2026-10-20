@@ -121,6 +121,8 @@ export interface SundayAPI {
     estimate(message: string, model?: string): Promise<AgentEstimate>;
     usage(): Promise<AgentUsage>;
     budgetContinue(scope: string, n: number): Promise<AgentUsage>;
+    /** Activity trace: real per-tool-call timings from daemon chat events. */
+    trace(): Promise<AgentTraceOut>;
   };
   loopguard: {
     status(): Promise<LoopGuardStatus>;
@@ -269,6 +271,32 @@ export interface AgentUsage {
   taskSpend: number;
   costPerSuccessfulTask?: number;
   pausedScopes?: string[];
+}
+
+/** One timed tool call from the daemon's real chat/event stream. */
+export interface AgentTraceEntryOut {
+  callId: string;
+  name: string;
+  argsSummary: string;
+  startedAt: number;
+  durationMs?: number;
+  status: 'running' | 'ok' | 'error';
+  resultSummary?: string;
+}
+
+/** One agent turn's activity trace (newest first in AgentTraceOut). */
+export interface AgentTurnTraceOut {
+  turnId: string;
+  sessionId?: string;
+  startedAt: number;
+  finishedAt?: number;
+  status: 'running' | 'done' | 'error';
+  entries: AgentTraceEntryOut[];
+  usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+export interface AgentTraceOut {
+  turns: AgentTurnTraceOut[];
 }
 
 export interface LoopGuardStatus {
@@ -622,6 +650,7 @@ const api: SundayAPI = {
     estimate: (message, model) => ipcRenderer.invoke('sunday:agent:estimate', message, model),
     usage: () => ipcRenderer.invoke('sunday:agent:usage'),
     budgetContinue: (scope, n) => ipcRenderer.invoke('sunday:budget:continue', scope, n),
+    trace: () => ipcRenderer.invoke('sunday:agent:trace'),
   },
   loopguard: {
     status: () => ipcRenderer.invoke('sunday:loopguard:status'),
