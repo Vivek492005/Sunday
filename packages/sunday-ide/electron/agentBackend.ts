@@ -468,6 +468,11 @@ async function ensureIdeSession(cwd?: string): Promise<string> {
   return id;
 }
 
+/** The daemon's SessionNotFound RPC error surfaces with this message. */
+function isSessionNotFoundError(e: unknown): boolean {
+  return e instanceof Error && /session not found/i.test(e.message);
+}
+
 /**
  * REAL agent send: F1 budget gate → daemon session → chat/send →
  * collect chat/event until turn-end. No mocks. Throws real errors when the
@@ -485,12 +490,29 @@ export async function realAgentSend(req: {
   // F1: real pre-run estimate (logged; the UI already showed it via estimate IPC)
   const estimate = getRealEstimate(req.message, req.model);
 
-  const sessionId = await ensureIdeSession(req.cwd);
-  const sendRes = (await daemonRpc(
-    'chat/send',
-    { sessionId, message: req.message, model: req.model === 'auto' ? undefined : req.model },
-    30000,
-  )) as { turnId?: string };
+  // Audit M7: ideSessionId is cached for the life of the IDE, but the
+  // daemon can be respawned underneath us (crash → circuit-breaker
+  // recovery). The cached id then belongs to a dead daemon instance and
+  // every chat/send fails with SessionNotFound until the IDE restarts.
+  // On that specific error: drop the cached id and retry ONCE with a
+  // fresh session. Any other error — and a second failure — propagates.
+  const attemptSend = async (sid: string): Promise<{ turnId?: string }> =>
+    (await daemonRpc(
+      'chat/send',
+      { sessionId: sid, message: req.message, model: req.model === 'auto' ? undefined : req.model },
+      30000,
+    )) as { turnId?: string };
+
+  let sessionId = await ensureIdeSession(req.cwd);
+  let sendRes: { turnId?: string };
+  try {
+    sendRes = await attemptSend(sessionId);
+  } catch (e) {
+    if (!isSessionNotFoundError(e)) throw e;
+    ideSessionId = null;
+    sessionId = await ensureIdeSession(req.cwd);
+    sendRes = await attemptSend(sessionId);
+  }
   const turnId = sendRes.turnId;
   if (!turnId) throw new Error('daemon chat/send returned no turnId');
 
