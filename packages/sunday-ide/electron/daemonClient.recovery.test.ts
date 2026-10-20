@@ -98,4 +98,20 @@ describe('daemonClient hung-daemon recovery (audit M1)', () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
+
+  it('drops an over-cap newline-free flood instead of poisoning the channel (audit M2)', async () => {
+    // Runs against the healthy daemon spawned by the previous test.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // 17MB with no newline: pre-fix this stayed in rpcBuffer forever
+      // and glued itself to the next response line, making it
+      // unparseable — the RPC below would time out instead of resolving.
+      procs[1].stdout.emit('data', Buffer.alloc(17 * 1024 * 1024, 0x78));
+      const res = (await daemonRpc('session/list', {}, 2000)) as { echoed?: string };
+      expect(res.echoed).toBe('session/list');
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('RPC buffer exceeded'));
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
 });

@@ -26,6 +26,9 @@ let rpcId = 1;
 const pending = new Map<number | string, PendingRpc>();
 let rpcBuffer = '';
 
+/** Cap on a single newline-free partial line from the daemon (audit M2). */
+const MAX_RPC_BUFFER = 16 * 1024 * 1024;
+
 function daemonBin(): string {
   // 1. Packaged app: dist-electron/sundayd.cjs (bundled by build-electron.mjs).
   const bundled = path.resolve(__dirname, 'sundayd.cjs');
@@ -141,6 +144,16 @@ function onDaemonData(chunk: Buffer): void {
     } catch {
       // Non-JSONRPC line (daemon logs go to stderr; ignore stdout noise)
     }
+  }
+  // SAFETY (audit M2): complete lines are drained above, so whatever
+  // remains is ONE partial line. A peer streaming newline-free data
+  // (buggy daemon build, stdout noise loop) would otherwise grow this
+  // buffer without bound — drop it instead of eating main-process RAM.
+  if (rpcBuffer.length > MAX_RPC_BUFFER) {
+    console.error(
+      `[sunday] daemon RPC buffer exceeded ${MAX_RPC_BUFFER} bytes without a newline — dropping partial line`,
+    );
+    rpcBuffer = '';
   }
 }
 

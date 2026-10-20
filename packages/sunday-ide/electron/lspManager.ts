@@ -72,7 +72,18 @@ export function startLspServer(language: string, command: string, args: string[]
         entry.buffer = entry.buffer.subarray(start + len);
         messageListener?.(language, payload);
       }
-      if (entry.buffer.length > MAX_FRAME) entry.buffer = Buffer.alloc(0);
+      // Cap on an incomplete frame / headerless garbage (audit M2):
+      // drop it rather than letting the buffer grow without bound.
+      if (entry.buffer.length > MAX_FRAME) {
+        console.error(
+          `[sunday] LSP buffer for '${language}' exceeded ${MAX_FRAME} bytes without a complete frame — dropping`,
+        );
+        entry.buffer = Buffer.alloc(0);
+      }
+    });
+    proc.stdin?.on('error', () => {
+      // EPIPE class (audit L2): the server died mid-write; the exit/error
+      // handlers own cleanup — an unhandled stdin 'error' would throw.
     });
     proc.stderr.on('data', () => {
       // server logs — ignored in normal operation
@@ -92,8 +103,13 @@ export function startLspServer(language: string, command: string, args: string[]
 export function sendLspMessage(language: string, json: string): boolean {
   const entry = servers.get(language);
   if (!entry?.proc.stdin) return false;
-  entry.proc.stdin.write(frame(json));
-  return true;
+  try {
+    entry.proc.stdin.write(frame(json));
+    return true;
+  } catch {
+    // Server died between the liveness check and the write (audit L2).
+    return false;
+  }
 }
 
 export function stopLspServer(language: string): void {

@@ -21,6 +21,9 @@ let rpcId = 1;
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 let buffer = '';
 
+/** Cap on a single newline-free partial line from the IDE (audit M2). */
+const MAX_STDIN_BUFFER = 16 * 1024 * 1024;
+
 const bridge: Bridge = (method, params) =>
   new Promise((resolve, reject) => {
     const id = rpcId++;
@@ -202,6 +205,15 @@ process.stdin.on('data', (chunk: Buffer) => {
         else p.resolve(msg.result);
       }
     }
+  }
+  // SAFETY (audit M2): complete lines are drained above, so whatever
+  // remains is ONE partial line — cap it instead of growing without
+  // bound if the peer streams newline-free data.
+  if (buffer.length > MAX_STDIN_BUFFER) {
+    process.stderr.write(
+      `[sunday-exthost] stdin buffer exceeded ${MAX_STDIN_BUFFER} bytes without a newline — dropping partial line\n`,
+    );
+    buffer = '';
   }
 });
 process.stdin.on('end', () => process.exit(0));

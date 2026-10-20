@@ -22,6 +22,9 @@ const pending = new Map<number | string, PendingRpc>();
 let spawnAttempts: number[] = [];
 let stdinBuffer = '';
 
+/** Cap on a single newline-free partial line from the host (audit M2). */
+const MAX_HOST_BUFFER = 16 * 1024 * 1024;
+
 function hostBin(): string {
   return path.resolve(__dirname, 'exthost.cjs');
 }
@@ -88,6 +91,16 @@ function onHostData(chunk: Buffer): void {
         },
       );
     }
+  }
+  // SAFETY (audit M2): complete lines are drained above, so whatever
+  // remains is ONE partial line. An extension writing raw newline-free
+  // bytes to the host's stdout in a loop would otherwise grow this
+  // buffer without bound — drop it instead of eating main-process RAM.
+  if (stdinBuffer.length > MAX_HOST_BUFFER) {
+    console.error(
+      `[sunday] extension-host RPC buffer exceeded ${MAX_HOST_BUFFER} bytes without a newline — dropping partial line`,
+    );
+    stdinBuffer = '';
   }
 }
 

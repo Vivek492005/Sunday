@@ -135,4 +135,21 @@ describe('extensionHostManager (fake host)', () => {
     expect(spawnMock).toHaveBeenCalledTimes(5);
     vi.useRealTimers();
   });
+
+  it('drops an over-cap newline-free flood instead of poisoning the channel (audit M2)', async () => {
+    // Runs against the healthy host spawned by the previous test.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // 17MB with no newline (an extension spewing raw bytes to the
+      // host's stdout): pre-fix this stayed in stdinBuffer forever and
+      // glued itself to the next response line, making it unparseable —
+      // the ping below would time out instead of resolving.
+      procs[4].stdout.emit('data', Buffer.alloc(17 * 1024 * 1024, 0x78));
+      const pong = await extHostRpc('extHost/ping', {}, 2000);
+      expect(pong).toBe('pong');
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('RPC buffer exceeded'));
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
 });
