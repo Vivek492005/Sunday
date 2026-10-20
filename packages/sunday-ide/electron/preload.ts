@@ -912,6 +912,22 @@ const api: SundayAPI = {
 
 contextBridge.exposeInMainWorld('sunday', api);
 
+// Mission mutations in the main process push 'sunday:missions:changed';
+// relay it as the DOM event MissionControl listens for.
+ipcRenderer.on('sunday:missions:changed', () => {
+  try {
+    const g = globalThis as unknown as {
+      dispatchEvent?: (event: unknown) => boolean;
+      CustomEvent?: new (type: string, init?: { detail?: unknown }) => unknown;
+    };
+    if (typeof g.dispatchEvent === 'function' && typeof g.CustomEvent === 'function') {
+      g.dispatchEvent(new g.CustomEvent('sunday:missions:changed'));
+    }
+  } catch {
+    // No DOM (shouldn't happen in the renderer preload) — ignore.
+  }
+});
+
 // Main-process startup update check pushes 'sunday:update:available';
 // re-broadcast it as the DOM event the status-bar pill listens for.
 // (The preload shares the page's DOM at runtime; the electron tsconfig

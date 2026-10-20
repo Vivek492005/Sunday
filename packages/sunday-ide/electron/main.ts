@@ -224,13 +224,34 @@ ipcMain.handle('sunday:account:sign-out', async () => {
 });
 ipcMain.handle('sunday:account:quota', async () => getAccountQuota(accountDeps));
 
+/** Notify the renderer that mission state changed (preload relays this
+ *  to the 'sunday:missions:changed' DOM event MissionControl listens to;
+ *  the component ALSO polls while runs are in flight). */
+function broadcastMissionsChanged(): void {
+  mainWindow?.webContents.send('sunday:missions:changed');
+}
+
 ipcMain.handle('sunday:missions:list', async () => listMissions());
-ipcMain.handle('sunday:missions:create', async (_e, input: CreateMissionInput) =>
-  createMission(input),
-);
-ipcMain.handle('sunday:missions:start', async (_e, id: string) => startMission(id));
-ipcMain.handle('sunday:missions:refresh', async (_e, id: string) => refreshMission(id));
-ipcMain.handle('sunday:missions:stop', async (_e, id: string) => stopMission(id));
+ipcMain.handle('sunday:missions:create', async (_e, input: CreateMissionInput) => {
+  const m = await createMission(input);
+  broadcastMissionsChanged();
+  return m;
+});
+ipcMain.handle('sunday:missions:start', async (_e, id: string) => {
+  const m = await startMission(id);
+  broadcastMissionsChanged();
+  return m;
+});
+ipcMain.handle('sunday:missions:refresh', async (_e, id: string) => {
+  const m = await refreshMission(id);
+  broadcastMissionsChanged();
+  return m;
+});
+ipcMain.handle('sunday:missions:stop', async (_e, id: string) => {
+  const m = await stopMission(id);
+  broadcastMissionsChanged();
+  return m;
+});
 
 ipcMain.handle('sunday:memory:list', async (_e, limit?: number) => listMemories(limit));
 ipcMain.handle('sunday:memory:search', async (_e, query: string, limit?: number) =>
