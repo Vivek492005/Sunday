@@ -325,10 +325,29 @@ ipcMain.handle('sunday:fs:readDir', async (_e, dirPath: string): Promise<FsEntry
 ipcMain.handle(
   'sunday:fs:readFile',
   async (_e, filePath: string): Promise<{ content: string; isBinary: boolean; truncated?: boolean }> => {
-    // SAFETY: never load a giant file fully into the renderer — 10MB cap.
+    // SAFETY: never load a giant file fully into memory — 10MB cap,
+    // enforced on the READ itself. (Audit H1: the old code buffered the
+    // ENTIRE file and only then sliced to 10MB — clicking a 1-2GB log /
+    // CSV / database dump in the Explorer OOM-killed the main process.)
+    // Stat first, then a bounded ranged read of at most MAX bytes.
     const st = await fs.stat(filePath);
     const MAX = 10 * 1024 * 1024;
-    const buf = st.size > MAX ? (await fs.readFile(filePath)).subarray(0, MAX) : await fs.readFile(filePath);
+    const want = Math.min(st.size, MAX);
+    let buf = Buffer.alloc(want);
+    if (want > 0) {
+      const fh = await fs.open(filePath, 'r');
+      try {
+        let off = 0;
+        while (off < want) {
+          const { bytesRead } = await fh.read(buf, off, want - off, off);
+          if (bytesRead === 0) break; // file shrank mid-read
+          off += bytesRead;
+        }
+        buf = buf.subarray(0, off);
+      } finally {
+        await fh.close();
+      }
+    }
     const head = buf.subarray(0, 8192);
     if (head.includes(0)) return { content: '', isBinary: true };
     return { content: buf.toString('utf-8'), isBinary: false, truncated: st.size > MAX };
