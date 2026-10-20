@@ -46,12 +46,31 @@ export function removeChatEventHandler(h: ChatEventHandler): void {
   chatEventHandlers.delete(h);
 }
 
+/** Generic daemon-notification handlers, keyed by JSON-RPC method name. */
+export type NotificationHandler = (params: unknown) => void;
+const notificationHandlers = new Map<string, Set<NotificationHandler>>();
+
+export function addNotificationHandler(method: string, h: NotificationHandler): void {
+  let set = notificationHandlers.get(method);
+  if (!set) {
+    set = new Set();
+    notificationHandlers.set(method, set);
+  }
+  set.add(h);
+}
+
+export function removeNotificationHandler(method: string, h: NotificationHandler): void {
+  notificationHandlers.get(method)?.delete(h);
+}
+
 function dispatchDaemonNotification(method: string, params: unknown): void {
   if (method === 'chat/event') {
     const p = params as { event?: { type: string; [k: string]: unknown } };
     const ev = p.event;
     if (ev) for (const h of chatEventHandlers) h(ev);
   }
+  const generic = notificationHandlers.get(method);
+  if (generic) for (const h of generic) h(params);
 }
 
 function onDaemonData(chunk: Buffer): void {
