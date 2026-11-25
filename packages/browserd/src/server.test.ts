@@ -7,6 +7,17 @@ import { ErrorCode } from '@sunday/protocol';
 import { BrowserdServer, type BrowserdConfig } from './server.js';
 import { FakeDriver, type FakePage } from './fake-driver.js';
 
+// M8-recording note (Privacy M8, takeover observation): when the user takes
+// over, the server finalizes the in-progress recording segment
+// (video.webm / trace.zip stay in <mediaBaseDir>/<sessionId>/media —
+// nothing already captured is discarded) and resumes on release into a
+// fresh subdir <media>/takeover-<n>/, so the resumed segment can never
+// overwrite the pre-takeover files. Only the latest segment's paths are
+// returned by browser/recording/stop; earlier segments stay on disk.
+// An explicit browser/recording/stop during the pause reports the paused
+// segment and cancels the auto-resume. See the "M8-recording" describe
+// block below and the matching comments in server.ts.
+
 interface Frame {
   jsonrpc: string;
   id?: number;
@@ -20,6 +31,8 @@ interface Harness {
   call(method: string, params?: unknown): Promise<Frame>;
   /** Inbound notifications (no id), e.g. browser/screencastFrame. */
   notifications: Frame[];
+  /** The injected fake driver (test hook) — undefined before first use. */
+  driver(): FakeDriver | undefined;
 }
 
 const harnesses: Array<{ input: PassThrough }> = [];
@@ -70,6 +83,7 @@ async function makeHarness(pages: FakePage[] = [dashboardPage()], config: Browse
   let nextId = 1;
   return {
     notifications,
+    driver: () => server.getDriver() as FakeDriver | undefined,
     async call(method: string, params: unknown = {}): Promise<Frame> {
       const id = nextId++;
       input.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
@@ -353,5 +367,75 @@ describe('P1-6: takeover pauses screencast', () => {
     await new Promise((r) => setTimeout(r, 800));
     const frames = h.notifications.filter((n) => n.method === 'browser/screencastFrame').length;
     expect(frames).toBe(0);
+  });
+});
+
+describe('M8-recording: takeover pauses recording', () => {
+  it('stops recording on takeover, resumes on release into a fresh segment', async () => {
+    const mediaBase = await mkdtemp(join(tmpdir(), 'browserd-media-'));
+    const h = await makeHarness([dashboardPage()], { mediaBaseDir: mediaBase, sessionId: 'sess-1' });
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+
+    expect((await h.call('browser/recording/start', { video: true, trace: true })).result).toEqual({
+      ok: true,
+    });
+    const mediaDir = join(mediaBase, 'sess-1', 'media');
+    expect((await stat(join(mediaDir, 'video.webm'))).isFile()).toBe(true);
+    expect((await stat(join(mediaDir, 'trace.zip'))).isFile()).toBe(true);
+    expect(h.driver()?.isRecording).toBe(true);
+
+    // Takeover pauses the driver recording.
+    expect((await h.call('browser/takeover')).result).toEqual({ ok: true, control: 'user' });
+    expect(h.driver()?.isRecording).toBe(false);
+
+    // Release resumes into a fresh segment subdir; pre-takeover files intact.
+    expect((await h.call('browser/release')).result).toEqual({ ok: true, control: 'agent' });
+    expect(h.driver()?.isRecording).toBe(true);
+    const segmentDir = join(mediaDir, 'takeover-1');
+    expect((await stat(join(segmentDir, 'video.webm'))).isFile()).toBe(true);
+    expect((await stat(join(segmentDir, 'trace.zip'))).isFile()).toBe(true);
+    expect((await stat(join(mediaDir, 'video.webm'))).isFile()).toBe(true);
+    expect((await stat(join(mediaDir, 'trace.zip'))).isFile()).toBe(true);
+
+    // Final stop returns the resumed segment's paths.
+    const stopped = await h.call('browser/recording/stop');
+    expect(stopped.result.ok).toBe(true);
+    expect(stopped.result.videoPath).toBe(join(segmentDir, 'video.webm'));
+    expect(stopped.result.tracePath).toBe(join(segmentDir, 'trace.zip'));
+  });
+
+  it('takeover without recording does not start it on release', async () => {
+    const h = await makeHarness();
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+    expect(h.driver()?.isRecording).toBe(false);
+
+    await h.call('browser/takeover');
+    expect(h.driver()?.isRecording).toBe(false);
+    await h.call('browser/release');
+    expect(h.driver()?.isRecording).toBe(false);
+  });
+
+  it('recording/start is blocked during takeover; stop during the pause reports the paused segment and cancels resume', async () => {
+    const mediaBase = await mkdtemp(join(tmpdir(), 'browserd-media-'));
+    const h = await makeHarness([dashboardPage()], { mediaBaseDir: mediaBase, sessionId: 'sess-1' });
+    await h.call('browser/open', { url: 'http://localhost:3000/' });
+    await h.call('browser/recording/start', { video: true, trace: true });
+    const mediaDir = join(mediaBase, 'sess-1', 'media');
+
+    await h.call('browser/takeover');
+    // Starting (new) capture during takeover is blocked — it would defeat
+    // the M8 pause.
+    const blocked = await h.call('browser/recording/start', { video: true });
+    expect(blocked.error?.code).toBe(ErrorCode.BrowserTakeover);
+
+    // Stopping during the pause reports the pre-takeover segment.
+    const stopped = await h.call('browser/recording/stop');
+    expect(stopped.result.ok).toBe(true);
+    expect(stopped.result.videoPath).toBe(join(mediaDir, 'video.webm'));
+    expect(stopped.result.tracePath).toBe(join(mediaDir, 'trace.zip'));
+
+    // Release must NOT resume after the explicit stop.
+    await h.call('browser/release');
+    expect(h.driver()?.isRecording).toBe(false);
   });
 });

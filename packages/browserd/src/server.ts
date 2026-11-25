@@ -15,7 +15,7 @@ import {
   type VerifyCheckResult,
   type ViewportSpec,
 } from '@sunday/protocol';
-import { DriverError, type Driver, type OpenResult } from './driver.js';
+import { DriverError, type Driver, type OpenResult, type RecordingStopResult } from './driver.js';
 import { PlaywrightDriver } from './playwright-driver.js';
 import { BrowserPolicy, BrowserPolicyError, type BrowserPolicyOptions } from './policy.js';
 import { BrowserRpcError, BrowserTransport } from './transport.js';
@@ -60,6 +60,10 @@ const SCREENCAST_PUSH_MS = 500;
  * Agent ACTION RPCs — blocked with ErrorCode.BrowserTakeover while the user
  * has taken over the browser. Observation RPCs (snapshot/console/network/
  * screenshot/verify_ui/frame) stay allowed so the agent can keep watching.
+ * browser/recording/start is blocked too: starting capture during takeover
+ * would defeat the M8 recording pause (the agent must not capture the
+ * user's own browsing). browser/recording/stop stays allowed — ending
+ * capture is always safe.
  */
 const TAKEOVER_BLOCKED_METHODS: ReadonlySet<string> = new Set([
   'browser/open',
@@ -69,6 +73,7 @@ const TAKEOVER_BLOCKED_METHODS: ReadonlySet<string> = new Set([
   'browser/scroll',
   'browser/wait',
   'browser/eval',
+  'browser/recording/start',
 ]);
 
 function sleep(ms: number): Promise<void> {
@@ -146,6 +151,21 @@ export class BrowserdServer {
   private readonly sessionId: string;
   private readonly mediaBaseDir: string;
   private recordingDir: string | undefined;
+  /**
+   * M8-recording: flags of the live (or takeover-paused) recording, so a
+   * resume restarts the same kinds (video/trace) the user started.
+   */
+  private recordingOpts: { video: boolean; trace: boolean } | undefined;
+  /** M8-recording: a recording was in progress when the user took over. */
+  private recordingWasRunning = false;
+  /**
+   * M8-recording: artifacts finalized when takeover paused the recording
+   * (video.webm / trace.zip of the pre-takeover segment). Kept so an
+   * explicit browser/recording/stop during the pause still reports them.
+   */
+  private recordingPausedResult: RecordingStopResult | undefined;
+  /** M8-recording: resumed-segment counter (unique takeover-<n> subdirs). */
+  private recordingSegments = 0;
 
   constructor(config: BrowserdConfig = {}) {
     this.policy = new BrowserPolicy({ approvedDomains: config.approvedDomains });
@@ -320,8 +340,18 @@ export class BrowserdServer {
       }
       case 'browser/recording/stop': {
         parseBrowser(name, params);
-        const r = await this.ensureDriver().stopRecording();
+        // M8-recording: if takeover paused the recording, the pre-takeover
+        // segment was already finalized then — report its artifacts instead
+        // of the driver's empty "nothing recording" result.
+        const r =
+          this.recordingWasRunning && this.recordingPausedResult
+            ? this.recordingPausedResult
+            : await this.ensureDriver().stopRecording();
         this.recordingDir = undefined;
+        this.recordingOpts = undefined;
+        // An explicit stop cancels the takeover auto-resume.
+        this.recordingWasRunning = false;
+        this.recordingPausedResult = undefined;
         return {
           ok: true as const,
           ...(r.videoPath ? { videoPath: r.videoPath } : {}),
@@ -343,6 +373,21 @@ export class BrowserdServer {
             // driver may not be open; state flags are what matter
           }
         }
+        // M8-recording: pause recording the same way. stopRecording
+        // FINALIZES the in-progress segment — video.webm / trace.zip are
+        // written into the media dir, so nothing already captured is
+        // discarded. Auto-resume on release (into a fresh segment subdir)
+        // if a recording was running.
+        this.recordingWasRunning = this.recordingDir !== undefined;
+        if (this.recordingWasRunning) {
+          try {
+            this.recordingPausedResult = await this.ensureDriver().stopRecording();
+          } catch {
+            // driver may not be open; state flags are what matter
+            this.recordingPausedResult = undefined;
+          }
+          this.recordingDir = undefined;
+        }
         this.lastFrame = null; // don't serve stale pre-takeover frames
         return { ok: true as const, control: 'user' as const };
       }
@@ -357,6 +402,26 @@ export class BrowserdServer {
             this.screencastRunning = true;
           } catch {
             // resume is best-effort
+          }
+        }
+        // M8-recording: resume recording if it was running before takeover.
+        // The resumed segment goes into its own subdir
+        // (<media>/takeover-<n>/) so it can never overwrite the
+        // pre-takeover video.webm / trace.zip. Only the latest segment's
+        // paths are returned by browser/recording/stop; earlier segments
+        // stay on disk under the session media dir.
+        if (this.recordingWasRunning) {
+          this.recordingWasRunning = false;
+          this.recordingPausedResult = undefined;
+          const opts = this.recordingOpts;
+          if (opts) {
+            try {
+              this.recordingSegments += 1;
+              const dir = join(this.sessionMediaDir(), `takeover-${this.recordingSegments}`);
+              await this.startRecordingMedia(opts.video, opts.trace, dir);
+            } catch {
+              // resume is best-effort
+            }
           }
         }
         return { ok: true as const, control: 'agent' as const };
@@ -395,18 +460,25 @@ export class BrowserdServer {
     });
   }
 
+  /** Session media dir: <mediaBaseDir>/<sessionId>/media. */
+  private sessionMediaDir(): string {
+    return join(this.mediaBaseDir, this.sessionId, 'media');
+  }
+
   /**
-   * Start recording into the session media dir:
-   * <mediaBaseDir>/<sessionId>/media (video.webm / trace.zip).
+   * Start recording into `dir` (default: the session media dir).
+   * M8-recording: resumed segments pass their own takeover-<n> subdir so
+   * they never overwrite an earlier segment's video.webm / trace.zip.
    */
-  private async startRecordingMedia(video: boolean, trace: boolean): Promise<string> {
-    const dir = join(this.mediaBaseDir, this.sessionId, 'media');
+  private async startRecordingMedia(video: boolean, trace: boolean, dir?: string): Promise<string> {
+    const target = dir ?? this.sessionMediaDir();
     // Owner-only (0700): recordings (video.webm, trace.zip) capture page
     // content including form input values; the Chromium profile holds cookies.
-    await mkdir(dir, { recursive: true, mode: 0o700 });
-    await this.ensureDriver().startRecording({ video, trace, dir });
-    this.recordingDir = dir;
-    return dir;
+    await mkdir(target, { recursive: true, mode: 0o700 });
+    await this.ensureDriver().startRecording({ video, trace, dir: target });
+    this.recordingDir = target;
+    this.recordingOpts = { video, trace };
+    return target;
   }
 
   /**

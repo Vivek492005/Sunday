@@ -218,10 +218,12 @@ export class PlaywrightDriver implements Driver {
   }
 
   /**
-   * Relaunch the persistent context with video recording enabled. The profile
-   * (cookies, storage) survives; the open page is restored from lastUrl.
+   * Relaunch the persistent context, with video recording iff videoDir is
+   * set (recordVideo is a context-launch option, so enabling or disabling
+   * video mid-session requires a relaunch). The profile (cookies, storage)
+   * survives; the open page is restored from lastUrl.
    */
-  private async relaunchWithVideo(): Promise<void> {
+  private async relaunchContext(): Promise<void> {
     const url = this.lastUrl;
     await this.stopScreencast().catch(() => undefined);
     await this.ctx?.close().catch(() => undefined);
@@ -420,7 +422,7 @@ export class PlaywrightDriver implements Driver {
       // recordVideo is a context-launch option: relaunch when the live
       // context wasn't started with it.
       await this.ensureLaunched();
-      if (!this.videoActive) await this.relaunchWithVideo();
+      if (!this.videoActive) await this.relaunchContext();
     }
     if (trace && !this.tracingActive) {
       await this.ensureLaunched();
@@ -453,6 +455,18 @@ export class PlaywrightDriver implements Driver {
       }
     }
     this.recordingDir = undefined;
+    // M8-recording: recordVideo is a context-launch option, so the context
+    // keeps capturing video until it is relaunched — merely finalizing the
+    // segment above does NOT stop capture. Stop means stop: relaunch
+    // without recordVideo so nothing more is recorded (the takeover pause
+    // relies on this; a later startRecording relaunches with video again).
+    // Without this, a stop followed by startRecording into a new dir would
+    // also keep recording video into the OLD dir.
+    if (this.videoActive) {
+      this.videoDir = undefined;
+      this.videoActive = false;
+      await this.relaunchContext().catch(() => undefined);
+    }
     return out;
   }
 

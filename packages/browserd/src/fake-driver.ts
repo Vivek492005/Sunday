@@ -109,6 +109,11 @@ export class FakeDriver implements Driver {
     return this.closedFlag;
   }
 
+  /** Test hook: whether a recording is currently running in the driver. */
+  get isRecording(): boolean {
+    return this.recording !== undefined;
+  }
+
   /** Test hook: reach into the fake DOM. */
   pageFor(url: string): FakePage | undefined {
     return this.pages.get(url);
