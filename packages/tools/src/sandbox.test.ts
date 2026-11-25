@@ -59,17 +59,30 @@ describe('buildBwrapCommand', () => {
     const built = buildBwrapCommand('make build', '/home/u/proj');
     expect(built.cmd).toBe('bwrap');
     const a = built.argv;
+    // --unshare-user first: without a fresh user namespace the caller has
+    // no CAP_SYS_ADMIN to create the network namespace (loopback setup
+    // fails with "Failed RTM_NEWADDR" on unprivileged hosts).
+    expect(a).toContain('--unshare-user');
+    expect(a.indexOf('--unshare-user')).toBeLessThan(a.indexOf('--unshare-net'));
     expect(a).toContain('--unshare-net');
     expect(a).toContain('--die-with-parent');
-    // Host root read-only, workspace writable at /work:
-    const roIdx = a.indexOf('--ro-bind');
-    expect(a.slice(roIdx, roIdx + 3)).toEqual(['--ro-bind', '/', '/']);
+    // Host toolchain/config read-only (the root itself is NOT bound: after
+    // --ro-bind / / nothing can create the /work mountpoint). /home and
+    // /root are deliberately not bound — no user secrets in the sandbox.
+    for (const dir of ['/usr', '/etc', '/bin', '/sbin', '/lib', '/lib64', '/opt', '/run']) {
+      expect(a).toContain(dir);
+    }
+    expect(a).not.toContain('/home');
+    expect(a).not.toContain('/root');
     expect(a).toContain('--proc');
     expect(a).toContain('--dev');
     // --dir /work must precede --bind (bwrap won't create the mountpoint):
     expect(a.indexOf('--dir')).toBeLessThan(a.indexOf('--bind'));
     const bindIdx = a.indexOf('--bind');
     expect(a.slice(bindIdx, bindIdx + 3)).toEqual(['--bind', '/home/u/proj', SANDBOX_WORKDIR]);
+    // --tmpfs /tmp must come AFTER the --bind: workspaces often live under
+    // /tmp (eval temp dirs) and over-mounting it first would hide the source.
+    expect(a.indexOf('--bind')).toBeLessThan(a.indexOf('--tmpfs'));
     expect(a.slice(-3)).toEqual(['sh', '-c', 'make build']);
     expect(a).toContain('--chdir');
   });

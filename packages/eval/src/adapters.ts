@@ -10,8 +10,9 @@ import { createInterface } from 'node:readline';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROTOCOL_VERSION } from '@sunday/protocol';
-import { createDefaultRegistry, type Tool, type ToolContext } from '@sunday/tools';
+import { createDefaultRegistry, SANDBOX_OFF, type SandboxConfig, type Tool, type ToolContext } from '@sunday/tools';
 import type { BaselineUsage, EvalTask, ExecutedCall, ModelAdapter, ScoreMetadata, ScriptStep } from './types.js';
+import { assertSandboxAvailable } from './sandboxOption.js';
 
 /** Token usage harvested from `usage` chat events during one task. */
 export type { BaselineUsage };
@@ -148,9 +149,27 @@ function browserStubTools(): Tool[] {
   return [browserOpen, browserSnapshot, browserConsole, browserVerifyUi, browserWalkthrough];
 }
 
+/** Options for FakeModelAdapter. */
+export interface FakeModelAdapterOptions {
+  /**
+   * Sandbox config for `run_terminal` in task scripts. Default 'off' =
+   * host execution (current behavior, unchanged). Pass a bubblewrap/docker
+   * config to run task shell commands sandboxed (F12); the constructor
+   * throws when the requested backend is unavailable — fail fast, never
+   * silently unsandboxed.
+   */
+  sandbox?: SandboxConfig;
+}
+
 /** Execute scripted steps against the real tools; record every call. */
 export class FakeModelAdapter implements ModelAdapter {
   readonly name = 'fake-scripted';
+  private readonly sandbox: SandboxConfig;
+
+  constructor(opts: FakeModelAdapterOptions = {}) {
+    this.sandbox = opts.sandbox ?? SANDBOX_OFF;
+    assertSandboxAvailable(this.sandbox);
+  }
 
   /**
    * F12: the scripted adapter consumes one gateway request per tool call
@@ -168,7 +187,13 @@ export class FakeModelAdapter implements ModelAdapter {
     for (const step of task.script) {
       if (step.kind === 'answer') continue;
       const started = Date.now();
-      const result = await registry.call(step.tool, step.args, { cwd: workspaceRoot });
+      // F12: stamp the sandbox config onto the tool context so run_terminal
+      // executes inside the sandbox when one is configured; with mode 'off'
+      // this is exactly the previous host-execution behavior.
+      const result = await registry.call(step.tool, step.args, {
+        cwd: workspaceRoot,
+        sandbox: this.sandbox,
+      });
       transcript.push({
         tool: step.tool,
         args: step.args,

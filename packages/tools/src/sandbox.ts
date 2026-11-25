@@ -248,29 +248,69 @@ export function buildDockerCommand(
   };
 }
 
-/** bwrap with an unshared network namespace, the host root mounted
- *  read-only, and only the workspace writable. `--dir /work` must precede
- *  `--bind` (bwrap does not create the mountpoint itself). */
+/** bwrap with a fresh user namespace, an unshared network namespace, the
+ *  host toolchain/config read-only, and only the workspace writable.
+ *  `--unshare-user` must come first: creating a network namespace needs
+ *  CAP_SYS_ADMIN, which an unprivileged caller only holds inside a fresh
+ *  user namespace — without it `--unshare-net` fails at loopback setup
+ *  ("Failed RTM_NEWADDR") on machines like this VM.
+ *
+ *  The host root itself is NOT bound: after `--ro-bind / /` nothing can
+ *  create the /work mountpoint (mkdir fails on the read-only root), and
+ *  creating it first is undone when the bind hides it — so the standard
+ *  top-level dirs are bound read-only instead (/usr, /etc, /bin, /sbin,
+ *  /lib, /lib64, /opt, /run: toolchain, shell, dynamic linker, system
+ *  config, CA bundle). `/home` and `/root` are deliberately NOT bound:
+ *  sandboxed code must not read the user's secrets (SSH keys, tokens).
+ *  `--dir /work` must precede `--bind` (bwrap does not create the
+ *  mountpoint itself), and `--tmpfs /tmp` must come after the `--bind`
+ *  (workspaces often live under /tmp; over-mounting it first would hide
+ *  the bind source). */
 export function buildBwrapCommand(command: string, workspace: string): BuiltSandboxCommand {
   return {
     cmd: 'bwrap',
     argv: [
+      '--unshare-user',
       '--unshare-net',
       '--die-with-parent',
       '--ro-bind',
-      '/',
-      '/',
+      '/usr',
+      '/usr',
+      '--ro-bind',
+      '/etc',
+      '/etc',
+      '--ro-bind',
+      '/bin',
+      '/bin',
+      '--ro-bind',
+      '/sbin',
+      '/sbin',
+      '--ro-bind',
+      '/lib',
+      '/lib',
+      '--ro-bind',
+      '/lib64',
+      '/lib64',
+      '--ro-bind',
+      '/opt',
+      '/opt',
+      '--ro-bind',
+      '/run',
+      '/run',
       '--dev',
       '/dev',
       '--proc',
       '/proc',
-      '--tmpfs',
-      '/tmp',
       '--dir',
       SANDBOX_WORKDIR,
       '--bind',
       workspace,
       SANDBOX_WORKDIR,
+      // --tmpfs /tmp AFTER the --bind: workspaces often live under /tmp
+      // (eval temp dirs), and over-mounting /tmp first would hide the
+      // bind source. The /work bind survives — it is its own mountpoint.
+      '--tmpfs',
+      '/tmp',
       '--chdir',
       SANDBOX_WORKDIR,
       'sh',

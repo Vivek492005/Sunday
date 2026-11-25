@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // sunday-eval CLI: run the benchmark harness.
 //
-//   sunday-eval run [--live] [--tasks a,b] [--out dir]
+//   sunday-eval run [--live] [--tasks a,b] [--out dir] [--sandbox off|docker|bubblewrap] [--sandbox-image <image>]
 //   sunday-eval scoreboard --runs <dir> --out <markdown> [--feed <json>]
 //
 // Default uses the scripted fake adapter (no API keys). --live drives a real
@@ -14,6 +14,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { FakeModelAdapter, SundaydAdapter, isLiveRequested } from './adapters.js';
+import { parseSandboxOption } from './sandboxOption.js';
 import { runBenchmark } from './runner.js';
 import { TASKS } from './tasks.js';
 import { TASK_PACK_VERSION } from './types.js';
@@ -37,9 +38,15 @@ function flag(name: string): string | undefined {
 
 function usage(): void {
   console.log('usage:');
-  console.log('  sunday-eval run [--live] [--tasks id1,id2] [--out dir]');
+  console.log('  sunday-eval run [--live] [--tasks id1,id2] [--out dir] [--sandbox off|docker|bubblewrap] [--sandbox-image <image>]');
   console.log('  sunday-eval scoreboard --runs <dir> --out <markdown> [--feed <json>]');
   console.log(`available tasks: ${TASKS.map((t) => t.id).join(', ')}`);
+  console.log('');
+  console.log('sandbox (F12): eval task scripts are dev-authored; by default their');
+  console.log('run_terminal calls execute UNSANDBOXED on the host. Contributed or');
+  console.log('untrusted tasks MUST run sandboxed (--sandbox bubblewrap on Linux,');
+  console.log('or --sandbox docker with a toolchain image) or be reviewed first.');
+  console.log('Only run_terminal is sandboxed; --live runs use the daemon config.');
 }
 
 interface StoredTask {
@@ -161,13 +168,22 @@ async function main(): Promise<void> {
     process.exit(cmd ? 1 : 0);
   }
   const live = flag('--live') !== undefined || isLiveRequested();
+  // F12: --sandbox docker|bubblewrap|off (default off). Invalid mode or a
+  // missing backend fails fast here, before any task runs — never silently
+  // unsandboxed. Live runs use the daemon's sunday.sandbox.* config, so
+  // --sandbox does not apply to them.
+  const sandbox = parseSandboxOption(rest);
+  if (live && sandbox.mode !== 'off') {
+    console.error('--sandbox applies to the scripted fake adapter only; live runs use the daemon\'s sunday.sandbox.* config');
+    process.exit(1);
+  }
   const adapter = live
     ? new SundaydAdapter(new URL('../../sundayd/dist/cli.js', import.meta.url).pathname)
-    : new FakeModelAdapter();
+    : new FakeModelAdapter({ sandbox });
   const tasks = flag('--tasks')?.split(',').map((s) => s.trim()).filter(Boolean);
   const outDir = flag('--out');
   const report = await runBenchmark(adapter, { tasks, outDir });
-  console.log(`\n${report.passed}/${report.total} passed · mean tool reliability ${(report.meanToolReliability * 100).toFixed(1)}%`);
+  console.log(`\n${report.passed}/${report.total} passed · mean tool reliability ${(report.meanToolReliability * 100).toFixed(1)}% · sandbox: ${sandbox.mode}`);
   if (report.passed < report.total) process.exitCode = 1;
 }
 

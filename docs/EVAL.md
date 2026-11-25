@@ -10,7 +10,7 @@ resulting workspace.
 
 ```sh
 pnpm --filter @sunday/eval eval
-# or: node packages/eval/dist/cli.js run [--live] [--tasks id1,id2] [--out dir]
+# or: node packages/eval/dist/cli.js run [--live] [--tasks id1,id2] [--out dir] [--sandbox off|docker|bubblewrap]
 ```
 
 Default uses the **scripted fake adapter**: it replays each task's scripted
@@ -20,6 +20,43 @@ tasks additionally assert against the real planner (`validatePlanUnits`) and
 policy module (`BrowserPolicy`).
 
 Output: `eval-results/<timestamp>/report.json` + `RESULTS.md`.
+
+## Sandboxing eval runs (F12)
+
+**Trust requirement — read before adding or running a task.** Eval tasks are
+dev-authored scripts, and by default their `run_terminal` calls execute
+**unsandboxed on the host** (mode `off`). A scripted `run_terminal` step can
+run anything the host user can — `rm -rf`, exfiltration, a fork bomb. Our own
+tasks are reviewed code in this repo, so the default is acceptable for them.
+**Contributed or otherwise untrusted tasks MUST run sandboxed or be reviewed
+before running.** Never run a task pack from an untrusted source with the
+default.
+
+```sh
+# Linux: bubblewrap (uses the host toolchain via a read-only root bind)
+node packages/eval/dist/cli.js run --sandbox bubblewrap
+
+# Docker: needs an image WITH a toolchain — the default alpine:latest has
+# no node, so tasks that shell out to node fail there. Point at an image
+# that has what the tasks need:
+node packages/eval/dist/cli.js run --sandbox docker --sandbox-image node:22-alpine
+```
+
+- `--sandbox off|docker|bubblewrap` (default `off` — current behavior,
+  unchanged). An unknown mode, or a requested backend that is not
+  installed (`docker` CLI missing, `bwrap` missing, bubblewrap on
+  non-Linux), **fails fast**: the CLI exits 1 with a clear error before
+  any task runs — a missing backend never degrades to unsandboxed
+  execution.
+- **Scope: only `run_terminal` is sandboxed.** The file/git/search tools
+  in a task script still run on the host, in the task's temp workspace.
+  Sandboxing confines shell commands, not the whole harness.
+- `--live` runs do not take `--sandbox`; the daemon applies its own
+  `sunday.sandbox.*` config there.
+- Verified on this VM: bubblewrap 0.9.0 (`--sandbox bubblewrap` runs the
+  `terminal-run` task and returns `42` from inside the sandbox; the
+  sandbox `/tmp` is isolated from the host). Docker is not installed here,
+  so docker-mode runs need a machine with Docker.
 
 ## Live-model mode
 
