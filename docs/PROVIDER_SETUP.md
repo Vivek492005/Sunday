@@ -65,6 +65,37 @@ settings):
 Free-tier availability changes over time; the router surfaces provider
 4xx/429 visibly (§10.6 of the design doc) instead of failing silently.
 
+## Free models on OpenRouter (no prepaid credit needed)
+
+With just an `OPENROUTER_API_KEY` (no credits), these 12 models are
+selectable in the Sunday chat model picker. Verified against
+<https://openrouter.ai/api/v1/models> on **2026-11-25** (prompt price $0);
+the free set rotates, so a listed model can stop being free — the router
+will surface that as a visible provider error, not a silent failure.
+Rate limits on free models are stricter than on paid ones. Tool use is
+not advertised for these (unverified on the free tier); plain chat works.
+
+| Model | Context | Notes |
+|---|---|---|
+| `openrouter/free` | 200K | Auto-picks a free model for each request |
+| `google/gemma-4-31b-it:free` | 262K | General chat, good all-rounder |
+| `google/gemma-4-26b-a4b-it:free` | 262K | General chat |
+| `nvidia/nemotron-3.5-lightning:free` | 1M | Fast, huge context |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | 256K | Reasoning model |
+| `nvidia/nemotron-3-ultra-550b-a55b:free` | 1M | Largest free model |
+| `nvidia/nemotron-3.5-super-vl:free` | 1M | Also understands images |
+| `inclusionai/ling-3.2-flash:free` | 1M | Huge context |
+| `baidu/ernie-5.5-flash-preview:free` | 1M | Huge context |
+| `particle-ai/particle-1:free` | 1M | Huge context |
+| `recursive/flint-v1.0:free` | 262K | General chat |
+| `liquid/lfm-3-1.7b:free` | 262K | Tiny, fastest |
+
+Note: the old `:free` variants of the paid defaults
+(`meta-llama/llama-3.3-70b-instruct:free`,
+`qwen/qwen-2.5-coder-32b-instruct:free`) are **no longer free** as of
+2026-11-25 — a free key will not run them. Pick one of the models above
+instead.
+
 ## Rate limits / 429 behavior
 
 The gateway has a per provider+model sliding-window limiter

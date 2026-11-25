@@ -109,7 +109,7 @@
   "green": 1,
   "total": 11
  },
- "updated": "2026-11-25T13:19:53+00:00",
+ "updated": "2026-11-25T13:35:00+00:00",
  "open_items": [
   {
    "id": "M8-recording",
@@ -145,6 +145,12 @@
    "id": "eval-quota-fairness-flake",
    "status": "note",
    "detail": "NOTE from the 2026-11-25 LONG HARD TEST: eval task parallel-quota-fairness (30ms-window contention vs the real gateway MultiAgentScheduler) failed once as 30/31 under full-suite CPU load (unit-b starved) and passed 9/9 in isolation immediately after (eval suite 52/52). Timing-sensitive, not related to the M8/F12 changes (no shell commands involved). Re-run in isolation if it ever goes red in CI."
+  },
+
+  {
+   "id": "openrouter-free-models",
+   "status": "done",
+   "detail": "DONE 2026-11-25 (unpushed, needs PAT): all 12 live OpenRouter free models added as selectable entries in DEFAULT_OPENROUTER_MODELS (packages/gateway/src/providers.ts) \u2014 openrouter/free auto-router + Gemma 4 26B/31B, Nemotron Lightning/Nano-reasoning/Ultra-550B/Super-VL, Ling 3.2 Flash, Ernie 5.5 Flash, Particle 1, Flint v1.0, LFM 3 1.7B; context windows from the live /v1/models API (prompt price $0). supportsTools=false (unverified on free tier), supportsFim=false; paid defaults stay first, routing defaults unchanged. Picker shows them via daemon models/list (BYOK models pass gateModelList ungated). Docs: docs/PROVIDER_SETUP.md free-models table. Tests: 1 new gateway test; gateway suite 107/107, typecheck clean. NOTE: free set rotates \u2014 old :free variants of llama-3.3-70b/qwen-coder are no longer free (verified 2026-11-25); Lyria audio models excluded (not chat)."
   }
  ]
 }

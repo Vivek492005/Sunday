@@ -113,6 +113,98 @@ const DEFAULT_OPENROUTER_MODELS: ModelEntry[] = [
     // legacy /completions endpoint with `suffix` support.
     supportsFim: true,
   },
+  // Free-tier models (no prepaid credit needed — `OPENROUTER_API_KEY` only).
+  // Verified against https://openrouter.ai/api/v1/models on 2026-11-25
+  // (pricing.prompt == 0). The free set ROTATES over time and the old
+  // `:free` variants of the paid defaults above (llama-3.3-70b, qwen-coder)
+  // are no longer free — when a listed model stops being free the router
+  // surfaces the provider 4xx/429 visibly (§10.6) instead of failing
+  // silently. supportsTools is false throughout: free-tier tool-call
+  // support is unverified — chat works, tool use is not advertised.
+  {
+    id: 'openrouter/free',
+    label: 'OpenRouter Free (auto-picks a free model)',
+    contextWindow: 200000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'baidu/ernie-5.5-flash-preview:free',
+    label: 'Ernie 5.5 Flash (OpenRouter, Free)',
+    contextWindow: 1024000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'recursive/flint-v1.0:free',
+    label: 'Flint v1.0 (OpenRouter, Free)',
+    contextWindow: 262144,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'google/gemma-4-26b-a4b-it:free',
+    label: 'Gemma 4 26B (OpenRouter, Free)',
+    contextWindow: 262144,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'google/gemma-4-31b-it:free',
+    label: 'Gemma 4 31B (OpenRouter, Free)',
+    contextWindow: 262144,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'liquid/lfm-3-1.7b:free',
+    label: 'LFM 3 1.7B (OpenRouter, Free)',
+    contextWindow: 262144,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'inclusionai/ling-3.2-flash:free',
+    label: 'Ling 3.2 Flash (OpenRouter, Free)',
+    contextWindow: 1048576,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'nvidia/nemotron-3.5-lightning:free',
+    label: 'Nemotron 3.5 Lightning (OpenRouter, Free)',
+    contextWindow: 1000000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    label: 'Nemotron 3 Nano Reasoning (OpenRouter, Free)',
+    contextWindow: 256000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    label: 'Nemotron 3 Ultra 550B (OpenRouter, Free)',
+    contextWindow: 1000000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'nvidia/nemotron-3.5-super-vl:free',
+    label: 'Nemotron 3.5 Super VL (OpenRouter, Free)',
+    contextWindow: 1000000,
+    supportsTools: false,
+    supportsFim: false,
+  },
+  {
+    id: 'particle-ai/particle-1:free',
+    label: 'Particle 1 (OpenRouter, Free)',
+    contextWindow: 1048576,
+    supportsTools: false,
+    supportsFim: false,
+  },
 ];
 
 const DEFAULT_GROQ_MODELS: ModelEntry[] = [

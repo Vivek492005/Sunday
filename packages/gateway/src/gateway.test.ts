@@ -72,6 +72,38 @@ describe('registry + router', () => {
     expect(b.provider.id).toBe('sunday'); // zero-config hosted default
     expect(() => router.route({ model: 'nope:x' })).toThrow(/unknown provider/);
   });
+
+  it('lists the OpenRouter free-tier models as selectable entries', async () => {
+    // Free set verified against openrouter.ai/api/v1/models on 2026-11-25
+    // (pricing.prompt == 0). The auto-router entry has no ':free' suffix.
+    const models = await new OpenRouterProvider().listModels();
+    const free = models.filter((m) => m.id.endsWith(':free') || m.id === 'openrouter/free');
+    expect(free.map((m) => m.id).sort()).toEqual(
+      [
+        'baidu/ernie-5.5-flash-preview:free',
+        'google/gemma-4-26b-a4b-it:free',
+        'google/gemma-4-31b-it:free',
+        'inclusionai/ling-3.2-flash:free',
+        'liquid/lfm-3-1.7b:free',
+        'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+        'nvidia/nemotron-3-ultra-550b-a55b:free',
+        'nvidia/nemotron-3.5-lightning:free',
+        'nvidia/nemotron-3.5-super-vl:free',
+        'openrouter/free',
+        'particle-ai/particle-1:free',
+        'recursive/flint-v1.0:free',
+      ].sort(),
+    );
+    for (const m of free) {
+      expect(m.supportsFim).toBe(false);
+      expect(m.supportsTools).toBe(false);
+      expect(m.contextWindow).toBeGreaterThan(0);
+      expect(m.label).toMatch(/Free/);
+    }
+    // Paid defaults stay first — free entries are additive, not replacements.
+    expect(models[0].id).toBe('meta-llama/llama-3.3-70b-instruct');
+    expect(models[1].id).toBe('qwen/qwen-2.5-coder-32b-instruct');
+  });
 });
 
 describe('SSE parsing', () => {
