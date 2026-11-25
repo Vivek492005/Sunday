@@ -81,10 +81,14 @@ const EXPECTED_METHODS = [
   'browser/panel/control',
   'browser/panel/screenshot',
   'browser/panel/close',
+  // Added by F11 (2026-10-21); the test expectation was never updated.
+  'browser/panel/accessibility-scan',
+  'browser/panel/viewport-matrix',
+  'browser/panel/visual-diff',
 ];
 
 describe('registerBrowserPanelMethods', () => {
-  it('registers exactly the eight browser/panel/* methods', () => {
+  it('registers exactly the eleven browser/panel/* methods', () => {
     const { daemon, handlers } = makeDaemon();
     registerBrowserPanelMethods(daemon, makeManager());
     expect([...handlers.keys()].sort()).toEqual([...EXPECTED_METHODS].sort());
@@ -95,7 +99,15 @@ describe('registerBrowserPanelMethods', () => {
     registerBrowserPanelMethods(daemon, makeManager({ isBrowserEnabled: () => false }));
     for (const method of EXPECTED_METHODS) {
       const handler = handlers.get(method)!;
-      const params = method === 'browser/panel/open' ? { url: 'https://example.com' } : {};
+      // open + viewport-matrix + visual-diff validate params before the
+      // enabled check, so they need valid params to reach the disabled
+      // error (same as the pre-existing special-case for open).
+      const params =
+        method === 'browser/panel/open' || method === 'browser/panel/viewport-matrix'
+          ? { url: 'https://example.com' }
+          : method === 'browser/panel/visual-diff'
+            ? { beforePng: 'aGVsbG8=', afterPng: 'd29ybGQ=' }
+            : {};
       await expect(handler(params)).rejects.toMatchObject({
         code: ErrorCode.InvalidParams,
         message: expect.stringContaining('browser is disabled'),

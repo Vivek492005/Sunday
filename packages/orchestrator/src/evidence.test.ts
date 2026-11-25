@@ -1,6 +1,8 @@
 // @sunday/orchestrator — vitest for evidence.ts (F9 Evidence Pack).
 // Pure/static: no check execution, no LLM — heuristics only.
 import { describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
   classifyIntentRelation,
   collectEvidencePack,
@@ -13,6 +15,11 @@ import {
   summarizeEvidencePack,
   withVisualProof,
 } from './evidence.js';
+
+// Package root derived from this file's location — never a hardcoded
+// absolute path (the old '/home/hatch/workspace/...' literal only existed
+// on the author's VM and made this test fail on every CI runner).
+const ORCHESTRATOR_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const SAMPLE_DIFF = `diff --git a/src/auth/session.ts b/src/auth/session.ts
 index 1111111..2222222 100644
@@ -154,7 +161,7 @@ describe('classifyIntentRelation', () => {
 
 describe('detectChecks', () => {
   it('detects npm test/lint/typecheck from package.json', () => {
-    const checks = detectChecks('/home/hatch/workspace/sunday-product/packages/orchestrator');
+    const checks = detectChecks(ORCHESTRATOR_ROOT);
     const kinds = checks.map((c) => c.kind);
     expect(kinds).toContain('test');
     expect(kinds).toContain('typecheck');

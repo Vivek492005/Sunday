@@ -109,7 +109,7 @@
   "green": 1,
   "total": 11
  },
- "updated": "2026-11-25T13:35:00+00:00",
+ "updated": "2026-11-25T13:38:00+00:00",
  "open_items": [
   {
    "id": "M8-recording",
@@ -138,19 +138,23 @@
   },
   {
    "id": "sundayd-panel-test-stale",
-   "status": "open",
-   "detail": "PRE-EXISTING failure found by the 2026-11-25 LONG HARD TEST (not caused by the M8/F12 work \u2014 both files untouched, diff empty): sundayd src/browser-panel.test.ts expects exactly 8 browser/panel/* methods, but registerBrowserPanelMethods registers 11 at f9a5035d (F11 added accessibility-scan, viewport-matrix, visual-diff; the test expectation was never updated). sundayd suite 514/515 because of this one test. Fix: update EXPECTED_METHODS to the 11 methods."
+   "status": "done",
+   "detail": "DONE 2026-11-25 (unpushed, needs PAT): EXPECTED_METHODS updated 8 -> 11 (F11 added accessibility-scan, viewport-matrix, visual-diff) + disabled-error test now passes valid params for viewport-matrix (url) and visual-diff (beforePng/afterPng), which validate params before the enabled check. sundayd suite 515/515 local, typecheck clean."
   },
   {
    "id": "eval-quota-fairness-flake",
    "status": "note",
    "detail": "NOTE from the 2026-11-25 LONG HARD TEST: eval task parallel-quota-fairness (30ms-window contention vs the real gateway MultiAgentScheduler) failed once as 30/31 under full-suite CPU load (unit-b starved) and passed 9/9 in isolation immediately after (eval suite 52/52). Timing-sensitive, not related to the M8/F12 changes (no shell commands involved). Re-run in isolation if it ever goes red in CI."
   },
-
   {
    "id": "openrouter-free-models",
    "status": "done",
    "detail": "DONE 2026-11-25 (unpushed, needs PAT): all 12 live OpenRouter free models added as selectable entries in DEFAULT_OPENROUTER_MODELS (packages/gateway/src/providers.ts) \u2014 openrouter/free auto-router + Gemma 4 26B/31B, Nemotron Lightning/Nano-reasoning/Ultra-550B/Super-VL, Ling 3.2 Flash, Ernie 5.5 Flash, Particle 1, Flint v1.0, LFM 3 1.7B; context windows from the live /v1/models API (prompt price $0). supportsTools=false (unverified on free tier), supportsFim=false; paid defaults stay first, routing defaults unchanged. Picker shows them via daemon models/list (BYOK models pass gateModelList ungated). Docs: docs/PROVIDER_SETUP.md free-models table. Tests: 1 new gateway test; gateway suite 107/107, typecheck clean. NOTE: free set rotates \u2014 old :free variants of llama-3.3-70b/qwen-coder are no longer free (verified 2026-11-25); Lyria audio models excluded (not chat)."
+  },
+  {
+   "id": "ci-evidence-hardcoded-path",
+   "status": "done",
+   "detail": "DONE 2026-11-25 (unpushed, needs PAT): CI 'Product tests' on 0f17dd16 failed on ALL 3 platforms at packages/orchestrator/src/evidence.test.ts:159 \u2014 detectChecks() was called with the hardcoded absolute path '/home/hatch/workspace/sunday-product/packages/orchestrator', which exists only on the author's VM; on CI runners it returned [] so 'expected [] to include test' failed. Root cause is pre-existing at f9a5035d, unrelated to the M8/F12 changes. Fix: path derived from the test file location via fileURLToPath(import.meta.url). Orchestrator suite 121/121 local, typecheck clean. Only hardcoded /home/hatch path in any test."
   }
  ]
 }
