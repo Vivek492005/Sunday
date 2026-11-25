@@ -109,5 +109,42 @@
   "green": 1,
   "total": 11
  },
- "updated": "2026-10-11T07:30:56+00:00"
+ "updated": "2026-11-25T13:19:53+00:00",
+ "open_items": [
+  {
+   "id": "M8-recording",
+   "status": "done",
+   "detail": "DONE 2026-11-25 (commit 3323d87d): takeover finalizes the in-progress recording segment (video.webm/trace.zip preserved in the session media dir) and resumes on release into a takeover-<n> segment subdir; browser/recording/start blocked during takeover; explicit stop during the pause reports the paused segment and cancels resume. PlaywrightDriver.stopRecording now truly stops video capture (relaunch without recordVideo \u2014 previously the context kept recording after a stop). Tests: 3 new M8-recording tests; browserd suite 77/77, typecheck clean."
+  },
+  {
+   "id": "M9-dns-rebinding",
+   "status": "closed-accepted-risk",
+   "detail": "Privacy M9 (DNS rebinding, policy.ts header + SECURITY_DISPOSITIONS.md SEC-11, Low): CLOSED by decision \u2014 documented as accepted residual risk; robust fix needs DNS pinning at socket-connect time. No code change unless newly scoped."
+  },
+  {
+   "id": "F12-eval-sandbox",
+   "status": "done",
+   "detail": "DONE 2026-11-25 (commit 195c0435): FakeModelAdapter takes a sandbox config stamped on ctx.sandbox; CLI --sandbox off|docker|bubblewrap (default off) + --sandbox-image; fail-fast with a clear error on a missing backend (never silently unsandboxed); trust rule documented in docs/EVAL.md + CLI --help. Also fixed 2 latent bwrap bugs in packages/tools/sandbox.ts (missing --unshare-user; --ro-bind / / breaking /work creation \u2014 now binds toolchain dirs read-only, /home+/root deliberately unbound). Verified LIVE on this VM (bwrap 0.9.0): full 31-task benchmark 31/31 under --sandbox bubblewrap; eval suite 52/52, tools 119/119, typechecks clean. Docker NOT installed here \u2014 docker-mode runs need a machine with Docker."
+  },
+  {
+   "id": "sign-out-token",
+   "status": "open",
+   "detail": "Known partial since 2.1.1: sign-out cannot unset the token in the running daemon (accountView delegates to auth extension sunday.google.signOut; no daemon-side token clear found in sundayd)."
+  },
+  {
+   "id": "labels-correction-2026-11-25",
+   "status": "note",
+   "detail": "CORRECTION: memory recorded open items as \"M8 sync IO, M9 watchdog, F12 fake model\" \u2014 those labels are unverified shorthand with no matching definitions in repo/docs. True items are as listed here (privacy-audit M8/M9 numbering; F12 = eval FakeModelAdapter sandbox)."
+  },
+  {
+   "id": "sundayd-panel-test-stale",
+   "status": "open",
+   "detail": "PRE-EXISTING failure found by the 2026-11-25 LONG HARD TEST (not caused by the M8/F12 work \u2014 both files untouched, diff empty): sundayd src/browser-panel.test.ts expects exactly 8 browser/panel/* methods, but registerBrowserPanelMethods registers 11 at f9a5035d (F11 added accessibility-scan, viewport-matrix, visual-diff; the test expectation was never updated). sundayd suite 514/515 because of this one test. Fix: update EXPECTED_METHODS to the 11 methods."
+  },
+  {
+   "id": "eval-quota-fairness-flake",
+   "status": "note",
+   "detail": "NOTE from the 2026-11-25 LONG HARD TEST: eval task parallel-quota-fairness (30ms-window contention vs the real gateway MultiAgentScheduler) failed once as 30/31 under full-suite CPU load (unit-b starved) and passed 9/9 in isolation immediately after (eval suite 52/52). Timing-sensitive, not related to the M8/F12 changes (no shell commands involved). Re-run in isolation if it ever goes red in CI."
+  }
+ ]
 }
