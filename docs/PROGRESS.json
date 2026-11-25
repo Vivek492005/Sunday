@@ -109,7 +109,7 @@
   "green": 1,
   "total": 11
  },
- "updated": "2026-11-25T13:38:00+00:00",
+ "updated": "2026-11-25T14:06:00+00:00",
  "open_items": [
   {
    "id": "M8-recording",
@@ -155,6 +155,11 @@
    "id": "ci-evidence-hardcoded-path",
    "status": "done",
    "detail": "DONE 2026-11-25 (unpushed, needs PAT): CI 'Product tests' on 0f17dd16 failed on ALL 3 platforms at packages/orchestrator/src/evidence.test.ts:159 \u2014 detectChecks() was called with the hardcoded absolute path '/home/hatch/workspace/sunday-product/packages/orchestrator', which exists only on the author's VM; on CI runners it returned [] so 'expected [] to include test' failed. Root cause is pre-existing at f9a5035d, unrelated to the M8/F12 changes. Fix: path derived from the test file location via fileURLToPath(import.meta.url). Orchestrator suite 121/121 local, typecheck clean. Only hardcoded /home/hatch path in any test."
+  },
+  {
+   "id": "ci-round2-eval-skills",
+   "status": "done",
+   "detail": "DONE 2026-11-25 (pushed, PAT used once + shredded): CI on 95c437fe still red on all 3 platforms (run 45573772409) with 3 failures previously masked by the orchestrator bail. (1) Ubuntu eval sandbox.test.ts:56 \u2014 new F12 test assumed docker absent, but CI Ubuntu runners have docker; fixed hermetically with the existing setSandboxProbeForTests(() => false) seam. (2) macOS eval sandbox.test.ts:72/108 \u2014 new F12 live-bubblewrap tests ran unconditionally; bubblewrap is Linux-only; fixed with describe.skipIf(process.platform !== 'linux'). (3) Windows skills importers.test.ts:74/113/225 \u2014 memoryFsLike.readdir matched prefixes with a hardcoded '/' separator, so backslash paths never matched and cursor-rules-dir went missing; fixed by normalizing separators in the mock fs + added a Windows-shape regression test (verified: fails without the fix, passes with it). Local: eval 52/52, skills 97/97, typechecks clean. CI re-check scheduled after push; remaining known risk: eval quota-fairness timing flake."
   }
  ]
 }

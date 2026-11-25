@@ -49,19 +49,27 @@ export function memoryFsLike(
       return path in files ? files[path] : null;
     },
     async readdir(path: string): Promise<string[] | null> {
-      const prefix = path.endsWith('/') ? path : path + '/';
+      // Compare with '/' separators throughout: on Windows the paths
+      // carry '\' (node:path.join), but the prefix match and the
+      // first-segment split below are separator-sensitive — with the
+      // old hardcoded '/' the rules dir was never found on Windows
+      // and detectImports missed 'cursor-rules-dir' (CI windows-latest).
+      const norm = (p: string) => p.replace(/\\/g, '/');
+      const npath = norm(path);
+      const prefix = npath.endsWith('/') ? npath : npath + '/';
       const names = new Set<string>();
       let found = false;
       for (const key of Object.keys(files)) {
-        if (key.startsWith(prefix)) {
+        const nkey = norm(key);
+        if (nkey.startsWith(prefix)) {
           found = true;
-          const rest = key.slice(prefix.length);
+          const rest = nkey.slice(prefix.length);
           const slash = rest.indexOf('/');
           names.add(slash === -1 ? rest : rest.slice(0, slash));
         }
       }
       // Also treat explicitly registered dirs (trailing-slash keys) as existing.
-      if (`${path}/` in files) found = true;
+      if (Object.keys(files).some((k) => norm(k) === `${npath}/`)) found = true;
       return found ? [...names] : null;
     },
     homedir(): string {

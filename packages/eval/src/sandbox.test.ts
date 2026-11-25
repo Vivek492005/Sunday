@@ -3,15 +3,18 @@
 // Verifies the --sandbox option end to end: the scripted adapter stamps
 // ctx.sandbox so run_terminal executes inside the sandbox, a missing
 // backend fails fast instead of running unsandboxed, and the default
-// (off) behavior is unchanged. The bubblewrap tests run live here
-// (bwrap is installed on this VM); docker is asserted unavailable
-// (no docker CLI here) via the real availability probe.
+// (off) behavior is unchanged. The bubblewrap tests run live on Linux
+// only (bwrap is Linux-only — they skip on macOS/Windows); the docker
+// fail-fast test injects a probe that reports no binaries, so it does
+// not depend on whether the host happens to have docker installed
+// (CI Ubuntu runners DO have docker — the old version of that test
+// assumed the author's VM and failed there).
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DOCKER_IMAGE } from '@sunday/tools';
+import { DEFAULT_DOCKER_IMAGE, setSandboxProbeForTests } from '@sunday/tools';
 import { FakeModelAdapter } from './adapters.js';
 import { parseSandboxOption, assertSandboxAvailable } from './sandboxOption.js';
 import { TASKS } from './tasks.js';
@@ -50,13 +53,20 @@ describe('eval --sandbox option parsing', () => {
 
 describe('eval sandbox availability (fail fast)', () => {
   it('adapter construction throws when the requested backend is unavailable', () => {
-    // Docker is not installed on this machine — the real probe must fail.
-    expect(
-      () => new FakeModelAdapter({ sandbox: { mode: 'docker', dockerImage: DEFAULT_DOCKER_IMAGE } }),
-    ).toThrow(/docker CLI was not found/);
-    expect(() =>
-      assertSandboxAvailable({ mode: 'docker', dockerImage: DEFAULT_DOCKER_IMAGE }),
-    ).toThrow(/docker CLI was not found/);
+    // Hermetic: inject a probe that reports no backend binary, regardless
+    // of the host. The real probe would pass on machines with docker
+    // installed (CI Ubuntu runners have it) and the test would fail.
+    setSandboxProbeForTests(() => false);
+    try {
+      expect(
+        () => new FakeModelAdapter({ sandbox: { mode: 'docker', dockerImage: DEFAULT_DOCKER_IMAGE } }),
+      ).toThrow(/docker CLI was not found/);
+      expect(() =>
+        assertSandboxAvailable({ mode: 'docker', dockerImage: DEFAULT_DOCKER_IMAGE }),
+      ).toThrow(/docker CLI was not found/);
+    } finally {
+      setSandboxProbeForTests(undefined);
+    }
   });
 
   it('default (off) adapter constructs without a backend', () => {
@@ -65,7 +75,7 @@ describe('eval sandbox availability (fail fast)', () => {
   });
 });
 
-describe('eval sandboxed run (bubblewrap, live)', () => {
+describe.skipIf(process.platform !== 'linux')('eval sandboxed run (bubblewrap, live)', () => {
   it('runs the terminal task sandboxed and returns output', async () => {
     const root = tempRoot('sunday-eval-sandbox-');
     try {

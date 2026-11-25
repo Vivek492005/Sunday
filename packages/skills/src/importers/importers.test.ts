@@ -77,6 +77,20 @@ describe('detectImports', () => {
     expect(kinds).toContain('mcp-cursor-user');
   });
 
+  it('finds the cursor rules dir with Windows-style paths', async () => {
+    // Regression: memoryFsLike.readdir matched prefixes with a hardcoded
+    // '/' separator, so on Windows (backslash paths from node:path.join)
+    // the rules dir was never found and 'cursor-rules-dir' went missing
+    // (CI windows-latest, importers.test.ts:74/113/225). The normalization
+    // makes the same keys match on any host.
+    const fs = memoryFsLike(
+      { '\\ws\\.cursor\\rules\\api.mdc': SAMPLE_CURSOR_RULE_MDC },
+      { home: HOME, platform: 'win32' },
+    );
+    const found = await detectImports({ workspaceDir: '\\ws', fs });
+    expect(found.map((f) => f.kind)).toContain('cursor-rules-dir');
+  });
+
   it('returns empty when nothing exists', async () => {
     const found = await detectImports({ workspaceDir: WS, fs: fsWith({}) });
     expect(found).toEqual([]);
