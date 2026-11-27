@@ -39,10 +39,12 @@ jobs:
         # with TS2307 "Cannot find module '@sunday/...'" (run 45947144093).
         # The loop-guard provider's real package name is `sunday-agent`,
         # not `@sunday/ext-agent` (that filter matched nothing, so its
-        # dist/loopGuard was never built on CI).
+        # dist/loopGuard was never built on CI). It needs `...` too:
+        # its own build failed on CI with TS2307 for '@sunday/mcp'
+        # (run 45948129215) because its workspace deps were unbuilt.
         run: |
           pnpm --filter "@sunday/eval..." build
-          pnpm --filter sunday-agent build
+          pnpm --filter "sunday-agent..." build
 
       - name: Run task pack (3 repetitions for variance)
         run: |
