@@ -152,24 +152,44 @@ export function runHookCommand(
 
     child.stdout?.on('data', (c) => onData(c, 'out'));
     child.stderr?.on('data', (c) => onData(c, 'err'));
+
+    // Whether the kill timer has fired. The promise resolves with the
+    // timeout verdict only AFTER the child has actually exited (see the
+    // close handler + settleTimeout below) — resolving at kill time left
+    // a live process holding its cwd, which made temp-dir cleanup fail
+    // on Windows with EBUSY (sundayd hooks.test.ts, CI run 45577568863).
+    let timedOut = false;
+    let giveUpTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const settleTimeout = () => {
+      // Child exited after the kill, or the bounded exit-wait expired:
+      // the hook result is a timeout either way.
+      if (settled) return;
+      settled = true;
+      clearTimeout(killTimer);
+      if (giveUpTimer) clearTimeout(giveUpTimer);
+      finish({ stdout, stderr, exitCode: null, timedOut: true, truncated });
+    };
+
     child.on('error', (e) => {
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);
+      if (giveUpTimer) clearTimeout(giveUpTimer);
       finish({
         stdout,
         stderr,
         exitCode: null,
-        timedOut: false,
+        timedOut,
         truncated,
-        spawnError: (e as Error).message,
+        spawnError: timedOut ? undefined : (e as Error).message,
       });
     });
 
     // The guarantee: this timer ALWAYS fires and ALWAYS kills.
     const killTimer = setTimeout(() => {
       if (settled) return;
-      settled = true;
+      timedOut = true;
       try {
         child.kill('SIGTERM');
       } catch {
@@ -183,7 +203,10 @@ export function runHookCommand(
           /* already dead */
         }
       }, 500).unref?.();
-      finish({ stdout, stderr, exitCode: null, timedOut: true, truncated });
+      // Bounded wait for the child to actually exit; give up after 2s
+      // so a wedged child can never hang the caller.
+      giveUpTimer = setTimeout(settleTimeout, 2000);
+      giveUpTimer.unref?.();
     }, Math.max(50, timeoutMs));
     // Don't let the timer hold the event loop open by itself.
     (killTimer as unknown as { unref?: () => void }).unref?.();
@@ -192,7 +215,12 @@ export function runHookCommand(
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);
-      finish({ stdout, stderr, exitCode: code, timedOut: false, truncated });
+      if (giveUpTimer) clearTimeout(giveUpTimer);
+      if (timedOut) {
+        finish({ stdout, stderr, exitCode: null, timedOut: true, truncated });
+      } else {
+        finish({ stdout, stderr, exitCode: code, timedOut: false, truncated });
+      }
     });
   });
 }

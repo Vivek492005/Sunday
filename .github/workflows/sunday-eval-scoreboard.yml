@@ -18,7 +18,10 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Pinned to the exact version product-tests uses: bare `9`
+          # failed twice at this step (runs 45601138504, 45803817027)
+          # before any of our code ran.
+          version: 9.15.0
 
       - uses: actions/setup-node@v4
         with:

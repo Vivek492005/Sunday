@@ -18,7 +18,12 @@ import type { StoredSession } from './sessions.js';
 
 let dirs: string[] = [];
 afterEach(() => {
-  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  // Windows can transiently lock a just-used temp dir (a killed hook
+  // child releasing its cwd, AV/indexer) — retry the removal instead of
+  // failing the suite with EBUSY (CI run 45577568863, hooks.test.ts:21).
+  for (const d of dirs) {
+    rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
   dirs = [];
 });
 

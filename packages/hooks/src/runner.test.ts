@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runHookCommand, sanitizeEnv } from './runner.js';
 
@@ -30,6 +33,21 @@ describe('runner', () => {
     expect(r.timedOut).toBe(true);
     // Must return well before the 30s sleep would finish.
     expect(elapsed).toBeLessThan(10000);
+  }, 20000);
+
+  it('timeout resolves only after the child has exited (cwd removable)', async () => {
+    // Regression: the timeout promise used to resolve at kill time while
+    // the child still held its cwd — on Windows, removing that temp dir
+    // then failed with EBUSY (CI run 45577568863, sundayd hooks.test.ts).
+    const dir = mkdtempSync(join(tmpdir(), 'hooks-timeout-cwd-'));
+    const sleepCmd = process.platform === 'win32' ? 'powershell' : 'sleep';
+    const sleepArgs =
+      process.platform === 'win32' ? ['-Command', 'Start-Sleep -Seconds 30'] : ['30'];
+    const r = await runHookCommand(sleepCmd, sleepArgs, { cwd: dir, timeoutMs: 400 });
+    expect(r.timedOut).toBe(true);
+    // The child must be gone by now: its cwd must be removable immediately.
+    expect(() => rmSync(dir, { recursive: true, force: true })).not.toThrow();
+    expect(existsSync(dir)).toBe(false);
   }, 20000);
 
   it('caps output and flags truncation', async () => {
