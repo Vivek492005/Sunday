@@ -9,7 +9,7 @@
   "description": "Sunday CLI frontend \u2014 terminal access to the per-user sundayd agent daemon (Phase 8).",
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "typescript": "^5.6.0",
+    "typescript": "^7.0.2",
     "vitest": "^3.0.0"
   },
   "license": "Apache-2.0",
