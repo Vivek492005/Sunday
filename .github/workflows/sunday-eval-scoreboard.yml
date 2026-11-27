@@ -33,7 +33,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build eval + loop-guard provider
-        run: pnpm --filter @sunday/eval --filter @sunday/ext-agent build
+        # `@sunday/eval...` builds eval AND its workspace deps (protocol,
+        # tools, orchestrator, browserd) — eval's tsc resolves their types
+        # from dist/, so building eval alone failed on a fresh runner
+        # with TS2307 "Cannot find module '@sunday/...'" (run 45947144093).
+        # The loop-guard provider's real package name is `sunday-agent`,
+        # not `@sunday/ext-agent` (that filter matched nothing, so its
+        # dist/loopGuard was never built on CI).
+        run: |
+          pnpm --filter "@sunday/eval..." build
+          pnpm --filter sunday-agent build
 
       - name: Run task pack (3 repetitions for variance)
         run: |
