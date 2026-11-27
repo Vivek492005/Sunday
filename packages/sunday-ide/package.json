@@ -4,7 +4,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "monaco-editor": "^0.52.2",
-    "react": "^18.3.1",
+    "react": "^19.3.1",
     "react-dom": "^18.3.1",
     "adm-zip": "^0.5.16",
     "@sunday/skills": "workspace:*",
@@ -18,7 +18,7 @@
   "description": "Sunday IDE — Sunday's own custom IDE shell (Electron + React + Monaco). Zero VS Code workbench UI; Monaco is used only as the text-editing engine.",
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "@types/react": "^18.3.12",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
